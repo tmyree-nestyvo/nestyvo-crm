@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nestyvo Demo Script</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      color: #1f2937;
+      background: #fff;
+      padding: 48px 56px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 32px;
+      padding-bottom: 24px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    .logo {
+      width: 48px; height: 48px;
+      background: #2563eb;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 22px; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .header-text h1 { font-size: 22px; font-weight: 700; color: #111827; }
+    .header-text p { font-size: 13px; color: #6b7280; margin-top: 2px; }
+    .badge {
+      margin-left: auto;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    /* Setup box */
+    .setup-box {
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 28px;
+      font-size: 13px;
+      color: #92400e;
+    }
+    .setup-box strong { color: #78350f; }
+    /* Section */
+    .section {
+      margin-bottom: 28px;
+      page-break-inside: avoid;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .step-num {
+      width: 28px; height: 28px;
+      background: #2563eb;
+      color: white;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .section-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #111827;
+    }
+    .timing {
+      margin-left: auto;
+      font-size: 12px;
+      color: #9ca3af;
+      font-weight: 500;
+    }
+    .talk-track {
+      font-style: italic;
+      color: #4b5563;
+      margin-bottom: 10px;
+      padding-left: 38px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .content { padding-left: 38px; }
+    /* Prompt box */
+    .prompt {
+      background: #1e293b;
+      color: #a3e635;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+      font-size: 13px;
+      margin: 8px 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .prompt-arrow { color: #60a5fa; flex-shrink: 0; }
+    /* Result box */
+    .result {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #166534;
+      margin: 6px 0 12px 0;
+    }
+    .result strong { font-weight: 600; }
+    /* Confirmation card callout */
+    .confirm-callout {
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #78350f;
+      margin: 6px 0 12px 0;
+    }
+    /* Bullet list */
+    ul { list-style: none; }
+    ul li {
+      padding: 4px 0;
+      font-size: 13px;
+      color: #374151;
+      padding-left: 16px;
+      position: relative;
+    }
+    ul li::before {
+      content: '•';
+      position: absolute;
+      left: 0;
+      color: #2563eb;
+      font-weight: 700;
+    }
+    /* Divider */
+    hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+    /* Closing */
+    .closing {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-top: 8px;
+    }
+    .closing h3 { font-size: 14px; font-weight: 700; color: #1d4ed8; margin-bottom: 8px; }
+    .closing p { font-style: italic; color: #1e40af; font-size: 13px; line-height: 1.7; }
+    /* Footer */
+    .footer {
+      margin-top: 36px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #9ca3af;
+    }
+    @media print {
+      body { padding: 32px 40px; }
+      .section { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo">N</div>
+    <div class="header-text">
+      <h1>Nestyvo Demo Script</h1>
+      <p>Scheduling Copilot &amp; Operations Platform</p>
+    </div>
+    <div class="badge">Charlene · 1:00 PM EST</div>
+  </div>
+
+  <div class="setup-box">
+    <strong>Before she joins:</strong> Log in as <strong>agent@nestyvo.com</strong> (dev mode, no password) · Open the <strong>Dashboard</strong> tab · Keep the <strong>Copilot</strong> tab one click away.
+  </div>
+
+  <!-- Step 1 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="step-num">1</div>
+      <div class="section-title">Agent Dashboard</div>
+      <div class="timing">~30 sec</div>
+    </div>
+    <p class="talk-track">"This is the dashboard a scheduling agent sees at the start of their shift — everything that needs attention, in one place."</p>
+    <div class="content">
+      <ul>
+        <li><strong>5 appointments today</strong> across Dr. Torres and Dr. Patel</li>
+        <li><strong>3 open callbacks</strong> — including 1 overdue</li>
+        <li><strong>1 open cancellation</strong> — Dr. Torres has a 3pm slot that just opened</li>
+        <li><strong>2 waitlist opportunities</strong> ready to fill</li>
+      </ul>
+    </div>
+  </div>
+
+  <hr />
+
+  <!-- Step 2 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="step-num">2</div>
+      <div class="section-title">Copilot — Patient Lookup</div>
+      <div class="timing">~1 min</div>
+    </div>
+    <p class="talk-track">"Instead of navigating through menus to find a patient, agents just describe what they need in plain language."</p>
+    <div class="content">
+      <p style="font-size:12px;color:#6b7280;margin-bottom:4px;">Type in the Copilot tab:</p>
+      <div class="prompt"><span class="prompt-arrow">▶</span> Look up patient Maria Gonzalez</div>
+      <div class="result">
+        <strong>Returns instantly:</strong> Maria Gonzalez · (213) 555-0201 · mgonzalez@email.com · Assigned to Dr. Sarah Torres · No waitlist
+      </div>
+    </div>
+  </div>
+
+  <hr />
+
+  <!-- Step 3 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="step-num">3</div>
+      <div class="section-title">Copilot — Cancellation Fill</div>
+      <div class="timing">~2 min ★ Money demo</div>
+    </div>
+    <p class="talk-track">"This is where it gets powerful. We had a cancellation at 3pm today for Dr. Torres. Watch what happens."</p>
+    <div class="content">
+      <div class="prompt"><span class="prompt-arrow">▶</span> Dr. Torres has a 3pm cancellation today — who should we call first?</div>
+      <div class="result">
+        <strong>AI searches the waitlist, ranks by fit:</strong> Jennifer Walsh · 0 days waiting · Prefers Mon/Wed/Fri mornings · New patient · Match score: 60
+      </div>
+      <p style="font-size:12px;color:#6b7280;margin: 10px 0 4px;">Then type:</p>
+      <div class="prompt"><span class="prompt-arrow">▶</span> Add Jennifer Walsh to the outreach queue and send her a text about the opening</div>
+      <div class="confirm-callout">
+        ⚠️ <strong>Amber confirmation card appears</strong> — shows exactly what will be sent before anything executes. Agent taps <strong>Confirm</strong> to proceed or <strong>Cancel</strong> to abort.
+      </div>
+      <p class="talk-track" style="padding-left:0">"The agent reviews every action before it's taken. Full control, zero mistakes — and a full audit trail for HIPAA compliance."</p>
+    </div>
+  </div>
+
+  <hr />
+
+  <!-- Step 4 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="step-num">4</div>
+      <div class="section-title">Patient Record</div>
+      <div class="timing">~30 sec</div>
+    </div>
+    <p class="talk-track">"Every patient has a full record — appointment history, contact preferences, assigned provider, waitlist status."</p>
+    <div class="content">
+      <ul>
+        <li>Go to <strong>Patients</strong> tab → search <strong>Jennifer</strong></li>
+        <li>Tap her record — shows phone, preferred contact method, assigned provider, appointment history</li>
+        <li><strong>"Ask Copilot"</strong> button links directly to a copilot session with her context loaded</li>
+      </ul>
+    </div>
+  </div>
+
+  <hr />
+
+  <!-- Step 5 -->
+  <div class="section">
+    <div class="section-header">
+      <div class="step-num">5</div>
+      <div class="section-title">Provider Calendar</div>
+      <div class="timing">~30 sec</div>
+    </div>
+    <p class="talk-track">"Agents can see any provider's schedule at a glance — appointments, statuses, virtual vs in-person."</p>
+    <div class="content">
+      <ul>
+        <li>Go to <strong>Calendar</strong> tab → select <strong>Dr. Torres</strong> → today's date</li>
+        <li>Shows full day: completed morning appointments, upcoming afternoon, the cancelled 3pm slot</li>
+        <li>Virtual appointments show a camera icon; in-person show a location pin</li>
+      </ul>
+    </div>
+  </div>
+
+  <hr />
+
+  <div class="closing">
+    <h3>Closing Line</h3>
+    <p>"Everything you just saw — the fill logic, the ranked waitlist matches, the outreach — that's also the same workflow that will run <em>automatically</em> in the background once we flip it to autonomous mode. The copilot is the human-in-the-loop version we're starting with, so the team stays in control while we build trust in the system."</p>
+  </div>
+
+  <div class="footer">
+    <span>Nestyvo · Scheduling Operations Platform</span>
+    <span>nestyvo.com · tmyree@nestyvo.com</span>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: nestyvo_db
+    environment:
+      POSTGRES_DB: nestyvo
+      POSTGRES_USER: nestyvo_user
+      POSTGRES_PASSWORD: nestyvo_dev_pass
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U nestyvo_user -d nestyvo']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: nestyvo_api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: nestyvo
+      DATABASE_USER: nestyvo_user
+      DATABASE_PASSWORD: nestyvo_dev_pass
+    profiles:
+      - full  # `docker compose --profile full up` to include API container
+
+volumes:
+  postgres_data:
