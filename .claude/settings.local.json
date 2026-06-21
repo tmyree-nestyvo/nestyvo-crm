@@ -51,7 +51,21 @@
       "Bash(pandoc --version)",
       "Bash(node -e \"require\\('fs'\\)\")",
       "Bash(open *)",
-      "Bash(git config *)"
+      "Bash(git config *)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "Bash(ssh-keygen -t ed25519 -C \"tmyree@nestyvo.com\" -f ~/.ssh/nestyvo_github -N \"\")",
+      "Bash(chmod 600 ~/.ssh/nestyvo_github)",
+      "Bash(ssh -T git@github.com -o StrictHostKeyChecking=no)",
+      "Bash(railway *)",
+      "Bash(export RAILWAY_TOKEN=f86c7d3d-46a3-4d97-93eb-5c8fbeb71a83)",
+      "Bash(curl *)",
+      "Bash(RAILWAY_TOKEN=f86c7d3d-46a3-4d97-93eb-5c8fbeb71a83 railway whoami)",
+      "Bash(RAILWAY_API_TOKEN=f86c7d3d-46a3-4d97-93eb-5c8fbeb71a83 railway whoami)",
+      "Bash(python3 -c \"import sys,json; fields=json.load\\(sys.stdin\\)['data']['__schema']['mutationType']['fields']; [print\\(f['name']\\) for f in fields if 'service' in f['name'].lower\\(\\) or 'deploy' in f['name'].lower\\(\\) or 'github' in f['name'].lower\\(\\) or 'source' in f['name'].lower\\(\\)]\")",
+      "Bash(python3 -c \"import sys,json; [print\\(f['name']\\) for f in json.load\\(sys.stdin\\)['data']['__type']['inputFields']]\")",
+      "Bash(python3 -c \"import sys,json; n=json.load\\(sys.stdin\\)['data']['deployments']['edges'][0]['node']; print\\('Status:', n['status']\\); print\\('URL:', n.get\\('url','none'\\)\\)\")",
+      "Bash(git commit -m 'feat: support DATABASE_URL for Railway/production deployment *)"
     ]
   }
 }

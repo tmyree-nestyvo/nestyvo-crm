@@ -56,18 +56,28 @@ const ALL_ENTITIES = [
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get('database.host'),
-        port: config.get<number>('database.port'),
-        database: config.get('database.name'),
-        username: config.get('database.user'),
-        password: config.get('database.password'),
-        ssl: config.get<boolean>('database.ssl') ? { rejectUnauthorized: true } : false,
-        entities: ALL_ENTITIES,
-        synchronize: config.get('nodeEnv') === 'development',
-        logging: config.get('nodeEnv') === 'development',
-      }),
+      useFactory: (config: ConfigService): any => {
+        const databaseUrl = process.env.DATABASE_URL;
+        const isProduction = config.get('nodeEnv') === 'production';
+        const shared = {
+          entities: ALL_ENTITIES,
+          synchronize: !isProduction,
+          logging: !isProduction,
+          ssl: isProduction ? { rejectUnauthorized: false } : false,
+        };
+        if (databaseUrl) {
+          return { type: 'postgres', url: databaseUrl, ...shared };
+        }
+        return {
+          type: 'postgres',
+          host: config.get('database.host'),
+          port: config.get<number>('database.port'),
+          database: config.get('database.name'),
+          username: config.get('database.user'),
+          password: config.get('database.password'),
+          ...shared,
+        };
+      },
       inject: [ConfigService],
     }),
     // RolesGuard (APP_GUARD) needs User repo — register it here
