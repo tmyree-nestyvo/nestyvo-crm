@@ -150,19 +150,57 @@ async function seed() {
     ds.getRepository(Patient).create({ practiceId: practice.id, firstName: 'Jennifer', lastName: 'Walsh', dob: '1985-11-08', phone: '(310) 555-0205', preferredContact: PreferredContact.SMS }),
   ]);
 
-  // Today's appointments (for a realistic dashboard)
+  // Helper: build a datetime offset from today
   const today = new Date();
+  const daysAgo = (n: number, h: number, m = 0) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - n);
+    d.setHours(h, m, 0, 0);
+    return d;
+  };
   const appt = (h: number, m: number) => { const d = new Date(today); d.setHours(h, m, 0, 0); return d; };
-  const apptEnd = (h: number, m: number) => { const d = new Date(today); d.setHours(h, m+50, 0, 0); return d; };
+  const apptEnd = (start: Date, durMin = 50) => new Date(start.getTime() + durMin * 60_000);
 
+  // Historical completed appointments (gives cadence algo enough signal)
+  // Maria Gonzalez → Torres, monthly (~28 days)
+  // David Kim      → Torres, bi-weekly (~14 days)
+  // Aisha Johnson  → Patel, weekly (~7 days)
+  // Carlos Rivera  → Patel, every 3 weeks (~21 days)
+  const histAppts: Partial<Appointment>[] = [];
+
+  // Maria — monthly cadence with Torres (last visit today at 9am)
+  for (const daysBack of [28, 56, 84, 112]) {
+    const s = daysAgo(daysBack, 9);
+    histAppts.push({ providerId: p1.id, patientId: patients[0].id, appointmentTypeId: types[1].id, startAt: s, endAt: apptEnd(s), status: AppointmentStatus.COMPLETED, locationType: LocationType.IN_PERSON, createdBy: agentUser.id });
+  }
+  // David — bi-weekly cadence with Torres (last visit today at 10am)
+  for (const daysBack of [14, 28, 42, 56]) {
+    const s = daysAgo(daysBack, 10);
+    histAppts.push({ providerId: p1.id, patientId: patients[1].id, appointmentTypeId: types[1].id, startAt: s, endAt: apptEnd(s), status: AppointmentStatus.COMPLETED, locationType: LocationType.VIRTUAL, createdBy: agentUser.id });
+  }
+  // Aisha — weekly cadence with Patel (last visit 7 days ago — due NOW)
+  for (const daysBack of [7, 14, 21, 28]) {
+    const s = daysAgo(daysBack, 11);
+    histAppts.push({ providerId: p2.id, patientId: patients[2].id, appointmentTypeId: types[3].id, startAt: s, endAt: apptEnd(s), status: AppointmentStatus.COMPLETED, locationType: LocationType.IN_PERSON, createdBy: agentUser.id });
+  }
+  // Carlos — 3-week cadence with Patel (last visit 22 days ago — overdue)
+  for (const daysBack of [22, 43, 64, 85]) {
+    const s = daysAgo(daysBack, 13);
+    histAppts.push({ providerId: p2.id, patientId: patients[3].id, appointmentTypeId: types[3].id, startAt: s, endAt: apptEnd(s), status: AppointmentStatus.COMPLETED, locationType: LocationType.IN_PERSON, createdBy: agentUser.id });
+  }
+
+  await ds.getRepository(Appointment).save(histAppts.map((a) => ds.getRepository(Appointment).create(a)));
+
+  // Today's scheduled / cancelled appointments
+  const todayApptStart = appt(9, 0);
   const appointments = await ds.getRepository(Appointment).save([
-    ds.getRepository(Appointment).create({ providerId: p1.id, patientId: patients[0].id, appointmentTypeId: types[1].id, startAt: appt(9,0), endAt: apptEnd(9,0), status: AppointmentStatus.COMPLETED, locationType: LocationType.IN_PERSON, createdBy: agentUser.id }),
-    ds.getRepository(Appointment).create({ providerId: p1.id, patientId: patients[1].id, appointmentTypeId: types[1].id, startAt: appt(10,0), endAt: apptEnd(10,0), status: AppointmentStatus.COMPLETED, locationType: LocationType.VIRTUAL, createdBy: agentUser.id }),
-    ds.getRepository(Appointment).create({ providerId: p1.id, patientId: patients[2].id, appointmentTypeId: types[1].id, startAt: appt(11,0), endAt: apptEnd(11,0), status: AppointmentStatus.SCHEDULED, locationType: LocationType.IN_PERSON, createdBy: agentUser.id }),
-    ds.getRepository(Appointment).create({ providerId: p2.id, patientId: patients[3].id, appointmentTypeId: types[3].id, startAt: appt(13,0), endAt: apptEnd(13,0), status: AppointmentStatus.SCHEDULED, locationType: LocationType.IN_PERSON, createdBy: agentUser.id }),
-    ds.getRepository(Appointment).create({ providerId: p2.id, patientId: patients[0].id, appointmentTypeId: types[3].id, startAt: appt(14,0), endAt: apptEnd(14,0), status: AppointmentStatus.SCHEDULED, locationType: LocationType.VIRTUAL, createdBy: agentUser.id }),
-    // A cancelled appointment that creates a fill opportunity
-    ds.getRepository(Appointment).create({ providerId: p1.id, patientId: patients[4].id, appointmentTypeId: types[1].id, startAt: appt(15,0), endAt: apptEnd(15,0), status: AppointmentStatus.CANCELLED, locationType: LocationType.IN_PERSON, cancelledAt: new Date(), cancellationReason: 'Patient called to cancel', createdBy: agentUser.id }),
+    ds.getRepository(Appointment).create({ providerId: p1.id, patientId: patients[0].id, appointmentTypeId: types[1].id, startAt: appt(9,0), endAt: apptEnd(appt(9,0)), status: AppointmentStatus.COMPLETED, locationType: LocationType.IN_PERSON, createdBy: agentUser.id }),
+    ds.getRepository(Appointment).create({ providerId: p1.id, patientId: patients[1].id, appointmentTypeId: types[1].id, startAt: appt(10,0), endAt: apptEnd(appt(10,0)), status: AppointmentStatus.COMPLETED, locationType: LocationType.VIRTUAL, createdBy: agentUser.id }),
+    ds.getRepository(Appointment).create({ providerId: p1.id, patientId: patients[2].id, appointmentTypeId: types[1].id, startAt: appt(11,0), endAt: apptEnd(appt(11,0)), status: AppointmentStatus.SCHEDULED, locationType: LocationType.IN_PERSON, createdBy: agentUser.id }),
+    ds.getRepository(Appointment).create({ providerId: p2.id, patientId: patients[3].id, appointmentTypeId: types[3].id, startAt: appt(13,0), endAt: apptEnd(appt(13,0)), status: AppointmentStatus.SCHEDULED, locationType: LocationType.IN_PERSON, createdBy: agentUser.id }),
+    ds.getRepository(Appointment).create({ providerId: p2.id, patientId: patients[0].id, appointmentTypeId: types[3].id, startAt: appt(14,0), endAt: apptEnd(appt(14,0)), status: AppointmentStatus.SCHEDULED, locationType: LocationType.VIRTUAL, createdBy: agentUser.id }),
+    // Cancelled appointment → creates a fill opportunity
+    ds.getRepository(Appointment).create({ providerId: p1.id, patientId: patients[4].id, appointmentTypeId: types[1].id, startAt: appt(15,0), endAt: apptEnd(appt(15,0)), status: AppointmentStatus.CANCELLED, locationType: LocationType.IN_PERSON, cancelledAt: new Date(), cancellationReason: 'Patient called to cancel', createdBy: agentUser.id }),
   ]);
 
   // Fill opportunity from the cancellation
