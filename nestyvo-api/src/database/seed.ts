@@ -12,6 +12,7 @@ import { AgentProviderAssignment } from './entities/agent-provider-assignment.en
 import { Appointment, AppointmentStatus, LocationType } from './entities/appointment.entity';
 import { FillOpportunity, FillOpportunityStatus } from './entities/fill-opportunity.entity';
 import { CallbackRequest, CallbackSource, CallbackStatus } from './entities/callback-request.entity';
+import { AuditLog } from './entities/audit-log.entity';
 
 if (!process.env.DATABASE_URL) {
   config({ path: '.env.development' });
@@ -212,6 +213,19 @@ async function seed() {
     ds.getRepository(WaitlistEntry).create({ providerId: p1.id, patientId: patients[4].id, waitlistType: WaitlistType.NEW_PATIENT, appointmentTypeId: types[0].id, preferredDays: [1, 3, 5], preferredTimes: { morning: true, afternoon: false, evening: false }, dateAdded: new Date(), priorityScore: 10 }),
     ds.getRepository(WaitlistEntry).create({ providerId: p2.id, patientId: patients[3].id, waitlistType: WaitlistType.FOLLOWUP, appointmentTypeId: types[3].id, preferredDays: [2, 4], preferredTimes: { morning: false, afternoon: true, evening: false }, dateAdded: new Date(Date.now() - 7 * 86400000), priorityScore: 5 }),
   ]);
+
+  // Seed contact attempt history for demo patients
+  const auditRepo = ds.getRepository(AuditLog);
+  await ds.query(
+    `INSERT INTO audit_logs ("userId", action, "resourceType", "resourceId", "newValues", "createdAt") VALUES
+      ($1,'scheduling_attempt.no_answer','patient',$2,'{"attemptType":"call","outcome":"no_answer","notes":"Rang 4 times, no pickup"}',NOW()-INTERVAL'5 days'),
+      ($1,'scheduling_attempt.voicemail','patient',$2,'{"attemptType":"call","outcome":"voicemail","notes":"Left message to call back"}',NOW()-INTERVAL'3 days'),
+      ($1,'scheduling_attempt.scheduled','patient',$2,'{"attemptType":"call","outcome":"scheduled","notes":"Confirmed Thu 2pm with Dr. Torres"}',NOW()-INTERVAL'1 day'),
+      ($1,'scheduling_attempt.reached','patient',$3,'{"attemptType":"call","outcome":"reached","notes":"Discussed availability"}',NOW()-INTERVAL'7 days'),
+      ($1,'scheduling_attempt.scheduled','patient',$3,'{"attemptType":"call","outcome":"scheduled","notes":"Booked follow-up for next week"}',NOW()-INTERVAL'6 days'),
+      ($1,'scheduling_attempt.busy','patient',$4,'{"attemptType":"call","outcome":"busy"}',NOW()-INTERVAL'2 days')`,
+    [agentUser.id, patients[4].id, patients[0].id, patients[1].id],
+  );
 
   console.log('✅ Seed complete.');
   console.log('');
