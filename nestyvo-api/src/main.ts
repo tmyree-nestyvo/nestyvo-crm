@@ -7,8 +7,13 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.use(helmet());
+  const allowedOrigins = [
+    'http://localhost:8081',
+    'http://localhost:19006',
+    ...(process.env.APP_URL ? [process.env.APP_URL] : []),
+  ];
   app.enableCors({
-    origin: process.env.APP_URL || 'http://localhost:8081',
+    origin: (origin, cb) => cb(null, !origin || allowedOrigins.includes(origin)),
     credentials: true,
   });
   app.useGlobalPipes(

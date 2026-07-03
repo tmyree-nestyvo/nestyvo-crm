@@ -13,22 +13,48 @@ import { Appointment, AppointmentStatus, LocationType } from './entities/appoint
 import { FillOpportunity, FillOpportunityStatus } from './entities/fill-opportunity.entity';
 import { CallbackRequest, CallbackSource, CallbackStatus } from './entities/callback-request.entity';
 
-config({ path: '.env.development' });
+if (!process.env.DATABASE_URL) {
+  config({ path: '.env.development' });
+}
 
-const ds = new DataSource({
-  type: 'postgres',
-  host: process.env.DATABASE_HOST,
-  port: Number(process.env.DATABASE_PORT),
-  database: process.env.DATABASE_NAME,
-  username: process.env.DATABASE_USER,
-  password: process.env.DATABASE_PASSWORD,
-  entities: [__dirname + '/entities/*.entity.ts'],
-  synchronize: true,
-});
+const databaseUrl = process.env.DATABASE_URL;
+const ds = new DataSource(
+  databaseUrl
+    ? {
+        type: 'postgres',
+        url: databaseUrl,
+        ssl: { rejectUnauthorized: false },
+        entities: [__dirname + '/entities/*.entity.ts'],
+        synchronize: true,
+      }
+    : {
+        type: 'postgres',
+        host: process.env.DATABASE_HOST,
+        port: Number(process.env.DATABASE_PORT),
+        database: process.env.DATABASE_NAME,
+        username: process.env.DATABASE_USER,
+        password: process.env.DATABASE_PASSWORD,
+        entities: [__dirname + '/entities/*.entity.ts'],
+        synchronize: true,
+      },
+);
 
 async function seed() {
   await ds.initialize();
   console.log('🌱 Seeding demo data…');
+
+  // Wipe existing demo data so the seed is idempotent
+  await ds.query(`
+    DO $$ BEGIN
+      TRUNCATE TABLE
+        callback_request, fill_opportunity, waitlist_entry, appointment,
+        agent_provider_assignment, "user", provider_availability,
+        provider_appointment_type, provider, patient, practice
+        CASCADE;
+    EXCEPTION WHEN undefined_table THEN NULL;
+    END $$;
+  `);
+  console.log('   Cleared existing data.');
 
   // Practice
   const practice = ds.getRepository(Practice).create({

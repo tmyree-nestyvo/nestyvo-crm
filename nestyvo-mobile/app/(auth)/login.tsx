@@ -14,7 +14,7 @@ import { signIn } from '../../lib/auth';
 import { useAuthStore } from '../../lib/store';
 import { api, API_BASE_URL } from '../../lib/api';
 
-const IS_DEV = API_BASE_URL.includes('localhost');
+const IS_DEV = API_BASE_URL.includes('localhost') || process.env.EXPO_PUBLIC_DEV_AUTH === 'true';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState(IS_DEV ? 'agent@nestyvo.com' : '');
