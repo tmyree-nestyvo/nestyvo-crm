@@ -10,6 +10,7 @@ import { CallbackRequest, CallbackStatus } from '../../database/entities/callbac
 import { AgentProviderAssignment } from '../../database/entities/agent-provider-assignment.entity';
 import { ProviderAvailability } from '../../database/entities/provider-availability.entity';
 import { ProviderBlock } from '../../database/entities/provider-block.entity';
+import { Patient } from '../../database/entities/patient.entity';
 
 @Injectable()
 export class DashboardService {
@@ -22,6 +23,7 @@ export class DashboardService {
     @InjectRepository(AgentProviderAssignment) private assignmentRepo: Repository<AgentProviderAssignment>,
     @InjectRepository(ProviderAvailability) private availabilityRepo: Repository<ProviderAvailability>,
     @InjectRepository(ProviderBlock) private blockRepo: Repository<ProviderBlock>,
+    @InjectRepository(Patient) private patientRepo: Repository<Patient>,
   ) {}
 
   async getAgentDashboard(user: User): Promise<any> {
@@ -159,6 +161,106 @@ export class DashboardService {
         type: a.appointmentType?.name, status: a.status, locationType: a.locationType,
       })),
     };
+  }
+
+  async getAgentCallbacks(user: User): Promise<any[]> {
+    const callbacks = await this.callbackRepo.find({
+      where: {
+        assignedAgentId: user.id,
+        status: In([CallbackStatus.OPEN, CallbackStatus.IN_PROGRESS, CallbackStatus.OVERDUE]),
+      },
+      relations: { patient: true },
+      order: { status: 'DESC', createdAt: 'ASC' },
+    });
+
+    return callbacks.map((c) => ({
+      id: c.id,
+      status: c.status,
+      source: c.source,
+      notes: c.notes,
+      dueAt: c.dueAt,
+      createdAt: c.createdAt,
+      patient: {
+        id: c.patient.id,
+        name: `${c.patient.firstName} ${c.patient.lastName}`,
+        phone: c.patient.phone,
+        email: c.patient.email,
+        preferredContact: c.patient.preferredContact,
+      },
+    }));
+  }
+
+  async getAgentCancellations(user: User): Promise<any[]> {
+    const assignments = await this.assignmentRepo.find({
+      where: { agentUserId: user.id, isActive: true },
+    });
+    const providerIds = assignments.map((a) => a.providerId);
+    if (!providerIds.length) return [];
+
+    const opps = await this.fillOpRepo.find({
+      where: { providerId: In(providerIds), status: FillOpportunityStatus.OPEN },
+      relations: { provider: true, sourceAppointment: { patient: true }, appointmentType: true },
+      order: { slotStartAt: 'ASC' },
+    });
+
+    return opps.map((o) => ({
+      id: o.id,
+      slotStartAt: o.slotStartAt,
+      slotEndAt: o.slotEndAt,
+      appointmentType: o.appointmentType?.name,
+      createdAt: o.createdAt,
+      provider: {
+        id: o.provider.id,
+        name: `${o.provider.firstName} ${o.provider.lastName}`,
+        credentials: o.provider.credentials,
+      },
+      cancelledPatient: o.sourceAppointment?.patient
+        ? {
+            name: `${o.sourceAppointment.patient.firstName} ${o.sourceAppointment.patient.lastName}`,
+            phone: o.sourceAppointment.patient.phone,
+          }
+        : null,
+      cancellationReason: o.sourceAppointment?.cancellationReason ?? null,
+      cancelledAt: o.sourceAppointment?.cancelledAt ?? null,
+    }));
+  }
+
+  async getAgentWaitlist(user: User): Promise<any[]> {
+    const assignments = await this.assignmentRepo.find({
+      where: { agentUserId: user.id, isActive: true },
+    });
+    const providerIds = assignments.map((a) => a.providerId);
+    if (!providerIds.length) return [];
+
+    const entries = await this.waitlistRepo.find({
+      where: { providerId: In(providerIds), status: WaitlistEntryStatus.ACTIVE },
+      relations: { provider: true, patient: true, appointmentType: true },
+      order: { providerId: 'ASC', priorityScore: 'DESC', dateAdded: 'ASC' },
+    });
+
+    return entries.map((e) => ({
+      id: e.id,
+      waitlistType: e.waitlistType,
+      priorityScore: e.priorityScore,
+      preferredDays: e.preferredDays,
+      preferredTimes: e.preferredTimes,
+      dateAdded: e.dateAdded,
+      notes: e.notes,
+      daysWaiting: Math.floor((Date.now() - new Date(e.dateAdded).getTime()) / 86_400_000),
+      provider: {
+        id: e.provider.id,
+        name: `${e.provider.firstName} ${e.provider.lastName}`,
+        credentials: e.provider.credentials,
+      },
+      patient: {
+        id: e.patient.id,
+        name: `${e.patient.firstName} ${e.patient.lastName}`,
+        phone: e.patient.phone,
+        email: e.patient.email,
+        preferredContact: e.patient.preferredContact,
+      },
+      appointmentType: e.appointmentType?.name,
+    }));
   }
 }
 

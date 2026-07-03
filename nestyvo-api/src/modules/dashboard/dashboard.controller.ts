@@ -22,4 +22,22 @@ export class DashboardController {
   getProviderDashboard(@CurrentUser() user: User) {
     return this.dashboardService.getProviderDashboard(user);
   }
+
+  @Get('agent/callbacks')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  getAgentCallbacks(@CurrentUser() user: User) {
+    return this.dashboardService.getAgentCallbacks(user);
+  }
+
+  @Get('agent/cancellations')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  getAgentCancellations(@CurrentUser() user: User) {
+    return this.dashboardService.getAgentCancellations(user);
+  }
+
+  @Get('agent/waitlist')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  getAgentWaitlist(@CurrentUser() user: User) {
+    return this.dashboardService.getAgentWaitlist(user);
+  }
 }

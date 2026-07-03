@@ -8,6 +8,7 @@ import { CallbackRequest } from '../../database/entities/callback-request.entity
 import { AgentProviderAssignment } from '../../database/entities/agent-provider-assignment.entity';
 import { ProviderAvailability } from '../../database/entities/provider-availability.entity';
 import { ProviderBlock } from '../../database/entities/provider-block.entity';
+import { Patient } from '../../database/entities/patient.entity';
 import { User } from '../../database/entities/user.entity';
 import { DashboardService } from './dashboard.service';
 import { DashboardController } from './dashboard.controller';
@@ -23,6 +24,7 @@ import { DashboardController } from './dashboard.controller';
       AgentProviderAssignment,
       ProviderAvailability,
       ProviderBlock,
+      Patient,
       User,
     ]),
   ],
