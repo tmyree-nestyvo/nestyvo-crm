@@ -43,11 +43,12 @@ const OUTCOMES = [
   { key: 'wrong_number', label: 'Wrong #',     icon: 'ban' as const,              color: '#9ca3af' },
 ];
 
+const TZ = 'America/Los_Angeles';
 function fmt(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: TZ });
 }
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: TZ });
 }
 function cadenceLabel(days: number) {
   if (days <= 7) return 'Weekly';

@@ -17,8 +17,9 @@ function useDashboard() {
   });
 }
 
+const TZ = 'America/Los_Angeles';
 function fmt(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: TZ });
 }
 
 function ProviderSlotGroup({ provider }: { provider: any }) {
@@ -183,7 +184,7 @@ export default function AgentDashboard() {
             icon="call-outline"
             color="#d97706"
             badge={data?.openCallbacks}
-            onPress={() => router.push('/(agent)/copilot')}
+            onPress={() => router.push('/(agent)/callbacks')}
           />
         </View>
         <View className="flex-row gap-3 mb-6">
@@ -193,13 +194,14 @@ export default function AgentDashboard() {
             icon="close-circle-outline"
             color="#dc2626"
             badge={data?.openCancellations}
-            onPress={() => router.push('/(agent)/copilot')}
+            onPress={() => router.push('/(agent)/cancellations')}
           />
           <StatCard
             label="Waitlist"
             value={data?.waitlistOpportunities ?? '—'}
             icon="list-outline"
             color="#7c3aed"
+            onPress={() => router.push('/(agent)/waitlist')}
           />
         </View>
 
