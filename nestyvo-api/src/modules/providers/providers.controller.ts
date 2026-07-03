@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Param, Query, Body, UseGuards } from '@nestjs/common';
-import { IsString, IsOptional, IsEnum } from 'class-validator';
+import { Controller, Get, Post, Param, Query, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { IsString, IsOptional, IsEnum, IsDateString } from 'class-validator';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Appointment, AppointmentStatus, LocationType } from '../../database/entities/appointment.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
+import { ProviderBlock, BlockType } from '../../database/entities/provider-block.entity';
 
 class BookAppointmentDto {
   @IsString() patientId: string;
@@ -28,6 +29,13 @@ class LogAttemptDto {
   @IsOptional() @IsString() notes?: string;
 }
 
+class CreateBlockDto {
+  @IsDateString() startAt: string;
+  @IsDateString() endAt: string;
+  @IsOptional() @IsEnum(BlockType) blockType?: BlockType;
+  @IsOptional() @IsString() reason?: string;
+}
+
 @Controller('providers')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ProvidersController {
@@ -36,6 +44,7 @@ export class ProvidersController {
     private fillCandidatesService: FillCandidatesService,
     @InjectRepository(Appointment) private appointmentRepo: Repository<Appointment>,
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
+    @InjectRepository(ProviderBlock) private blockRepo: Repository<ProviderBlock>,
   ) {}
 
   @Get()
@@ -121,5 +130,42 @@ export class ProvidersController {
       }),
     );
     return { success: true };
+  }
+
+  @Post('self/blocks')
+  @Roles(UserRole.PROVIDER)
+  async createBlock(
+    @Body() dto: CreateBlockDto,
+    @CurrentUser() user: User,
+  ) {
+    const provider = await this.providersService.findByUserId(user.id);
+    if (!provider) throw new ForbiddenException('Not a provider account');
+
+    const block = await this.blockRepo.save(
+      this.blockRepo.create({
+        providerId: provider.id,
+        startAt: new Date(dto.startAt),
+        endAt: new Date(dto.endAt),
+        blockType: dto.blockType ?? BlockType.OTHER,
+        reason: dto.reason,
+        createdBy: user.id,
+      }),
+    );
+    return { id: block.id, startAt: block.startAt, endAt: block.endAt };
+  }
+
+  @Get('self/blocks')
+  @Roles(UserRole.PROVIDER)
+  async getBlocks(@CurrentUser() user: User) {
+    const provider = await this.providersService.findByUserId(user.id);
+    if (!provider) throw new ForbiddenException('Not a provider account');
+
+    const now = new Date();
+    const thirtyDays = new Date(now.getTime() + 30 * 86_400_000);
+    const blocks = await this.blockRepo.find({
+      where: { providerId: provider.id },
+      order: { startAt: 'ASC' },
+    });
+    return blocks.filter((b) => b.endAt >= now && b.startAt <= thirtyDays);
   }
 }

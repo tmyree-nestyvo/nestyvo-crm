@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike } from 'typeorm';
+import { Repository, ILike, Like } from 'typeorm';
 import { Patient } from '../../database/entities/patient.entity';
 import { Appointment } from '../../database/entities/appointment.entity';
+import { AuditLog } from '../../database/entities/audit-log.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class PatientsService {
   constructor(
     @InjectRepository(Patient) private patientRepo: Repository<Patient>,
     @InjectRepository(Appointment) private appointmentRepo: Repository<Appointment>,
+    @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
   ) {}
 
   async search(query: string, user: User): Promise<any[]> {
@@ -74,5 +76,25 @@ export class PatientsService {
         locationType: a.locationType,
       })),
     };
+  }
+
+  async getContactAttempts(patientId: string): Promise<any[]> {
+    const logs = await this.auditRepo.find({
+      where: { resourceType: 'patient', resourceId: patientId },
+      relations: { user: true },
+      order: { createdAt: 'DESC' },
+      take: 30,
+    });
+
+    return logs
+      .filter((l) => l.action.startsWith('scheduling_attempt.'))
+      .map((l) => ({
+        id: l.id,
+        outcome: l.action.replace('scheduling_attempt.', ''),
+        attemptType: l.newValues?.attemptType,
+        notes: l.newValues?.notes,
+        agentName: l.user ? `${l.user.firstName} ${l.user.lastName}` : null,
+        createdAt: l.createdAt,
+      }));
   }
 }

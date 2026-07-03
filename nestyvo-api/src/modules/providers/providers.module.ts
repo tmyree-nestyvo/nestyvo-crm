@@ -6,6 +6,7 @@ import { AgentProviderAssignment } from '../../database/entities/agent-provider-
 import { WaitlistEntry } from '../../database/entities/waitlist-entry.entity';
 import { Patient } from '../../database/entities/patient.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
+import { ProviderBlock } from '../../database/entities/provider-block.entity';
 import { User } from '../../database/entities/user.entity';
 import { ProvidersService } from './providers.service';
 import { FillCandidatesService } from './fill-candidates.service';
@@ -15,7 +16,7 @@ import { ProvidersController } from './providers.controller';
   imports: [
     TypeOrmModule.forFeature([
       Provider, Appointment, AgentProviderAssignment,
-      WaitlistEntry, Patient, AuditLog, User,
+      WaitlistEntry, Patient, AuditLog, ProviderBlock, User,
     ]),
   ],
   providers: [ProvidersService, FillCandidatesService],

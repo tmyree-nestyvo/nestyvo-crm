@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards, NotFoundException } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -22,5 +22,11 @@ export class PatientsController {
   @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
   findOne(@Param('id') id: string) {
     return this.patientsService.findById(id);
+  }
+
+  @Get(':id/attempts')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  getAttempts(@Param('id') id: string) {
+    return this.patientsService.getContactAttempts(id);
   }
 }
