@@ -26,6 +26,7 @@ export default function ProviderLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="list" size={size} color={color} />,
         }}
       />
+      <Tabs.Screen name="block-time" options={{ href: null }} />
     </Tabs>
   );
 }

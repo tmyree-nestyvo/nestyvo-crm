@@ -13,9 +13,38 @@ function usePatient(id: string) {
   });
 }
 
+function useAttempts(id: string) {
+  return useQuery({
+    queryKey: ['patient-attempts', id],
+    queryFn: () => api.get(`/patients/${id}/attempts`).then((r) => r.data),
+    staleTime: 30_000,
+  });
+}
+
+const OUTCOME_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
+  scheduled:    { label: 'Scheduled',  icon: 'checkmark-circle', color: '#16a34a' },
+  no_answer:    { label: 'No answer',  icon: 'call',             color: '#6b7280' },
+  voicemail:    { label: 'Voicemail',  icon: 'recording',        color: '#d97706' },
+  declined:     { label: 'Declined',   icon: 'close-circle',     color: '#dc2626' },
+  wrong_number: { label: 'Wrong #',    icon: 'ban',              color: '#9ca3af' },
+  reached:      { label: 'Reached',    icon: 'checkmark',        color: '#2563eb' },
+  busy:         { label: 'Busy',       icon: 'time',             color: '#7c3aed' },
+};
+
+function timeAgo(iso: string) {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return 'Yesterday';
+  return `${days}d ago`;
+}
+
 export default function PatientDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: patient, isLoading } = usePatient(id);
+  const { data: attempts = [] } = useAttempts(id);
 
   if (isLoading) {
     return (
@@ -58,6 +87,41 @@ export default function PatientDetailScreen() {
           <InfoRow icon="list-outline" label="Waitlist" value={patient?.waitlistStatus ?? '—'} />
           <InfoRow icon="git-network-outline" label="Referral" value={patient?.referralSource ?? '—'} />
         </View>
+
+        {/* Contact History */}
+        {attempts.length > 0 && (
+          <>
+            <Text className="text-base font-semibold text-gray-900 mb-3">Contact History</Text>
+            <View className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-4">
+              {attempts.map((a: any, i: number) => {
+                const cfg = OUTCOME_CONFIG[a.outcome] ?? { label: a.outcome, icon: 'ellipse', color: '#9ca3af' };
+                return (
+                  <View
+                    key={a.id}
+                    className={`px-4 py-3 flex-row items-center gap-3 ${i < attempts.length - 1 ? 'border-b border-gray-50' : ''}`}
+                  >
+                    <View className="w-7 h-7 rounded-full items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: `${cfg.color}18` }}>
+                      <Ionicons name={cfg.icon} size={14} color={cfg.color} />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-gray-800 text-sm font-medium">{cfg.label}</Text>
+                      {a.notes ? (
+                        <Text className="text-gray-400 text-xs mt-0.5 italic">"{a.notes}"</Text>
+                      ) : null}
+                    </View>
+                    <View className="items-end">
+                      <Text className="text-gray-400 text-xs">{timeAgo(a.createdAt)}</Text>
+                      {a.agentName ? (
+                        <Text className="text-gray-300 text-xs mt-0.5">{a.agentName.split(' ')[0]}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        )}
 
         {/* Recent Appointments */}
         <Text className="text-base font-semibold text-gray-900 mb-3">Recent Appointments</Text>

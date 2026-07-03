@@ -53,9 +53,18 @@ export default function ProviderScheduleScreen() {
           <Text className="text-gray-500 text-sm">Provider View</Text>
           <Text className="text-xl font-bold text-gray-900">Dr. {name?.split(' ').pop()}</Text>
         </View>
-        <TouchableOpacity onPress={handleSignOut} className="p-2">
-          <Ionicons name="log-out-outline" size={22} color="#6b7280" />
-        </TouchableOpacity>
+        <View className="flex-row items-center gap-2">
+          <TouchableOpacity
+            onPress={() => router.push('/(provider)/block-time')}
+            className="flex-row items-center gap-1.5 bg-gray-100 px-3 py-2 rounded-xl"
+          >
+            <Ionicons name="remove-circle-outline" size={16} color="#374151" />
+            <Text className="text-gray-700 text-sm font-medium">Block time</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSignOut} className="p-2">
+            <Ionicons name="log-out-outline" size={22} color="#6b7280" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
