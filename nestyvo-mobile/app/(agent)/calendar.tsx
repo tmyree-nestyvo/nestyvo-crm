@@ -129,7 +129,7 @@ export default function CalendarScreen() {
                   }`}
                 >
                   <Text className={`text-sm font-medium ${active ? 'text-white' : 'text-gray-700'}`}>
-                    {p.firstName} {p.lastName}
+                    {p.name}
                   </Text>
                   {openCount > 0 && (
                     <View className={`rounded-full px-1.5 py-0.5 ${active ? 'bg-white/20' : 'bg-green-100'}`}>
@@ -241,7 +241,7 @@ export default function CalendarScreen() {
                 {selectedSlots.length > 0
                   ? `${selectedSlots.length} open slot${selectedSlots.length !== 1 ? 's' : ''}`
                   : 'No open slots'}
-                {selectedProvider ? ` · ${selectedProvider.firstName} ${selectedProvider.lastName}` : ''}
+                {selectedProvider ? ` · ${selectedProvider.name}` : ''}
               </Text>
             </View>
           </View>
@@ -278,9 +278,7 @@ export default function CalendarScreen() {
                       pathname: '/(agent)/fill-slot',
                       params: {
                         providerId: activeProviderId,
-                        providerName: selectedProvider
-                          ? `${selectedProvider.firstName} ${selectedProvider.lastName}`
-                          : '',
+                        providerName: selectedProvider?.name ?? '',
                         slotStartAt: slot.startAt,
                         slotEndAt: slot.endAt,
                       },
