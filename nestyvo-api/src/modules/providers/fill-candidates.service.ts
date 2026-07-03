@@ -56,14 +56,15 @@ export class FillCandidatesService {
       this.getCadenceCandidates(providerId, slotStartAt, visitHistory, allAppts),
     ]);
 
-    // Merge — waitlist patients take precedence, no duplicates
+    // Waitlist always surfaces first (Charlene requirement), cadence after.
+    // Each group is sorted by score within itself.
     const waitlistPatientIds = new Set(waitlistEntries.map((c) => c.patientId));
-    const merged = [
-      ...waitlistEntries,
-      ...cadenceOnlyCandidates.filter((c) => !waitlistPatientIds.has(c.patientId)),
-    ];
+    const sortedWaitlist = waitlistEntries.sort((a, b) => b.score - a.score);
+    const sortedCadence = cadenceOnlyCandidates
+      .filter((c) => !waitlistPatientIds.has(c.patientId))
+      .sort((a, b) => b.score - a.score);
 
-    return merged.sort((a, b) => b.score - a.score).slice(0, 15);
+    return [...sortedWaitlist, ...sortedCadence].slice(0, 15);
   }
 
   private async getWaitlistCandidates(
