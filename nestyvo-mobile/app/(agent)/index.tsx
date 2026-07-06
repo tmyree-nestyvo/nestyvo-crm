@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore } from '../../lib/store';
+import { useAuthStore, UserRole } from '../../lib/store';
 import { api } from '../../lib/api';
 import { StatCard } from '../../components/dashboard/StatCard';
 import { signOut } from '../../lib/auth';
@@ -135,7 +135,7 @@ function ProviderSlotGroup({ provider }: { provider: any }) {
 }
 
 export default function AgentDashboard() {
-  const { name, clearAuth } = useAuthStore();
+  const { name, role, clearAuth } = useAuthStore();
   const { data, isLoading, refetch, isRefetching } = useDashboard();
   const [allExpanded, setAllExpanded] = useState(false);
 
@@ -160,9 +160,20 @@ export default function AgentDashboard() {
             Good morning, {name?.split(' ')[0]}
           </Text>
         </View>
-        <TouchableOpacity onPress={handleSignOut} className="p-2">
-          <Ionicons name="log-out-outline" size={22} color="#6b7280" />
-        </TouchableOpacity>
+        <View className="flex-row items-center gap-1">
+          {role === 'administrator' && (
+            <TouchableOpacity
+              onPress={() => router.push('/(provider)')}
+              className="flex-row items-center gap-1 bg-gray-100 px-3 py-1.5 rounded-xl mr-1"
+            >
+              <Ionicons name="person-outline" size={14} color="#374151" />
+              <Text className="text-gray-700 text-xs font-medium">Provider</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={handleSignOut} className="p-2">
+            <Ionicons name="log-out-outline" size={22} color="#6b7280" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -177,6 +188,7 @@ export default function AgentDashboard() {
             value={data?.totalOpenSlots ?? '—'}
             icon="time-outline"
             color="#16a34a"
+            onPress={() => router.push('/(agent)/open-slots')}
           />
           <StatCard
             label="Open Callbacks"

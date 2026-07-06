@@ -169,7 +169,7 @@ export class DashboardService {
         assignedAgentId: user.id,
         status: In([CallbackStatus.OPEN, CallbackStatus.IN_PROGRESS, CallbackStatus.OVERDUE]),
       },
-      relations: { patient: true },
+      relations: { patient: { assignedProvider: true } },
       order: { status: 'DESC', createdAt: 'ASC' },
     });
 
@@ -180,6 +180,12 @@ export class DashboardService {
       notes: c.notes,
       dueAt: c.dueAt,
       createdAt: c.createdAt,
+      provider: c.patient?.assignedProvider
+        ? {
+            name: `${c.patient.assignedProvider.firstName} ${c.patient.assignedProvider.lastName}`,
+            credentials: c.patient.assignedProvider.credentials,
+          }
+        : null,
       patient: {
         id: c.patient.id,
         name: `${c.patient.firstName} ${c.patient.lastName}`,

@@ -72,6 +72,11 @@ export default function CallbacksScreen() {
                 <View className="flex-row items-start justify-between gap-2">
                   <View className="flex-1">
                     <Text className="text-gray-900 font-semibold text-base">{cb.patient.name}</Text>
+                    {cb.provider ? (
+                      <Text className="text-gray-400 text-xs mt-0.5">
+                        {cb.provider.name}{cb.provider.credentials ? ` ${cb.provider.credentials}` : ''}
+                      </Text>
+                    ) : null}
                     <View className="flex-row items-center gap-2 mt-1">
                       <View
                         className={`rounded-full px-2 py-0.5 ${
