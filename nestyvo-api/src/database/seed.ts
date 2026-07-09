@@ -199,9 +199,9 @@ async function seed() {
   // Fill opportunities — one open (from today's cancellation), three already filled this month
   await ds.getRepository(FillOpportunity).save([
     ds.getRepository(FillOpportunity).create({ sourceAppointmentId: appointments[5].id, providerId: p1.id, slotStartAt: appt(15,0), slotEndAt: apptEnd(appt(15,0)), appointmentTypeId: types[1].id, status: FillOpportunityStatus.OPEN }),
-    ds.getRepository(FillOpportunity).create({ providerId: p1.id, slotStartAt: daysAgo(5,10), slotEndAt: apptEnd(daysAgo(5,10)), appointmentTypeId: types[0].id, status: FillOpportunityStatus.FILLED }),
-    ds.getRepository(FillOpportunity).create({ providerId: p1.id, slotStartAt: daysAgo(12,14), slotEndAt: apptEnd(daysAgo(12,14)), appointmentTypeId: types[1].id, status: FillOpportunityStatus.FILLED }),
-    ds.getRepository(FillOpportunity).create({ providerId: p2.id, slotStartAt: daysAgo(8,11), slotEndAt: apptEnd(daysAgo(8,11)), appointmentTypeId: types[3].id, status: FillOpportunityStatus.FILLED }),
+    ds.getRepository(FillOpportunity).create({ sourceAppointmentId: appointments[5].id, providerId: p1.id, slotStartAt: daysAgo(5,10), slotEndAt: apptEnd(daysAgo(5,10)), appointmentTypeId: types[0].id, status: FillOpportunityStatus.FILLED }),
+    ds.getRepository(FillOpportunity).create({ sourceAppointmentId: appointments[5].id, providerId: p1.id, slotStartAt: daysAgo(12,14), slotEndAt: apptEnd(daysAgo(12,14)), appointmentTypeId: types[1].id, status: FillOpportunityStatus.FILLED }),
+    ds.getRepository(FillOpportunity).create({ sourceAppointmentId: appointments[5].id, providerId: p2.id, slotStartAt: daysAgo(8,11), slotEndAt: apptEnd(daysAgo(8,11)), appointmentTypeId: types[3].id, status: FillOpportunityStatus.FILLED }),
   ]);
 
   // Open callbacks

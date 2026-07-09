@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, Between } from 'typeorm';
+import { Repository, In, Between, MoreThanOrEqual } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
 import { Provider } from '../../database/entities/provider.entity';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
@@ -302,25 +302,25 @@ export class DashboardService {
         where: {
           providerId: In(providerIds),
           status: In([AppointmentStatus.SCHEDULED, AppointmentStatus.COMPLETED]),
-          createdAt: Between(periodStart, now),
+          createdAt: MoreThanOrEqual(periodStart),
         },
       }),
       this.appointmentRepo.find({
         where: {
           providerId: In(providerIds),
           status: AppointmentStatus.CANCELLED,
-          cancelledAt: Between(periodStart, now),
+          cancelledAt: MoreThanOrEqual(periodStart),
         },
       }),
       this.fillOpRepo.find({
         where: {
           providerId: In(providerIds),
           status: FillOpportunityStatus.FILLED,
-          createdAt: Between(periodStart, now),
+          createdAt: MoreThanOrEqual(periodStart),
         },
       }),
       this.auditRepo.find({
-        where: { createdAt: Between(periodStart, now) },
+        where: { createdAt: MoreThanOrEqual(periodStart) },
       }),
     ]);
 
