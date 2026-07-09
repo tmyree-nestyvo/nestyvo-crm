@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -39,5 +39,11 @@ export class DashboardController {
   @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
   getAgentWaitlist(@CurrentUser() user: User) {
     return this.dashboardService.getAgentWaitlist(user);
+  }
+
+  @Get('agent/stats')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  getAgentStats(@CurrentUser() user: User, @Query('period') period = 'month') {
+    return this.dashboardService.getAgentStats(user, period);
   }
 }

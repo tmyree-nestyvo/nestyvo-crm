@@ -11,6 +11,7 @@ import { AgentProviderAssignment } from '../../database/entities/agent-provider-
 import { ProviderAvailability } from '../../database/entities/provider-availability.entity';
 import { ProviderBlock } from '../../database/entities/provider-block.entity';
 import { Patient } from '../../database/entities/patient.entity';
+import { AuditLog } from '../../database/entities/audit-log.entity';
 
 @Injectable()
 export class DashboardService {
@@ -24,6 +25,7 @@ export class DashboardService {
     @InjectRepository(ProviderAvailability) private availabilityRepo: Repository<ProviderAvailability>,
     @InjectRepository(ProviderBlock) private blockRepo: Repository<ProviderBlock>,
     @InjectRepository(Patient) private patientRepo: Repository<Patient>,
+    @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
   ) {}
 
   async getAgentDashboard(user: User): Promise<any> {
@@ -267,6 +269,103 @@ export class DashboardService {
       },
       appointmentType: e.appointmentType?.name,
     }));
+  }
+
+  async getAgentStats(user: User, period: string): Promise<any> {
+    const assignments = await this.assignmentRepo.find({
+      where: { agentUserId: user.id, isActive: true },
+    });
+    const providerIds = assignments.map((a) => a.providerId);
+    if (!providerIds.length) return { periodLabel: period, providers: [], summary: { scheduled: 0, cancellations: 0, filled: 0, contactsMade: 0, revenueRecovered: 0 } };
+
+    const now = new Date();
+    let periodStart: Date;
+    let periodLabel: string;
+
+    if (period === '7d') {
+      periodStart = new Date(now.getTime() - 7 * 86_400_000);
+      periodLabel = 'Last 7 days';
+    } else if (period === '30d') {
+      periodStart = new Date(now.getTime() - 30 * 86_400_000);
+      periodLabel = 'Last 30 days';
+    } else {
+      // Default: this calendar month
+      periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      periodLabel = now.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'America/Los_Angeles' });
+    }
+
+    const providers = await this.providerRepo.findBy({ id: In(providerIds) });
+
+    // Fetch all data for the period in bulk, then group by provider
+    const [scheduledAppts, cancelledAppts, filledOpps, auditEntries] = await Promise.all([
+      this.appointmentRepo.find({
+        where: {
+          providerId: In(providerIds),
+          status: In([AppointmentStatus.SCHEDULED, AppointmentStatus.COMPLETED]),
+          createdAt: Between(periodStart, now),
+        },
+      }),
+      this.appointmentRepo.find({
+        where: {
+          providerId: In(providerIds),
+          status: AppointmentStatus.CANCELLED,
+          cancelledAt: Between(periodStart, now),
+        },
+      }),
+      this.fillOpRepo.find({
+        where: {
+          providerId: In(providerIds),
+          status: FillOpportunityStatus.FILLED,
+          createdAt: Between(periodStart, now),
+        },
+      }),
+      this.auditRepo.find({
+        where: { createdAt: Between(periodStart, now) },
+      }),
+    ]);
+
+    // Filter audit entries to scheduling attempts for our providers
+    const contactAttempts = auditEntries.filter(
+      (a) => a.action.startsWith('scheduling_attempt.') && providerIds.includes((a.newValues as any)?.providerId),
+    );
+
+    const SESSION_RATE = 150; // default $/session until per-provider rate is configured
+
+    const providerStats = providers.map((p) => {
+      const scheduled = scheduledAppts.filter((a) => a.providerId === p.id).length;
+      const cancellations = cancelledAppts.filter((a) => a.providerId === p.id).length;
+      const filled = filledOpps.filter((o) => o.providerId === p.id).length;
+      const contactsMade = contactAttempts.filter((a) => (a.newValues as any)?.providerId === p.id).length;
+      const revenueRecovered = filled * SESSION_RATE;
+      const fillRate = scheduled + cancellations > 0
+        ? Math.round((scheduled / (scheduled + cancellations)) * 100)
+        : null;
+
+      return {
+        id: p.id,
+        name: `${p.firstName} ${p.lastName}`,
+        credentials: p.credentials,
+        scheduled,
+        cancellations,
+        filled,
+        contactsMade,
+        revenueRecovered,
+        fillRate,
+      };
+    });
+
+    const summary = providerStats.reduce(
+      (acc, p) => ({
+        scheduled: acc.scheduled + p.scheduled,
+        cancellations: acc.cancellations + p.cancellations,
+        filled: acc.filled + p.filled,
+        contactsMade: acc.contactsMade + p.contactsMade,
+        revenueRecovered: acc.revenueRecovered + p.revenueRecovered,
+      }),
+      { scheduled: 0, cancellations: 0, filled: 0, contactsMade: 0, revenueRecovered: 0 },
+    );
+
+    return { periodLabel, providers: providerStats, summary };
   }
 }
 

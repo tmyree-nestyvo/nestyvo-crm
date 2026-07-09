@@ -54,6 +54,7 @@ export default function AgentLayout() {
         }}
       />
       <Tabs.Screen name="open-slots" options={{ href: null }} />
+      <Tabs.Screen name="stats" options={{ href: null }} />
       <Tabs.Screen name="patients/[id]" options={{ href: null }} />
       <Tabs.Screen name="fill-slot" options={{ href: null }} />
       <Tabs.Screen name="callbacks" options={{ href: null }} />

@@ -161,6 +161,12 @@ export default function AgentDashboard() {
           </Text>
         </View>
         <View className="flex-row items-center gap-1">
+          <TouchableOpacity
+            onPress={() => router.push('/(agent)/stats')}
+            className="p-2"
+          >
+            <Ionicons name="bar-chart-outline" size={22} color="#6b7280" />
+          </TouchableOpacity>
           {role === 'administrator' && (
             <TouchableOpacity
               onPress={() => router.push('/(provider)')}
