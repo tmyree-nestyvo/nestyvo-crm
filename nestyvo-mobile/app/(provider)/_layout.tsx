@@ -20,6 +20,13 @@ export default function ProviderLayout() {
         }}
       />
       <Tabs.Screen
+        name="clients"
+        options={{
+          title: 'Clients',
+          tabBarIcon: ({ color, size }) => <Ionicons name="people" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="waitlist"
         options={{
           title: 'Waitlist',

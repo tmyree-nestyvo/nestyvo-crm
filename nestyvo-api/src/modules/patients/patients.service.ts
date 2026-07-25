@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike, Like } from 'typeorm';
+import { Repository, ILike, In } from 'typeorm';
 import { Patient } from '../../database/entities/patient.entity';
-import { Appointment } from '../../database/entities/appointment.entity';
+import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
+import { Provider } from '../../database/entities/provider.entity';
 
 @Injectable()
 export class PatientsService {
@@ -12,6 +13,7 @@ export class PatientsService {
     @InjectRepository(Patient) private patientRepo: Repository<Patient>,
     @InjectRepository(Appointment) private appointmentRepo: Repository<Appointment>,
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
+    @InjectRepository(Provider) private providerRepo: Repository<Provider>,
   ) {}
 
   async search(query: string, user: User): Promise<any[]> {
@@ -75,6 +77,82 @@ export class PatientsService {
         status: a.status,
         locationType: a.locationType,
       })),
+    };
+  }
+
+  async getRoster(user: User): Promise<{ active: any[]; inactive: any[] }> {
+    let patients: Patient[];
+
+    if (user.role === UserRole.PROVIDER) {
+      const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
+      if (!provider) return { active: [], inactive: [] };
+      patients = await this.patientRepo.find({
+        where: { assignedProviderId: provider.id },
+        order: { lastName: 'ASC', firstName: 'ASC' },
+      });
+    } else {
+      patients = await this.patientRepo.find({
+        where: { practiceId: user.practiceId },
+        order: { lastName: 'ASC', firstName: 'ASC' },
+      });
+    }
+
+    if (patients.length === 0) return { active: [], inactive: [] };
+
+    const now = new Date();
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const patientIds = patients.map((p) => p.id);
+
+    const allAppts = await this.appointmentRepo.find({
+      where: { patientId: In(patientIds) },
+      order: { startAt: 'DESC' },
+    });
+
+    const apptsByPatient = new Map<string, Appointment[]>();
+    for (const a of allAppts) {
+      if (!apptsByPatient.has(a.patientId)) apptsByPatient.set(a.patientId, []);
+      apptsByPatient.get(a.patientId)!.push(a);
+    }
+
+    const mapped = patients.map((p) => {
+      const appts = apptsByPatient.get(p.id) ?? [];
+      const lastAppt = appts.find(
+        (a) => new Date(a.startAt) <= now && a.status === AppointmentStatus.COMPLETED,
+      );
+      const nextAppt = [...appts].reverse().find(
+        (a) => new Date(a.startAt) > now && a.status === AppointmentStatus.SCHEDULED,
+      );
+
+      const isActive = !!(
+        (lastAppt && new Date(lastAppt.startAt) >= ninetyDaysAgo) || nextAppt
+      );
+
+      let age: number | null = null;
+      if (p.dob) {
+        age = Math.floor(
+          (now.getTime() - new Date(p.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000),
+        );
+      }
+
+      return {
+        id: p.id,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        dob: p.dob,
+        age,
+        phone: p.phone,
+        email: p.email,
+        preferredContact: p.preferredContact,
+        waitlistStatus: p.waitlistStatus,
+        isActive,
+        lastAppt: lastAppt?.startAt ?? null,
+        nextAppt: nextAppt?.startAt ?? null,
+      };
+    });
+
+    return {
+      active: mapped.filter((p) => p.isActive),
+      inactive: mapped.filter((p) => !p.isActive),
     };
   }
 

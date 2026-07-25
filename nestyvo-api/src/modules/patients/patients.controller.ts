@@ -18,6 +18,12 @@ export class PatientsController {
     return this.patientsService.search(query, user);
   }
 
+  @Get('roster')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.PROVIDER, UserRole.PRACTICE_MANAGER)
+  getRoster(@CurrentUser() user: User) {
+    return this.patientsService.getRoster(user);
+  }
+
   @Get(':id')
   @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
   findOne(@Param('id') id: string) {
