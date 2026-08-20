@@ -78,3 +78,25 @@ export const patientLinksApi = {
     api.post('/patient-links', { patientAId, patientBId }).then((r) => r.data),
   remove: (linkId: string) => api.delete(`/patient-links/${linkId}`).then((r) => r.data),
 };
+
+// Client tags (block-size classification)
+export const clientTagsApi = {
+  list: () => api.get('/client-tags').then((r) => r.data),
+  create: (name: string, blockMinutes: number) =>
+    api.post('/client-tags', { name, blockMinutes }).then((r) => r.data),
+  update: (id: string, updates: { name?: string; blockMinutes?: number; isActive?: boolean }) =>
+    api.patch(`/client-tags/${id}`, updates).then((r) => r.data),
+  remove: (id: string) => api.delete(`/client-tags/${id}`).then((r) => r.data),
+  setPatientTag: (patientId: string, tagId: string | null) =>
+    api.patch(`/patients/${patientId}/tag`, { tagId }).then((r) => r.data),
+};
+
+// Tickets (agent → office escalation)
+export const ticketsApi = {
+  list: (status?: string) => api.get('/tickets', { params: { status } }).then((r) => r.data),
+  get: (id: string) => api.get(`/tickets/${id}`).then((r) => r.data),
+  create: (input: { patientId?: string; category: string; priority?: string; subject: string; description: string }) =>
+    api.post('/tickets', input).then((r) => r.data),
+  update: (id: string, updates: { status?: string; assignedToUserId?: string | null; resolutionNotes?: string }) =>
+    api.patch(`/tickets/${id}`, updates).then((r) => r.data),
+};

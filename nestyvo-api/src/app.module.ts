@@ -15,6 +15,8 @@ import { WaitlistModule } from './modules/waitlist/waitlist.module';
 import { AppointmentsModule } from './modules/appointments/appointments.module';
 import { SmsModule } from './modules/sms/sms.module';
 import { PatientLinksModule } from './modules/patient-links/patient-links.module';
+import { ClientTagsModule } from './modules/client-tags/client-tags.module';
+import { TicketsModule } from './modules/tickets/tickets.module';
 import { JwtAuthGuard } from './auth/auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 
@@ -35,6 +37,8 @@ import { AgentProviderAssignment } from './database/entities/agent-provider-assi
 import { CallbackRequest } from './database/entities/callback-request.entity';
 import { AppointmentReminder } from './database/entities/appointment-reminder.entity';
 import { PatientLink } from './database/entities/patient-link.entity';
+import { ClientTag } from './database/entities/client-tag.entity';
+import { Ticket } from './database/entities/ticket.entity';
 
 const ALL_ENTITIES = [
   Practice,
@@ -53,6 +57,8 @@ const ALL_ENTITIES = [
   CallbackRequest,
   AppointmentReminder,
   PatientLink,
+  ClientTag,
+  Ticket,
 ];
 
 @Module({
@@ -101,6 +107,8 @@ const ALL_ENTITIES = [
     AppointmentsModule,
     SmsModule,
     PatientLinksModule,
+    ClientTagsModule,
+    TicketsModule,
   ],
   controllers: [AppController],
   providers: [

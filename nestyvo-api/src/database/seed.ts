@@ -13,6 +13,8 @@ import { Appointment, AppointmentStatus, LocationType } from './entities/appoint
 import { FillOpportunity, FillOpportunityStatus } from './entities/fill-opportunity.entity';
 import { CallbackRequest, CallbackSource, CallbackStatus } from './entities/callback-request.entity';
 import { AuditLog } from './entities/audit-log.entity';
+import { ClientTag } from './entities/client-tag.entity';
+import { Ticket, TicketCategory, TicketPriority, TicketStatus } from './entities/ticket.entity';
 
 if (!process.env.DATABASE_URL) {
   config({ path: '.env.development' });
@@ -149,6 +151,16 @@ async function seed() {
     ds.getRepository(Patient).create({ practiceId: practice.id, firstName: 'Jennifer', lastName: 'Walsh', dob: '1985-11-08', phone: '(310) 555-0205', preferredContact: PreferredContact.SMS }),
   ]);
 
+  // Client tags (block-size classification) + assign a couple for demo
+  const tags = await ds.getRepository(ClientTag).save([
+    ds.getRepository(ClientTag).create({ practiceId: practice.id, name: '30 Min Client', blockMinutes: 30 }),
+    ds.getRepository(ClientTag).create({ practiceId: practice.id, name: '1 Hour Client', blockMinutes: 60 }),
+    ds.getRepository(ClientTag).create({ practiceId: practice.id, name: '90 Min Intake', blockMinutes: 90 }),
+  ]);
+  patients[1].tagId = tags[1].id; // David Kim → 1 Hour Client
+  patients[3].tagId = tags[0].id; // Carlos Rivera → 30 Min Client
+  await ds.getRepository(Patient).save([patients[1], patients[3]]);
+
   // Second practice — different vertical (tax prep), demonstrates multi-partner
   // customer linking: one patient below intentionally shares Maria Gonzalez's phone.
   const taxPractice = ds.getRepository(Practice).create({
@@ -255,6 +267,30 @@ async function seed() {
     ds.getRepository(CallbackRequest).create({ patientId: patients[4].id, source: CallbackSource.MISSED_CALL, status: CallbackStatus.OPEN, assignedAgentId: agentUser.id, notes: 'Patient called back about rescheduling' }),
     ds.getRepository(CallbackRequest).create({ patientId: patients[2].id, source: CallbackSource.WEBSITE, status: CallbackStatus.OPEN, assignedAgentId: agentUser.id, notes: 'New patient inquiry via website form' }),
     ds.getRepository(CallbackRequest).create({ patientId: patients[1].id, source: CallbackSource.VOICEMAIL, status: CallbackStatus.OVERDUE, assignedAgentId: agentUser.id, notes: 'Left voicemail yesterday, needs follow-up' }),
+  ]);
+
+  // Example tickets — agent escalations to the office
+  await ds.getRepository(Ticket).save([
+    ds.getRepository(Ticket).create({
+      practiceId: practice.id,
+      patientId: patients[0].id,
+      category: TicketCategory.BILLING,
+      priority: TicketPriority.NORMAL,
+      subject: 'Insurance card on file is expired',
+      description: 'Maria mentioned her insurance renewed in July but we still have the old card on file. Needs updated info before her next visit.',
+      status: TicketStatus.OPEN,
+      createdByUserId: agentUser.id,
+    }),
+    ds.getRepository(Ticket).create({
+      practiceId: practice.id,
+      patientId: patients[4].id,
+      category: TicketCategory.SCHEDULING,
+      priority: TicketPriority.HIGH,
+      subject: 'Wants a same-day exception outside normal hours',
+      description: 'Jennifer asked about an early-morning slot before 9am — outside current provider availability. Needs office sign-off before we offer that.',
+      status: TicketStatus.OPEN,
+      createdByUserId: agentUser.id,
+    }),
   ]);
 
   // Waitlist entries

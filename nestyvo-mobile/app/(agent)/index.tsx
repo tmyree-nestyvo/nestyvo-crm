@@ -167,6 +167,14 @@ export default function AgentDashboard() {
           >
             <Ionicons name="bar-chart-outline" size={22} color="#6b7280" />
           </TouchableOpacity>
+          {(role === 'administrator' || role === 'practice_manager') && (
+            <TouchableOpacity
+              onPress={() => router.push('/(agent)/tickets')}
+              className="p-2"
+            >
+              <Ionicons name="flag-outline" size={22} color="#6b7280" />
+            </TouchableOpacity>
+          )}
           {role === 'administrator' && (
             <TouchableOpacity
               onPress={() => router.push('/(provider)')}

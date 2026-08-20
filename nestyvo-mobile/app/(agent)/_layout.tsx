@@ -60,6 +60,8 @@ export default function AgentLayout() {
       <Tabs.Screen name="callbacks" options={{ href: null }} />
       <Tabs.Screen name="cancellations" options={{ href: null }} />
       <Tabs.Screen name="waitlist" options={{ href: null }} />
+      <Tabs.Screen name="tags" options={{ href: null }} />
+      <Tabs.Screen name="tickets" options={{ href: null }} />
     </Tabs>
   );
 }

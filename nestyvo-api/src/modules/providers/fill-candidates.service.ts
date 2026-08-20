@@ -23,6 +23,21 @@ export interface FillCandidate {
   preferredTimeMatch: boolean;
   score: number;
   waitlistEntryId?: string;
+  tag: { name: string; blockMinutes: number } | null;
+  tagFit: 'match' | 'under' | 'over' | 'none';
+}
+
+const TAG_MATCH_TOLERANCE_MIN = 10;
+
+function tagFitAdjustment(
+  tag: { name: string; blockMinutes: number } | null | undefined,
+  slotDurationMin: number,
+): { delta: number; fit: FillCandidate['tagFit'] } {
+  if (!tag) return { delta: 0, fit: 'none' };
+  const diff = tag.blockMinutes - slotDurationMin;
+  if (Math.abs(diff) <= TAG_MATCH_TOLERANCE_MIN) return { delta: 40, fit: 'match' };
+  if (diff < 0) return { delta: 15, fit: 'under' };
+  return { delta: -50, fit: 'over' };
 }
 
 @Injectable()
@@ -40,11 +55,12 @@ export class FillCandidatesService {
     const dayOfWeek = slotStartAt.getDay();
     const hour = slotStartAt.getHours();
     const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+    const slotDurationMin = Math.round((slotEndAt.getTime() - slotStartAt.getTime()) / 60_000);
 
     // Fetch all completed/scheduled appointments for this provider to build visit history map
     const allAppts = await this.appointmentRepo.find({
       where: { providerId, status: AppointmentStatus.COMPLETED },
-      relations: { patient: true },
+      relations: { patient: { tag: true } },
       order: { startAt: 'DESC' },
     });
 
@@ -52,8 +68,8 @@ export class FillCandidatesService {
     const visitHistory = buildVisitHistory(allAppts, slotStartAt);
 
     const [waitlistEntries, cadenceOnlyCandidates] = await Promise.all([
-      this.getWaitlistCandidates(providerId, dayOfWeek, timeOfDay, visitHistory, slotStartAt),
-      this.getCadenceCandidates(providerId, slotStartAt, visitHistory, allAppts),
+      this.getWaitlistCandidates(providerId, dayOfWeek, timeOfDay, visitHistory, slotStartAt, slotDurationMin),
+      this.getCadenceCandidates(providerId, slotStartAt, visitHistory, allAppts, slotDurationMin),
     ]);
 
     // Waitlist always surfaces first (Charlene requirement), cadence after.
@@ -73,10 +89,11 @@ export class FillCandidatesService {
     timeOfDay: string,
     visitHistory: Map<string, VisitInfo>,
     slotDate: Date,
+    slotDurationMin: number,
   ): Promise<FillCandidate[]> {
     const entries = await this.waitlistRepo.find({
       where: { providerId, status: WaitlistEntryStatus.ACTIVE },
-      relations: { patient: true, appointmentType: true },
+      relations: { patient: { tag: true }, appointmentType: true },
       order: { priorityScore: 'DESC', dateAdded: 'ASC' },
     });
 
@@ -86,12 +103,15 @@ export class FillCandidatesService {
       const preferredTimeMatch = e.preferredTimes?.[timeOfDay] ?? false;
       const isUrgent = e.waitlistType === WaitlistType.URGENT;
       const visit = visitHistory.get(e.patientId);
+      const tag = e.patient.tag ? { name: e.patient.tag.name, blockMinutes: e.patient.tag.blockMinutes } : null;
+      const { delta: tagDelta, fit: tagFit } = tagFitAdjustment(tag, slotDurationMin);
 
       let score = e.priorityScore + Math.min(daysWaiting, 50);
       if (isUrgent) score += 100;
       if (preferredDayMatch) score += 20;
       if (preferredTimeMatch) score += 10;
       if (visit?.isDue) score += 15;
+      score += tagDelta;
 
       return {
         patientId: e.patient.id,
@@ -111,6 +131,8 @@ export class FillCandidatesService {
         preferredTimeMatch,
         score,
         waitlistEntryId: e.id,
+        tag,
+        tagFit,
       };
     });
   }
@@ -120,6 +142,7 @@ export class FillCandidatesService {
     slotDate: Date,
     visitHistory: Map<string, VisitInfo>,
     allAppts: Appointment[],
+    slotDurationMin: number,
   ): Promise<FillCandidate[]> {
     const candidates: FillCandidate[] = [];
     const seenPatients = new Set<string>();
@@ -140,8 +163,10 @@ export class FillCandidatesService {
       );
       if (hasFutureAppt) continue;
 
-      const score = 30 + Math.min(visit.daysOverdue ?? 0, 30);
       const patient = appt.patient;
+      const tag = patient.tag ? { name: patient.tag.name, blockMinutes: patient.tag.blockMinutes } : null;
+      const { delta: tagDelta, fit: tagFit } = tagFitAdjustment(tag, slotDurationMin);
+      const score = 30 + Math.min(visit.daysOverdue ?? 0, 30) + tagDelta;
 
       candidates.push({
         patientId: appt.patientId,
@@ -158,6 +183,8 @@ export class FillCandidatesService {
         preferredDayMatch: false,
         preferredTimeMatch: false,
         score,
+        tag,
+        tagFit,
       });
     }
 

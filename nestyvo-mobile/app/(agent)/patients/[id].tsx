@@ -1,9 +1,10 @@
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, patientLinksApi } from '../../../lib/api';
+import { api, patientLinksApi, clientTagsApi, ticketsApi } from '../../../lib/api';
 import { AppointmentCard } from '../../../components/dashboard/AppointmentCard';
 import { useAuthStore } from '../../../lib/store';
 
@@ -48,6 +49,7 @@ export default function PatientDetailScreen() {
   const { role } = useAuthStore();
   const { data: patient, isLoading } = usePatient(id);
   const { data: attempts = [] } = useAttempts(id);
+  const [ticketModal, setTicketModal] = useState(false);
 
   if (isLoading) {
     return (
@@ -65,6 +67,13 @@ export default function PatientDetailScreen() {
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
         <Text className="text-lg font-bold text-gray-900 flex-1">{patient?.name}</Text>
+        <TouchableOpacity
+          onPress={() => setTicketModal(true)}
+          className="flex-row items-center gap-1.5 bg-gray-100 px-3 py-1.5 rounded-full mr-2"
+        >
+          <Ionicons name="flag-outline" size={14} color="#374151" />
+          <Text className="text-gray-700 text-xs font-medium">Flag for office</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           onPress={() => router.push(`/(agent)/copilot?context=patient:${id}`)}
           className="flex-row items-center gap-1.5 bg-primary-50 border border-primary-100 px-3 py-1.5 rounded-full"
@@ -90,6 +99,8 @@ export default function PatientDetailScreen() {
           <InfoRow icon="list-outline" label="Waitlist" value={patient?.waitlistStatus ?? '—'} />
           <InfoRow icon="git-network-outline" label="Referral" value={patient?.referralSource ?? '—'} />
         </View>
+
+        <TagSection patientId={id} tag={patient?.tag ?? null} />
 
         {/* Contact History */}
         {attempts.length > 0 && (
@@ -140,7 +151,195 @@ export default function PatientDetailScreen() {
           </View>
         )}
       </ScrollView>
+
+      <TicketModal visible={ticketModal} onClose={() => setTicketModal(false)} patientId={id} />
     </SafeAreaView>
+  );
+}
+
+const TICKET_CATEGORIES = ['scheduling', 'billing', 'clinical', 'technical', 'other'];
+const TICKET_PRIORITIES = ['low', 'normal', 'high'];
+
+function TicketModal({ visible, onClose, patientId }: { visible: boolean; onClose: () => void; patientId: string }) {
+  const [category, setCategory] = useState('scheduling');
+  const [priority, setPriority] = useState('normal');
+  const [subject, setSubject] = useState('');
+  const [description, setDescription] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+
+  const createTicket = useMutation({
+    mutationFn: () => ticketsApi.create({ patientId, category, priority, subject, description }),
+    onSuccess: () => setSubmitted(true),
+  });
+
+  const reset = () => {
+    setCategory('scheduling');
+    setPriority('normal');
+    setSubject('');
+    setDescription('');
+    setSubmitted(false);
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={reset}>
+      <View className="flex-1 justify-end bg-black/40">
+        <View className="bg-white rounded-t-3xl px-5 pt-5 pb-10">
+          {submitted ? (
+            <View className="items-center py-6">
+              <Ionicons name="checkmark-circle" size={40} color="#16a34a" />
+              <Text className="text-gray-900 font-semibold mt-3">Sent to the office</Text>
+              <Text className="text-gray-400 text-sm mt-1 text-center">They'll follow up from here.</Text>
+              <TouchableOpacity onPress={reset} className="mt-5 bg-gray-100 px-5 py-2.5 rounded-full">
+                <Text className="text-gray-700 text-sm font-medium">Done</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <Text className="text-base font-bold text-gray-900 mb-1">Flag for Office</Text>
+              <Text className="text-gray-400 text-sm mb-4">Hand this off for follow-up.</Text>
+
+              <Text className="text-gray-500 text-xs font-medium mb-2">Category</Text>
+              <View className="flex-row flex-wrap gap-2 mb-4">
+                {TICKET_CATEGORIES.map((c) => (
+                  <TouchableOpacity
+                    key={c}
+                    onPress={() => setCategory(c)}
+                    className={`px-3 py-1.5 rounded-full border ${category === c ? 'bg-primary-600 border-primary-600' : 'bg-gray-50 border-gray-200'}`}
+                  >
+                    <Text className={`text-xs font-medium capitalize ${category === c ? 'text-white' : 'text-gray-600'}`}>{c}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text className="text-gray-500 text-xs font-medium mb-2">Priority</Text>
+              <View className="flex-row gap-2 mb-4">
+                {TICKET_PRIORITIES.map((p) => (
+                  <TouchableOpacity
+                    key={p}
+                    onPress={() => setPriority(p)}
+                    className={`px-3 py-1.5 rounded-full border ${priority === p ? 'bg-primary-600 border-primary-600' : 'bg-gray-50 border-gray-200'}`}
+                  >
+                    <Text className={`text-xs font-medium capitalize ${priority === p ? 'text-white' : 'text-gray-600'}`}>{p}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text className="text-gray-500 text-xs font-medium mb-2">Subject</Text>
+              <TextInput
+                value={subject}
+                onChangeText={setSubject}
+                placeholder="Short summary"
+                className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 mb-4"
+              />
+
+              <Text className="text-gray-500 text-xs font-medium mb-2">Description</Text>
+              <TextInput
+                value={description}
+                onChangeText={setDescription}
+                placeholder="What does the office need to know?"
+                multiline
+                numberOfLines={3}
+                className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 mb-5"
+                style={{ textAlignVertical: 'top', minHeight: 72 }}
+              />
+
+              <TouchableOpacity
+                onPress={() => createTicket.mutate()}
+                disabled={!subject || !description || createTicket.isPending}
+                className={`rounded-xl py-3 items-center ${!subject || !description ? 'bg-gray-200' : 'bg-primary-600'}`}
+              >
+                {createTicket.isPending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text className="text-white font-semibold text-sm">Send to Office</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={reset} className="mt-3 items-center py-1">
+                <Text className="text-gray-400 text-sm">Cancel</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function TagSection({ patientId, tag }: { patientId: string; tag: { id: string; name: string; blockMinutes: number } | null }) {
+  const [picker, setPicker] = useState(false);
+  const queryClient = useQueryClient();
+  const { role } = useAuthStore();
+
+  const { data: tags = [] } = useQuery({
+    queryKey: ['client-tags'],
+    queryFn: clientTagsApi.list,
+    enabled: picker,
+  });
+
+  const setTag = useMutation({
+    mutationFn: (tagId: string | null) => clientTagsApi.setPatientTag(patientId, tagId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
+      setPicker(false);
+    },
+  });
+
+  return (
+    <>
+      <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
+        <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Block Size</Text>
+        <TouchableOpacity onPress={() => setPicker(true)} className="flex-row items-center gap-3">
+          <View className="w-7 h-7 bg-gray-50 rounded-lg items-center justify-center">
+            <Ionicons name="time-outline" size={14} color="#6b7280" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-gray-900 text-sm font-medium">{tag ? tag.name : 'No tag set'}</Text>
+            {tag ? <Text className="text-gray-400 text-xs">{tag.blockMinutes} min</Text> : null}
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
+        </TouchableOpacity>
+      </View>
+
+      <Modal visible={picker} transparent animationType="slide" onRequestClose={() => setPicker(false)}>
+        <View className="flex-1 justify-end bg-black/40">
+          <View className="bg-white rounded-t-3xl px-5 pt-5 pb-10">
+            <Text className="text-base font-bold text-gray-900 mb-4">Set Block Size</Text>
+            <View className="gap-2">
+              {tags.map((t: any) => (
+                <TouchableOpacity
+                  key={t.id}
+                  onPress={() => setTag.mutate(t.id)}
+                  className="flex-row items-center justify-between px-4 py-3.5 rounded-xl border border-gray-100 bg-gray-50"
+                >
+                  <Text className="text-gray-800 font-medium text-sm">{t.name}</Text>
+                  <Text className="text-gray-400 text-xs">{t.blockMinutes} min</Text>
+                </TouchableOpacity>
+              ))}
+              {tags.length === 0 ? (
+                <Text className="text-gray-400 text-sm text-center py-4">No tags yet.</Text>
+              ) : null}
+            </View>
+            {tag ? (
+              <TouchableOpacity onPress={() => setTag.mutate(null)} className="mt-4 items-center py-2">
+                <Text className="text-red-500 text-sm">Clear tag</Text>
+              </TouchableOpacity>
+            ) : null}
+            {(role === 'administrator' || role === 'practice_manager') && (
+              <TouchableOpacity
+                onPress={() => { setPicker(false); router.push('/(agent)/tags'); }}
+                className="mt-2 items-center py-2"
+              >
+                <Text className="text-primary-600 text-sm font-medium">Manage tags</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => setPicker(false)} className="mt-1 items-center py-2">
+              <Text className="text-gray-400 text-sm">Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 

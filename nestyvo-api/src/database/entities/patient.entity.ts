@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { Practice } from './practice.entity';
 import { Provider } from './provider.entity';
 import { User } from './user.entity';
+import { ClientTag } from './client-tag.entity';
 
 export enum PreferredContact {
   PHONE = 'phone',
@@ -63,6 +64,13 @@ export class Patient {
 
   @Column({ type: 'text', nullable: true })
   notes: string;
+
+  @Column({ nullable: true })
+  tagId: string | null;
+
+  @ManyToOne(() => ClientTag, { nullable: true })
+  @JoinColumn({ name: 'tagId' })
+  tag: ClientTag;
 
   @Column({ nullable: true })
   createdBy: string;

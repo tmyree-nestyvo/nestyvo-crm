@@ -46,7 +46,7 @@ export class PatientsService {
   async findById(id: string): Promise<any> {
     const patient = await this.patientRepo.findOne({
       where: { id },
-      relations: { assignedProvider: true },
+      relations: { assignedProvider: true, tag: true },
     });
     if (!patient) throw new NotFoundException('Patient not found');
 
@@ -69,6 +69,7 @@ export class PatientsService {
       assignedProvider: patient.assignedProvider
         ? `${patient.assignedProvider.firstName} ${patient.assignedProvider.lastName}`
         : null,
+      tag: patient.tag ? { id: patient.tag.id, name: patient.tag.name, blockMinutes: patient.tag.blockMinutes } : null,
       recentAppointments: recentAppointments.map((a) => ({
         id: a.id,
         startAt: a.startAt,
@@ -154,6 +155,28 @@ export class PatientsService {
       active: mapped.filter((p) => p.isActive),
       inactive: mapped.filter((p) => !p.isActive),
     };
+  }
+
+  async setTag(patientId: string, tagId: string | null, user: User) {
+    const patient = await this.patientRepo.findOne({ where: { id: patientId } });
+    if (!patient) throw new NotFoundException('Patient not found');
+
+    const oldTagId = patient.tagId;
+    patient.tagId = tagId;
+    await this.patientRepo.save(patient);
+
+    await this.auditRepo.save(
+      this.auditRepo.create({
+        userId: user.id,
+        action: 'patient.tag_update',
+        resourceType: 'patient',
+        resourceId: patientId,
+        oldValues: { tagId: oldTagId },
+        newValues: { tagId },
+      }),
+    );
+
+    return { success: true, tagId };
   }
 
   async getContactAttempts(patientId: string): Promise<any[]> {

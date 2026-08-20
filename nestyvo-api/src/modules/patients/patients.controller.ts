@@ -1,10 +1,15 @@
-import { Controller, Get, Param, Query, UseGuards, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Query, Body, UseGuards, NotFoundException } from '@nestjs/common';
+import { IsOptional, IsString } from 'class-validator';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { PatientsService } from './patients.service';
+
+class SetTagDto {
+  @IsOptional() @IsString() tagId?: string | null;
+}
 
 @Controller('patients')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -34,5 +39,11 @@ export class PatientsController {
   @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
   getAttempts(@Param('id') id: string) {
     return this.patientsService.getContactAttempts(id);
+  }
+
+  @Patch(':id/tag')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  setTag(@Param('id') id: string, @Body() dto: SetTagDto, @CurrentUser() user: User) {
+    return this.patientsService.setTag(id, dto.tagId ?? null, user);
   }
 }

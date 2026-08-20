@@ -27,12 +27,21 @@ interface Candidate {
   preferredTimeMatch: boolean;
   score: number;
   waitlistEntryId?: string;
+  tag: { name: string; blockMinutes: number } | null;
+  tagFit: 'match' | 'under' | 'over' | 'none';
 }
 
 const SOURCE_CONFIG = {
   urgent_waitlist: { label: 'Urgent', color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: 'alert-circle' as const },
   waitlist:        { label: 'Waitlist', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', icon: 'list' as const },
   cadence:         { label: 'Due for visit', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', icon: 'refresh' as const },
+};
+
+const TAG_FIT_CONFIG: Record<Candidate['tagFit'], { label: string; color: string; bg: string; border: string; icon: any } | null> = {
+  match: { label: 'Fits slot', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', icon: 'checkmark-circle' },
+  under: { label: 'Shorter block', color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb', icon: 'remove-circle-outline' },
+  over: { label: "Doesn't fit", color: '#d97706', bg: '#fffbeb', border: '#fcd34d', icon: 'alert-circle-outline' },
+  none: null,
 };
 
 const OUTCOMES = [
@@ -83,6 +92,7 @@ function CandidateCard({
   const queryClient = useQueryClient();
 
   const cfg = SOURCE_CONFIG[candidate.source];
+  const tagCfg = TAG_FIT_CONFIG[candidate.tagFit];
 
   const logAttempt = useMutation({
     mutationFn: (outcome: string) =>
@@ -157,6 +167,16 @@ function CandidateCard({
                 <Ionicons name={cfg.icon} size={10} color={cfg.color} />
                 <Text style={{ color: cfg.color, fontSize: 10, fontWeight: '600' }}>{cfg.label}</Text>
               </View>
+              {/* Tag-fit badge */}
+              {tagCfg && (
+                <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: tagCfg.bg, borderWidth: 1, borderColor: tagCfg.border }}>
+                  <Ionicons name={tagCfg.icon} size={10} color={tagCfg.color} />
+                  <Text style={{ color: tagCfg.color, fontSize: 10, fontWeight: '600' }}>
+                    {candidate.tag?.name} · {tagCfg.label}
+                  </Text>
+                </View>
+              )}
               {callLogged && (
                 <Text className="text-gray-400 text-xs">
                   {OUTCOMES.find((o) => o.key === callLogged)?.label ?? callLogged}
@@ -338,6 +358,9 @@ export default function FillSlotScreen() {
           <View className="w-2 h-2 rounded-full bg-green-400" />
           <Text className="text-green-700 text-sm font-medium">
             Open slot: {slotStartAt ? fmt(slotStartAt) : ''} – {slotEndAt ? fmt(slotEndAt) : ''}
+            {slotStartAt && slotEndAt
+              ? ` (${Math.round((new Date(slotEndAt).getTime() - new Date(slotStartAt).getTime()) / 60000)} min)`
+              : ''}
           </Text>
         </View>
         <Text className="text-gray-400 text-xs mt-1">
