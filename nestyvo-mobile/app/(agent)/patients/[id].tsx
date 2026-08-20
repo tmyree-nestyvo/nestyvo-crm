@@ -2,9 +2,10 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../../../lib/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api, patientLinksApi } from '../../../lib/api';
 import { AppointmentCard } from '../../../components/dashboard/AppointmentCard';
+import { useAuthStore } from '../../../lib/store';
 
 function usePatient(id: string) {
   return useQuery({
@@ -44,6 +45,7 @@ function timeAgo(iso: string) {
 
 export default function PatientDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { role } = useAuthStore();
   const { data: patient, isLoading } = usePatient(id);
   const { data: attempts = [] } = useAttempts(id);
 
@@ -124,6 +126,8 @@ export default function PatientDetailScreen() {
           </>
         )}
 
+        {role === 'administrator' && <LinkedAccounts patientId={id} />}
+
         {/* Recent Appointments */}
         <Text className="text-base font-semibold text-gray-900 mb-3">Recent Appointments</Text>
         {patient?.recentAppointments?.length ? (
@@ -137,6 +141,73 @@ export default function PatientDetailScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function LinkedAccounts({ patientId }: { patientId: string }) {
+  const queryClient = useQueryClient();
+
+  const { data: links = [] } = useQuery({
+    queryKey: ['patient-links', patientId],
+    queryFn: () => patientLinksApi.getLinks(patientId),
+  });
+  const { data: suggestions = [] } = useQuery({
+    queryKey: ['patient-link-suggestions', patientId],
+    queryFn: () => patientLinksApi.getSuggestions(patientId),
+  });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['patient-links', patientId] });
+    queryClient.invalidateQueries({ queryKey: ['patient-link-suggestions', patientId] });
+  };
+
+  const linkMutation = useMutation({
+    mutationFn: (targetId: string) => patientLinksApi.create(patientId, targetId),
+    onSuccess: invalidate,
+  });
+  const unlinkMutation = useMutation({
+    mutationFn: (linkId: string) => patientLinksApi.remove(linkId),
+    onSuccess: invalidate,
+  });
+
+  if (links.length === 0 && suggestions.length === 0) return null;
+
+  return (
+    <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
+      <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+        Linked Accounts
+      </Text>
+      {links.map((link: any) => (
+        <View key={link.linkId} className="flex-row items-center gap-3 mb-3 last:mb-0">
+          <View className="w-7 h-7 bg-gray-50 rounded-lg items-center justify-center">
+            <Ionicons name="link-outline" size={14} color="#6b7280" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-gray-900 text-sm font-medium">{link.name}</Text>
+            <Text className="text-gray-400 text-xs">{link.practiceName}</Text>
+          </View>
+          <TouchableOpacity onPress={() => unlinkMutation.mutate(link.linkId)}>
+            <Text className="text-red-500 text-xs font-medium">Unlink</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+      {suggestions.map((s: any) => (
+        <View key={s.patientId} className="flex-row items-center gap-3 mb-3 last:mb-0">
+          <View className="w-7 h-7 bg-amber-50 rounded-lg items-center justify-center">
+            <Ionicons name="help-outline" size={14} color="#d97706" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-gray-900 text-sm font-medium">Possible match: {s.name}</Text>
+            <Text className="text-gray-400 text-xs">
+              {s.practiceName} · matched on {s.matchedOn}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => linkMutation.mutate(s.patientId)}>
+            <Text className="text-primary-600 text-xs font-medium">Link</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+    </View>
   );
 }
 

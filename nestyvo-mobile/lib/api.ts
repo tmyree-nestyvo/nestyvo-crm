@@ -62,3 +62,19 @@ export const providersApi = {
   getSchedule: (id: string, date?: string) =>
     api.get(`/providers/${id}/schedule`, { params: { date } }).then((r) => r.data),
 };
+
+// Reminders (public, unauthenticated — patient self-service cancel link)
+export const remindersApi = {
+  get: (reminderId: string) => api.get(`/reminders/${reminderId}`).then((r) => r.data),
+  cancel: (reminderId: string) => api.post(`/reminders/${reminderId}/cancel`).then((r) => r.data),
+};
+
+// Patient links (admin-only cross-practice customer linking)
+export const patientLinksApi = {
+  getLinks: (patientId: string) => api.get(`/patients/${patientId}/links`).then((r) => r.data),
+  getSuggestions: (patientId: string) =>
+    api.get(`/patients/${patientId}/link-suggestions`).then((r) => r.data),
+  create: (patientAId: string, patientBId: string) =>
+    api.post('/patient-links', { patientAId, patientBId }).then((r) => r.data),
+  remove: (linkId: string) => api.delete(`/patient-links/${linkId}`).then((r) => r.data),
+};

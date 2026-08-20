@@ -149,6 +149,52 @@ async function seed() {
     ds.getRepository(Patient).create({ practiceId: practice.id, firstName: 'Jennifer', lastName: 'Walsh', dob: '1985-11-08', phone: '(310) 555-0205', preferredContact: PreferredContact.SMS }),
   ]);
 
+  // Second practice — different vertical (tax prep), demonstrates multi-partner
+  // customer linking: one patient below intentionally shares Maria Gonzalez's phone.
+  const taxPractice = ds.getRepository(Practice).create({
+    name: 'Ortiz & Associates',
+    address: '4400 Riverside Dr, Riverside, CA 92501',
+    phone: '(951) 555-0300',
+    email: 'office@ortiztax.com',
+    timezone: 'America/Los_Angeles',
+  });
+  await ds.getRepository(Practice).save(taxPractice);
+
+  const taxPreparer = ds.getRepository(Provider).create({
+    practiceId: taxPractice.id,
+    firstName: 'Sal',
+    lastName: 'Ortiz',
+    credentials: 'EA',
+    specialty: 'Tax Preparation',
+    phone: '(951) 555-0301',
+    email: 'sal@ortiztax.com',
+    isVirtual: false,
+    isInPerson: true,
+    status: ProviderStatus.ACTIVE,
+  });
+  await ds.getRepository(Provider).save(taxPreparer);
+
+  await ds.getRepository(Patient).save([
+    ds.getRepository(Patient).create({
+      practiceId: taxPractice.id,
+      firstName: 'Maria',
+      lastName: 'Gonzalez',
+      phone: '(213) 555-0201',
+      email: 'mgonzalez@email.com',
+      preferredContact: PreferredContact.PHONE,
+      assignedProviderId: taxPreparer.id,
+    }),
+    ds.getRepository(Patient).create({
+      practiceId: taxPractice.id,
+      firstName: 'Robert',
+      lastName: 'Nguyen',
+      phone: '(951) 555-0210',
+      email: 'rnguyen@email.com',
+      preferredContact: PreferredContact.EMAIL,
+      assignedProviderId: taxPreparer.id,
+    }),
+  ]);
+
   // Helper: build a datetime offset from today
   const today = new Date();
   const daysAgo = (n: number, h: number, m = 0) => {

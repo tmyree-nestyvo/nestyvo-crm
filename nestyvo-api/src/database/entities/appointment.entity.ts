@@ -65,8 +65,8 @@ export class Appointment {
   @Column({ type: 'timestamptz', nullable: true })
   cancelledAt: Date;
 
-  @Column({ nullable: true })
-  cancellationReason: string;
+  @Column({ type: 'varchar', nullable: true })
+  cancellationReason: string | null;
 
   @Column({ nullable: true })
   createdBy: string;

@@ -5,10 +5,11 @@ import { User } from '../database/entities/user.entity';
 import { Patient } from '../database/entities/patient.entity';
 import { Appointment, AppointmentStatus } from '../database/entities/appointment.entity';
 import { WaitlistEntry, WaitlistEntryStatus } from '../database/entities/waitlist-entry.entity';
-import { FillOpportunity, FillOpportunityStatus } from '../database/entities/fill-opportunity.entity';
 import { ProviderAvailability } from '../database/entities/provider-availability.entity';
 import { ProviderBlock } from '../database/entities/provider-block.entity';
 import { AuditLog } from '../database/entities/audit-log.entity';
+import { AppointmentsService } from '../modules/appointments/appointments.service';
+import { RemindersService } from '../modules/sms/reminders.service';
 
 @Injectable()
 export class AgentToolExecutorService {
@@ -18,10 +19,11 @@ export class AgentToolExecutorService {
     @InjectRepository(Patient) private patientRepo: Repository<Patient>,
     @InjectRepository(Appointment) private appointmentRepo: Repository<Appointment>,
     @InjectRepository(WaitlistEntry) private waitlistRepo: Repository<WaitlistEntry>,
-    @InjectRepository(FillOpportunity) private fillOpRepo: Repository<FillOpportunity>,
     @InjectRepository(ProviderAvailability) private availabilityRepo: Repository<ProviderAvailability>,
     @InjectRepository(ProviderBlock) private blockRepo: Repository<ProviderBlock>,
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
+    private appointmentsService: AppointmentsService,
+    private remindersService: RemindersService,
   ) {}
 
   async execute(toolName: string, input: Record<string, any>, user: User): Promise<any> {
@@ -271,40 +273,19 @@ export class AgentToolExecutorService {
     });
     const saved = await this.appointmentRepo.save(appt);
     await this.audit('appointment.create', 'appointment', saved.id, null, saved, user);
+    await this.remindersService.scheduleForAppointment(saved);
     return { id: saved.id, startAt: saved.startAt, endAt: saved.endAt };
   }
 
   private async cancelAppointment(input: any, user: User) {
-    const appt = await this.appointmentRepo.findOne({ where: { id: input.appointment_id } });
-    if (!appt) return { error: 'Appointment not found' };
-
-    const old = { ...appt };
-    appt.status = AppointmentStatus.CANCELLED;
-    appt.cancelledAt = new Date();
-    appt.cancellationReason = input.reason;
-    await this.appointmentRepo.save(appt);
-
-    // Auto-create fill opportunity
-    const fill = this.fillOpRepo.create({
-      sourceAppointmentId: appt.id,
-      providerId: appt.providerId,
-      slotStartAt: appt.startAt,
-      slotEndAt: appt.endAt,
-      appointmentTypeId: appt.appointmentTypeId,
-      status: FillOpportunityStatus.OPEN,
-    });
-    await this.fillOpRepo.save(fill);
-
-    await this.audit('appointment.cancel', 'appointment', appt.id, old, appt, user);
-    return { success: true, fillOpportunityId: fill.id };
+    return this.appointmentsService.cancel(input.appointment_id, { reason: input.reason, user });
   }
 
   private async rescheduleAppointment(input: any, user: User) {
     const appt = await this.appointmentRepo.findOne({ where: { id: input.appointment_id } });
     if (!appt) return { error: 'Appointment not found' };
 
-    // Cancel original
-    await this.cancelAppointment({ appointment_id: appt.id, reason: input.reason || 'Rescheduled' }, user);
+    await this.appointmentsService.cancel(appt.id, { reason: input.reason || 'Rescheduled', user });
 
     // Create new
     const newAppt = this.appointmentRepo.create({
@@ -319,6 +300,7 @@ export class AgentToolExecutorService {
     });
     const saved = await this.appointmentRepo.save(newAppt);
     await this.audit('appointment.reschedule', 'appointment', saved.id, null, saved, user);
+    await this.remindersService.scheduleForAppointment(saved);
     return { id: saved.id, startAt: saved.startAt };
   }
 

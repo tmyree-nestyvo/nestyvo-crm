@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import configuration from './config/configuration';
 import { AppController } from './app.controller';
@@ -11,6 +12,9 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ProvidersModule } from './modules/providers/providers.module';
 import { PatientsModule } from './modules/patients/patients.module';
 import { WaitlistModule } from './modules/waitlist/waitlist.module';
+import { AppointmentsModule } from './modules/appointments/appointments.module';
+import { SmsModule } from './modules/sms/sms.module';
+import { PatientLinksModule } from './modules/patient-links/patient-links.module';
 import { JwtAuthGuard } from './auth/auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 
@@ -29,6 +33,8 @@ import { OutreachQueue } from './database/entities/outreach-queue.entity';
 import { AuditLog } from './database/entities/audit-log.entity';
 import { AgentProviderAssignment } from './database/entities/agent-provider-assignment.entity';
 import { CallbackRequest } from './database/entities/callback-request.entity';
+import { AppointmentReminder } from './database/entities/appointment-reminder.entity';
+import { PatientLink } from './database/entities/patient-link.entity';
 
 const ALL_ENTITIES = [
   Practice,
@@ -45,6 +51,8 @@ const ALL_ENTITIES = [
   AuditLog,
   AgentProviderAssignment,
   CallbackRequest,
+  AppointmentReminder,
+  PatientLink,
 ];
 
 @Module({
@@ -54,6 +62,7 @@ const ALL_ENTITIES = [
       load: [configuration],
       envFilePath: [`.env.${process.env.NODE_ENV || 'development'}`, '.env'],
     }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService): any => {
@@ -89,6 +98,9 @@ const ALL_ENTITIES = [
     ProvidersModule,
     PatientsModule,
     WaitlistModule,
+    AppointmentsModule,
+    SmsModule,
+    PatientLinksModule,
   ],
   controllers: [AppController],
   providers: [

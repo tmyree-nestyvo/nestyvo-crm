@@ -23,6 +23,9 @@ export class Practice {
   @Column({ default: true })
   isActive: boolean;
 
+  @Column({ default: true })
+  remindersEnabled: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 
