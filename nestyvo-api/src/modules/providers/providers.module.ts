@@ -11,6 +11,7 @@ import { User } from '../../database/entities/user.entity';
 import { ProvidersService } from './providers.service';
 import { FillCandidatesService } from './fill-candidates.service';
 import { ProvidersController } from './providers.controller';
+import { SmsModule } from '../sms/sms.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ProvidersController } from './providers.controller';
       Provider, Appointment, AgentProviderAssignment,
       WaitlistEntry, Patient, AuditLog, ProviderBlock, User,
     ]),
+    SmsModule,
   ],
   providers: [ProvidersService, FillCandidatesService],
   controllers: [ProvidersController],

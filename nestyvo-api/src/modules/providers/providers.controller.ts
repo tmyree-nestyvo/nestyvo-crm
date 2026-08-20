@@ -12,6 +12,7 @@ import { Repository } from 'typeorm';
 import { Appointment, AppointmentStatus, LocationType } from '../../database/entities/appointment.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { ProviderBlock, BlockType } from '../../database/entities/provider-block.entity';
+import { RemindersService } from '../sms/reminders.service';
 
 class BookAppointmentDto {
   @IsString() patientId: string;
@@ -45,6 +46,7 @@ export class ProvidersController {
     @InjectRepository(Appointment) private appointmentRepo: Repository<Appointment>,
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
     @InjectRepository(ProviderBlock) private blockRepo: Repository<ProviderBlock>,
+    private remindersService: RemindersService,
   ) {}
 
   @Get()
@@ -110,6 +112,7 @@ export class ProvidersController {
         newValues: saved as any,
       }),
     );
+    await this.remindersService.scheduleForAppointment(saved);
     return { id: saved.id, startAt: saved.startAt, endAt: saved.endAt };
   }
 
