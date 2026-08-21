@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Modal, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +25,7 @@ function daysAgo(iso: string) {
 
 export default function TicketsScreen() {
   const { role } = useAuthStore();
+  const isOffice = role === 'administrator' || role === 'practice_manager';
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<string | undefined>(undefined);
   const [active, setActive] = useState<any | null>(null);
@@ -43,15 +44,10 @@ export default function TicketsScreen() {
       setActive(null);
       setNotes('');
     },
+    onError: (err: any) => {
+      Alert.alert('Couldn\'t update ticket', err?.response?.data?.message || 'Please try again.');
+    },
   });
-
-  if (role !== 'administrator' && role !== 'practice_manager') {
-    return (
-      <SafeAreaView className="flex-1 bg-surface items-center justify-center px-6">
-        <Text className="text-gray-400 text-sm">You don't have access to this page.</Text>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
@@ -62,7 +58,7 @@ export default function TicketsScreen() {
         <View className="flex-1">
           <Text className="text-xl font-bold text-gray-900">Tickets</Text>
           <Text className="text-xs text-gray-400 mt-0.5">
-            {data.length} ticket{data.length !== 1 ? 's' : ''}{filter ? ` · ${STATUS_CONFIG[filter]?.label}` : ''}
+            {isOffice ? 'All tickets for your practice' : 'Tickets you filed'} · {data.length} ticket{data.length !== 1 ? 's' : ''}{filter ? ` · ${STATUS_CONFIG[filter]?.label}` : ''}
           </Text>
         </View>
       </View>

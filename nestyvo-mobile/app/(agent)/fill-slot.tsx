@@ -203,9 +203,16 @@ function CandidateCard({
         {expanded && (
           <View className="px-4 pb-4 pt-1 border-t border-gray-100 gap-2">
             {/* Contact info */}
-            <View className="flex-row gap-4">
+            <View className="flex-row items-center gap-4">
               <DetailPill icon="call-outline" label={candidate.phone ?? '—'} />
               <DetailPill icon="mail-outline" label={candidate.email ?? '—'} />
+              <TouchableOpacity
+                onPress={() => router.push(`/(agent)/patients/${candidate.patientId}`)}
+                className="flex-row items-center gap-1 ml-auto"
+              >
+                <Ionicons name="pricetag-outline" size={13} color="#2563eb" />
+                <Text className="text-primary-600 text-xs font-medium">Edit tag</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Visit history — shown for ALL candidates */}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -170,6 +170,9 @@ function TicketModal({ visible, onClose, patientId }: { visible: boolean; onClos
   const createTicket = useMutation({
     mutationFn: () => ticketsApi.create({ patientId, category, priority, subject, description }),
     onSuccess: () => setSubmitted(true),
+    onError: (err: any) => {
+      Alert.alert('Couldn\'t send ticket', err?.response?.data?.message || 'Please try again.');
+    },
   });
 
   const reset = () => {
@@ -294,6 +297,9 @@ function TagSection({
       queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
       setPicker(false);
     },
+    onError: (err: any) => {
+      Alert.alert('Couldn\'t update tag', err?.response?.data?.message || 'Please try again.');
+    },
   });
 
   return (
@@ -376,13 +382,18 @@ function LinkedAccounts({ patientId }: { patientId: string }) {
     queryClient.invalidateQueries({ queryKey: ['patient-link-suggestions', patientId] });
   };
 
+  const onLinkError = (err: any) => {
+    Alert.alert('Couldn\'t update link', err?.response?.data?.message || 'Please try again.');
+  };
   const linkMutation = useMutation({
     mutationFn: (targetId: string) => patientLinksApi.create(patientId, targetId),
     onSuccess: invalidate,
+    onError: onLinkError,
   });
   const unlinkMutation = useMutation({
     mutationFn: (linkId: string) => patientLinksApi.remove(linkId),
     onSuccess: invalidate,
+    onError: onLinkError,
   });
 
   if (links.length === 0 && suggestions.length === 0) return null;
