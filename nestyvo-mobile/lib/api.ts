@@ -81,7 +81,7 @@ export const patientLinksApi = {
 
 // Client tags (block-size classification)
 export const clientTagsApi = {
-  list: () => api.get('/client-tags').then((r) => r.data),
+  list: (practiceId?: string) => api.get('/client-tags', { params: { practiceId } }).then((r) => r.data),
   create: (name: string, blockMinutes: number) =>
     api.post('/client-tags', { name, blockMinutes }).then((r) => r.data),
   update: (id: string, updates: { name?: string; blockMinutes?: number; isActive?: boolean }) =>

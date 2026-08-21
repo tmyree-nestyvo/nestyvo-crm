@@ -100,7 +100,7 @@ export default function PatientDetailScreen() {
           <InfoRow icon="git-network-outline" label="Referral" value={patient?.referralSource ?? '—'} />
         </View>
 
-        <TagSection patientId={id} tag={patient?.tag ?? null} />
+        <TagSection patientId={id} tag={patient?.tag ?? null} practiceId={patient?.practiceId} practiceName={patient?.practiceName} />
 
         {/* Contact History */}
         {attempts.length > 0 && (
@@ -266,14 +266,25 @@ function TicketModal({ visible, onClose, patientId }: { visible: boolean; onClos
   );
 }
 
-function TagSection({ patientId, tag }: { patientId: string; tag: { id: string; name: string; blockMinutes: number } | null }) {
+function TagSection({
+  patientId,
+  tag,
+  practiceId,
+  practiceName,
+}: {
+  patientId: string;
+  tag: { id: string; name: string; blockMinutes: number } | null;
+  practiceId?: string;
+  practiceName?: string;
+}) {
   const [picker, setPicker] = useState(false);
   const queryClient = useQueryClient();
-  const { role } = useAuthStore();
+  const { role, practiceId: myPracticeId } = useAuthStore();
+  const isCrossPractice = role === 'administrator' && practiceId && practiceId !== myPracticeId;
 
   const { data: tags = [] } = useQuery({
-    queryKey: ['client-tags'],
-    queryFn: clientTagsApi.list,
+    queryKey: ['client-tags', practiceId],
+    queryFn: () => clientTagsApi.list(practiceId),
     enabled: picker,
   });
 
@@ -304,7 +315,12 @@ function TagSection({ patientId, tag }: { patientId: string; tag: { id: string; 
       <Modal visible={picker} transparent animationType="slide" onRequestClose={() => setPicker(false)}>
         <View className="flex-1 justify-end bg-black/40">
           <View className="bg-white rounded-t-3xl px-5 pt-5 pb-10">
-            <Text className="text-base font-bold text-gray-900 mb-4">Set Block Size</Text>
+            <Text className="text-base font-bold text-gray-900">Set Block Size</Text>
+            {isCrossPractice ? (
+              <Text className="text-gray-400 text-xs mb-4">{practiceName}'s tags</Text>
+            ) : (
+              <View className="mb-4" />
+            )}
             <View className="gap-2">
               {tags.map((t: any) => (
                 <TouchableOpacity
@@ -325,7 +341,7 @@ function TagSection({ patientId, tag }: { patientId: string; tag: { id: string; 
                 <Text className="text-red-500 text-sm">Clear tag</Text>
               </TouchableOpacity>
             ) : null}
-            {(role === 'administrator' || role === 'practice_manager') && (
+            {(role === 'administrator' || role === 'practice_manager') && !isCrossPractice && (
               <TouchableOpacity
                 onPress={() => { setPicker(false); router.push('/(agent)/tags'); }}
                 className="mt-2 items-center py-2"

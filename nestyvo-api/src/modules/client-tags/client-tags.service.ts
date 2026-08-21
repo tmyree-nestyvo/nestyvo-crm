@@ -2,15 +2,16 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ClientTag } from '../../database/entities/client-tag.entity';
-import { User } from '../../database/entities/user.entity';
+import { User, UserRole } from '../../database/entities/user.entity';
 
 @Injectable()
 export class ClientTagsService {
   constructor(@InjectRepository(ClientTag) private tagRepo: Repository<ClientTag>) {}
 
-  list(user: User) {
+  list(user: User, targetPracticeId?: string) {
+    const practiceId = targetPracticeId && user.role === UserRole.ADMINISTRATOR ? targetPracticeId : user.practiceId;
     return this.tagRepo.find({
-      where: { practiceId: user.practiceId, isActive: true },
+      where: { practiceId, isActive: true },
       order: { blockMinutes: 'ASC' },
     });
   }

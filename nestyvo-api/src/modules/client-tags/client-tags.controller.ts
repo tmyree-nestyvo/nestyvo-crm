@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards } from '@nestjs/common';
 import { IsString, IsInt, IsOptional, IsBoolean, Min } from 'class-validator';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
@@ -25,8 +25,8 @@ export class ClientTagsController {
 
   @Get()
   @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
-  list(@CurrentUser() user: User) {
-    return this.tagsService.list(user);
+  list(@Query('practiceId') practiceId: string | undefined, @CurrentUser() user: User) {
+    return this.tagsService.list(user, practiceId);
   }
 
   @Post()

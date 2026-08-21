@@ -15,7 +15,7 @@ export default function TagsScreen() {
 
   const { data: tags = [], isLoading } = useQuery({
     queryKey: ['client-tags'],
-    queryFn: clientTagsApi.list,
+    queryFn: () => clientTagsApi.list(),
   });
 
   const createTag = useMutation({

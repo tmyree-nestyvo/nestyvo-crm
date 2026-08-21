@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike, In } from 'typeorm';
 import { Patient } from '../../database/entities/patient.entity';
@@ -6,6 +6,7 @@ import { Appointment, AppointmentStatus } from '../../database/entities/appointm
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Provider } from '../../database/entities/provider.entity';
+import { ClientTag } from '../../database/entities/client-tag.entity';
 
 @Injectable()
 export class PatientsService {
@@ -14,6 +15,7 @@ export class PatientsService {
     @InjectRepository(Appointment) private appointmentRepo: Repository<Appointment>,
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
     @InjectRepository(Provider) private providerRepo: Repository<Provider>,
+    @InjectRepository(ClientTag) private tagRepo: Repository<ClientTag>,
   ) {}
 
   async search(query: string, user: User): Promise<any[]> {
@@ -46,7 +48,7 @@ export class PatientsService {
   async findById(id: string): Promise<any> {
     const patient = await this.patientRepo.findOne({
       where: { id },
-      relations: { assignedProvider: true, tag: true },
+      relations: { assignedProvider: true, tag: true, practice: true },
     });
     if (!patient) throw new NotFoundException('Patient not found');
 
@@ -66,6 +68,8 @@ export class PatientsService {
       preferredContact: patient.preferredContact,
       referralSource: patient.referralSource,
       waitlistStatus: patient.waitlistStatus,
+      practiceId: patient.practiceId,
+      practiceName: patient.practice.name,
       assignedProvider: patient.assignedProvider
         ? `${patient.assignedProvider.firstName} ${patient.assignedProvider.lastName}`
         : null,
@@ -160,6 +164,14 @@ export class PatientsService {
   async setTag(patientId: string, tagId: string | null, user: User) {
     const patient = await this.patientRepo.findOne({ where: { id: patientId } });
     if (!patient) throw new NotFoundException('Patient not found');
+
+    if (tagId) {
+      const tag = await this.tagRepo.findOne({ where: { id: tagId } });
+      if (!tag) throw new NotFoundException('Tag not found');
+      if (tag.practiceId !== patient.practiceId) {
+        throw new BadRequestException('Tag belongs to a different practice');
+      }
+    }
 
     const oldTagId = patient.tagId;
     patient.tagId = tagId;
