@@ -82,6 +82,9 @@ export default function PatientsScreen() {
                   <Text className="text-gray-500 text-xs mt-0.5">
                     {item.phone} {item.assignedProvider ? `· ${item.assignedProvider}` : ''}
                   </Text>
+                  {item.practiceName ? (
+                    <Text className="text-gray-400 text-xs mt-0.5">{item.practiceName}</Text>
+                  ) : null}
                 </View>
                 {badge.label ? (
                   <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${badge.color}18` }}>

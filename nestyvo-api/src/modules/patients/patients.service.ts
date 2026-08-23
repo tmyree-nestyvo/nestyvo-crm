@@ -19,7 +19,11 @@ export class PatientsService {
   ) {}
 
   async search(query: string, user: User): Promise<any[]> {
-    const baseWhere = user.role === UserRole.ADMINISTRATOR ? {} : { practiceId: user.practiceId };
+    // Admins and scheduling agents work across every partner practice — agents are
+    // Charlene's offshore team, not tied to one office, so they search everyone.
+    // Practice managers and providers stay scoped to their own practice.
+    const isCrossPractice = user.role === UserRole.ADMINISTRATOR || user.role === UserRole.SCHEDULING_AGENT;
+    const baseWhere = isCrossPractice ? {} : { practiceId: user.practiceId };
 
     const where: any[] = [
       { ...baseWhere, firstName: ILike(`%${query}%`) },
@@ -42,7 +46,7 @@ export class PatientsService {
 
     const patients = await this.patientRepo.find({
       where,
-      relations: { assignedProvider: true },
+      relations: { assignedProvider: true, practice: true },
       take: 20,
       order: { lastName: 'ASC' },
     });
@@ -52,6 +56,7 @@ export class PatientsService {
       name: `${p.firstName} ${p.lastName}`,
       phone: p.phone,
       email: p.email,
+      practiceName: p.practice.name,
       waitlistStatus: p.waitlistStatus,
       assignedProvider: p.assignedProvider
         ? `${p.assignedProvider.firstName} ${p.assignedProvider.lastName}`
