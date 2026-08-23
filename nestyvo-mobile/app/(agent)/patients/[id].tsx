@@ -295,6 +295,9 @@ function TagSection({
     mutationFn: (tagId: string | null) => clientTagsApi.setPatientTag(patientId, tagId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
+      // A tag change can flip this client's fill-matching rank on any open slot —
+      // stale fill-candidates lists elsewhere in the app need to refetch too.
+      queryClient.invalidateQueries({ queryKey: ['fill-candidates'] });
       setPicker(false);
     },
     onError: (err: any) => {

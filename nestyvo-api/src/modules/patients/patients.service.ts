@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike, In } from 'typeorm';
+import { Repository, ILike, In, Raw } from 'typeorm';
 import { Patient } from '../../database/entities/patient.entity';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
@@ -21,13 +21,27 @@ export class PatientsService {
   async search(query: string, user: User): Promise<any[]> {
     const baseWhere = user.role === UserRole.ADMINISTRATOR ? {} : { practiceId: user.practiceId };
 
+    const where: any[] = [
+      { ...baseWhere, firstName: ILike(`%${query}%`) },
+      { ...baseWhere, lastName: ILike(`%${query}%`) },
+      { ...baseWhere, phone: ILike(`%${query}%`) },
+      { ...baseWhere, email: ILike(`%${query}%`) },
+    ];
+
+    // Phone numbers are stored formatted ("(202) 555-0100"); a digits-only search
+    // like "2025550100" wouldn't substring-match that. Compare on digits only too.
+    const digits = query.replace(/\D/g, '');
+    if (digits.length >= 3) {
+      where.push({
+        ...baseWhere,
+        phone: Raw((alias) => `regexp_replace(${alias}, '[^0-9]', '', 'g') ILIKE :digits`, {
+          digits: `%${digits}%`,
+        }),
+      });
+    }
+
     const patients = await this.patientRepo.find({
-      where: [
-        { ...baseWhere, firstName: ILike(`%${query}%`) },
-        { ...baseWhere, lastName: ILike(`%${query}%`) },
-        { ...baseWhere, phone: ILike(`%${query}%`) },
-        { ...baseWhere, email: ILike(`%${query}%`) },
-      ],
+      where,
       relations: { assignedProvider: true },
       take: 20,
       order: { lastName: 'ASC' },
