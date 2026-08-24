@@ -14,7 +14,16 @@ export class ProvidersService {
     @InjectRepository(AgentProviderAssignment) private assignmentRepo: Repository<AgentProviderAssignment>,
   ) {}
 
-  async listForUser(user: User): Promise<Provider[]> {
+  async listForUser(user: User, targetPracticeId?: string): Promise<Provider[]> {
+    // Admins and agents work across every partner practice — let them scope the
+    // list to a specific one (e.g. for a provider-assignment dropdown) on request.
+    if (targetPracticeId && (user.role === UserRole.ADMINISTRATOR || user.role === UserRole.SCHEDULING_AGENT)) {
+      return this.providerRepo.find({
+        where: { practiceId: targetPracticeId } as any,
+        order: { lastName: 'ASC' },
+      });
+    }
+
     if (user.role === UserRole.ADMINISTRATOR) {
       return this.providerRepo.find({ where: { isActive: true } as any, order: { lastName: 'ASC' } });
     }

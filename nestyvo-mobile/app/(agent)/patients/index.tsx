@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
+import { useAuthStore } from '../../../lib/store';
 
 function usePatientSearch(query: string) {
   return useQuery({
@@ -23,11 +24,24 @@ const WAITLIST_BADGE: Record<string, { label: string; color: string }> = {
 export default function PatientsScreen() {
   const [query, setQuery] = useState('');
   const { data, isLoading } = usePatientSearch(query);
+  const { role } = useAuthStore();
+  const canCreate = role === 'administrator' || role === 'scheduling_agent' || role === 'practice_manager';
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
       <View className="px-5 pt-4 pb-3">
-        <Text className="text-xl font-bold text-gray-900 mb-3">Patients</Text>
+        <View className="flex-row items-center justify-between mb-3">
+          <Text className="text-xl font-bold text-gray-900">Patients</Text>
+          {canCreate && (
+            <TouchableOpacity
+              onPress={() => router.push('/(agent)/patients/new')}
+              className="flex-row items-center gap-1.5 bg-primary-600 px-3 py-1.5 rounded-full"
+            >
+              <Ionicons name="add" size={16} color="#fff" />
+              <Text className="text-white text-xs font-semibold">New Client</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <View className="flex-row items-center bg-white border border-gray-200 rounded-xl px-4 gap-3">
           <Ionicons name="search" size={18} color="#9ca3af" />
           <TextInput

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike, In, Raw } from 'typeorm';
-import { Patient } from '../../database/entities/patient.entity';
+import { Patient, PreferredContact } from '../../database/entities/patient.entity';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
@@ -178,6 +178,69 @@ export class PatientsService {
       active: mapped.filter((p) => p.isActive),
       inactive: mapped.filter((p) => !p.isActive),
     };
+  }
+
+  async create(
+    input: {
+      practiceId: string;
+      firstName: string;
+      lastName: string;
+      phone?: string;
+      email?: string;
+      dob?: string;
+      preferredContact?: PreferredContact;
+      assignedProviderId?: string;
+      referralSource?: string;
+      tagId?: string;
+    },
+    user: User,
+  ) {
+    const practiceId = user.role === UserRole.PRACTICE_MANAGER ? user.practiceId : input.practiceId;
+    if (!practiceId) throw new BadRequestException('practiceId is required');
+
+    if (input.assignedProviderId) {
+      const provider = await this.providerRepo.findOne({ where: { id: input.assignedProviderId } });
+      if (!provider) throw new NotFoundException('Provider not found');
+      if (provider.practiceId !== practiceId) {
+        throw new BadRequestException('Provider belongs to a different practice');
+      }
+    }
+
+    if (input.tagId) {
+      const tag = await this.tagRepo.findOne({ where: { id: input.tagId } });
+      if (!tag) throw new NotFoundException('Tag not found');
+      if (tag.practiceId !== practiceId) {
+        throw new BadRequestException('Tag belongs to a different practice');
+      }
+    }
+
+    const saved = await this.patientRepo.save(
+      this.patientRepo.create({
+        practiceId,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        phone: input.phone,
+        email: input.email,
+        dob: input.dob,
+        preferredContact: input.preferredContact,
+        assignedProviderId: input.assignedProviderId,
+        referralSource: input.referralSource,
+        tagId: input.tagId,
+        createdBy: user.id,
+      }),
+    );
+
+    await this.auditRepo.save(
+      this.auditRepo.create({
+        userId: user.id,
+        action: 'patient.create',
+        resourceType: 'patient',
+        resourceId: saved.id,
+        newValues: saved as any,
+      }),
+    );
+
+    return { id: saved.id, name: `${saved.firstName} ${saved.lastName}` };
   }
 
   async setTag(patientId: string, tagId: string | null, user: User) {

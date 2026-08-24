@@ -54,13 +54,29 @@ export async function agentConfirm(
 export const patientsApi = {
   search: (q: string) => api.get('/patients', { params: { q } }).then((r) => r.data),
   get: (id: string) => api.get(`/patients/${id}`).then((r) => r.data),
+  create: (input: {
+    practiceId?: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+    email?: string;
+    preferredContact?: string;
+    assignedProviderId?: string;
+    referralSource?: string;
+    tagId?: string;
+  }) => api.post('/patients', input).then((r) => r.data),
 };
 
 // Providers
 export const providersApi = {
-  list: () => api.get('/providers').then((r) => r.data),
+  list: (practiceId?: string) => api.get('/providers', { params: { practiceId } }).then((r) => r.data),
   getSchedule: (id: string, date?: string) =>
     api.get(`/providers/${id}/schedule`, { params: { date } }).then((r) => r.data),
+};
+
+// Practices (admin/agent cross-practice picker)
+export const practicesApi = {
+  list: () => api.get('/practices').then((r) => r.data),
 };
 
 // Reminders (public, unauthenticated — patient self-service cancel link)

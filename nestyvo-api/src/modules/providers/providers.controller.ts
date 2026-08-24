@@ -51,8 +51,8 @@ export class ProvidersController {
 
   @Get()
   @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER, UserRole.PROVIDER)
-  async list(@CurrentUser() user: User) {
-    const providers = await this.providersService.listForUser(user);
+  async list(@Query('practiceId') practiceId: string | undefined, @CurrentUser() user: User) {
+    const providers = await this.providersService.listForUser(user, practiceId);
     return providers.map((p) => ({
       id: p.id,
       firstName: p.firstName,
