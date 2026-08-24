@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { api } from '../../lib/api';
 
 // ── Data ────────────────────────────────────────────────────────────────────
@@ -53,18 +53,23 @@ const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function CalendarScreen() {
+  const { initialProviderId, bookingPatientId, bookingPatientName } = useLocalSearchParams<{
+    initialProviderId?: string;
+    bookingPatientId?: string;
+    bookingPatientName?: string;
+  }>();
   const today = todayPT();
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState(today);
-  const [selectedProviderId, setSelectedProviderId] = useState('');
+  const [selectedProviderId, setSelectedProviderId] = useState(initialProviderId ?? '');
 
   const { data, isLoading } = useDashboard();
 
   const providers: any[] = data?.providers ?? [];
 
-  // Auto-select first provider when data loads
-  const activeProviderId = selectedProviderId || providers[0]?.id || '';
+  // Auto-select first provider when data loads (or the one passed in via params)
+  const activeProviderId = selectedProviderId || initialProviderId || providers[0]?.id || '';
 
   // Build a map: date → slot array for the active provider
   const slotsMap = useMemo<Record<string, any[]>>(() => {
@@ -109,6 +114,15 @@ export default function CalendarScreen() {
         <View className="px-5 pt-4 pb-2">
           <Text className="text-xl font-bold text-gray-900">Calendar</Text>
         </View>
+
+        {bookingPatientId && (
+          <View className="mx-5 mb-3 bg-primary-50 border border-primary-100 rounded-xl px-4 py-3 flex-row items-center gap-2">
+            <Ionicons name="person-add-outline" size={16} color="#2563eb" />
+            <Text className="text-primary-700 text-sm font-medium flex-1">
+              Pick an open slot to book {bookingPatientName}
+            </Text>
+          </View>
+        )}
 
         {/* Provider chips */}
         {isLoading ? (
@@ -274,20 +288,32 @@ export default function CalendarScreen() {
                 </View>
                 <TouchableOpacity
                   onPress={() =>
-                    router.push({
-                      pathname: '/(agent)/fill-slot',
-                      params: {
-                        providerId: activeProviderId,
-                        providerName: selectedProvider?.name ?? '',
-                        slotStartAt: slot.startAt,
-                        slotEndAt: slot.endAt,
-                      },
-                    })
+                    bookingPatientId
+                      ? router.push({
+                          pathname: '/(agent)/book-slot',
+                          params: {
+                            providerId: activeProviderId,
+                            providerName: selectedProvider?.name ?? '',
+                            slotStartAt: slot.startAt,
+                            slotEndAt: slot.endAt,
+                            patientId: bookingPatientId,
+                            patientName: bookingPatientName ?? '',
+                          },
+                        })
+                      : router.push({
+                          pathname: '/(agent)/fill-slot',
+                          params: {
+                            providerId: activeProviderId,
+                            providerName: selectedProvider?.name ?? '',
+                            slotStartAt: slot.startAt,
+                            slotEndAt: slot.endAt,
+                          },
+                        })
                   }
                   className="bg-primary-600 rounded-full px-4 py-2 flex-row items-center gap-1.5"
                 >
-                  <Ionicons name="people-outline" size={14} color="#fff" />
-                  <Text className="text-white text-sm font-semibold">Fill</Text>
+                  <Ionicons name={bookingPatientId ? 'checkmark-outline' : 'people-outline'} size={14} color="#fff" />
+                  <Text className="text-white text-sm font-semibold">{bookingPatientId ? 'Book' : 'Fill'}</Text>
                 </TouchableOpacity>
               </View>
             ))

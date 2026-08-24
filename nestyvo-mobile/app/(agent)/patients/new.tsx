@@ -110,6 +110,8 @@ export default function NewClientScreen() {
     enabled: !!effectivePracticeId,
   });
 
+  const [created, setCreated] = useState<{ id: string; name: string } | null>(null);
+
   const createClient = useMutation({
     mutationFn: () =>
       patientsApi.create({
@@ -124,12 +126,50 @@ export default function NewClientScreen() {
         tagId: tag?.id,
       }),
     onSuccess: (data) => {
-      router.replace(`/(agent)/patients/${data.id}`);
+      // Nothing to schedule against without a provider — go straight to the profile.
+      if (!provider) {
+        router.replace(`/(agent)/patients/${data.id}`);
+        return;
+      }
+      setCreated(data);
     },
     onError: (err: any) => {
       Alert.alert('Couldn\'t create client', err?.response?.data?.message || 'Please try again.');
     },
   });
+
+  if (created) {
+    return (
+      <SafeAreaView className="flex-1 bg-surface items-center justify-center px-6">
+        <Ionicons name="checkmark-circle" size={48} color="#16a34a" />
+        <Text className="text-gray-900 font-bold text-lg mt-4">{created.name} added</Text>
+        <Text className="text-gray-500 text-sm mt-1 text-center">
+          Want to get their first appointment on the books with {provider?.label}?
+        </Text>
+        <TouchableOpacity
+          onPress={() =>
+            router.push({
+              pathname: '/(agent)/calendar',
+              params: {
+                initialProviderId: provider!.id,
+                bookingPatientId: created.id,
+                bookingPatientName: created.name,
+              },
+            })
+          }
+          className="mt-6 bg-primary-600 rounded-xl px-6 py-3 w-full items-center"
+        >
+          <Text className="text-white font-semibold text-sm">Schedule First Appointment</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => router.replace(`/(agent)/patients/${created.id}`)}
+          className="mt-3 py-2"
+        >
+          <Text className="text-gray-500 text-sm">View Profile Instead</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   const canSubmit = firstName.trim().length > 0 && lastName.trim().length > 0 && !!effectivePracticeId;
 

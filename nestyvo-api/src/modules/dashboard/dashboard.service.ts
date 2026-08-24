@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Between, MoreThanOrEqual } from 'typeorm';
-import { User } from '../../database/entities/user.entity';
-import { Provider } from '../../database/entities/provider.entity';
+import { User, UserRole } from '../../database/entities/user.entity';
+import { Provider, ProviderStatus } from '../../database/entities/provider.entity';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
 import { FillOpportunity, FillOpportunityStatus } from '../../database/entities/fill-opportunity.entity';
 import { WaitlistEntry, WaitlistEntryStatus } from '../../database/entities/waitlist-entry.entity';
@@ -35,10 +35,18 @@ export class DashboardService {
     const thirtyDaysOut = new Date(startOfToday);
     thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30);
 
-    const assignments = await this.assignmentRepo.find({
-      where: { agentUserId: user.id, isActive: true },
-    });
-    const providerIds = assignments.map((a) => a.providerId);
+    let providerIds: string[];
+    if (user.role === UserRole.ADMINISTRATOR) {
+      // Admin works across every partner practice — not tied to an agent
+      // assignment, so show every active provider rather than none.
+      const allProviders = await this.providerRepo.find({ where: { status: ProviderStatus.ACTIVE } });
+      providerIds = allProviders.map((p) => p.id);
+    } else {
+      const assignments = await this.assignmentRepo.find({
+        where: { agentUserId: user.id, isActive: true },
+      });
+      providerIds = assignments.map((a) => a.providerId);
+    }
 
     if (!providerIds.length) {
       return { totalOpenSlots: 0, openCallbacks: 0, openCancellations: 0, waitlistOpportunities: 0, providers: [] };

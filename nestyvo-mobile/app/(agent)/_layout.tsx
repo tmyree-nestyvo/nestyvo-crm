@@ -58,6 +58,7 @@ export default function AgentLayout() {
       <Tabs.Screen name="patients/[id]" options={{ href: null }} />
       <Tabs.Screen name="patients/new" options={{ href: null }} />
       <Tabs.Screen name="fill-slot" options={{ href: null }} />
+      <Tabs.Screen name="book-slot" options={{ href: null }} />
       <Tabs.Screen name="callbacks" options={{ href: null }} />
       <Tabs.Screen name="cancellations" options={{ href: null }} />
       <Tabs.Screen name="waitlist" options={{ href: null }} />
