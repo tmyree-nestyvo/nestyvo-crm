@@ -10,7 +10,17 @@
   to = "/index.html"
   status = 200
 
+# Every route rewrites to index.html's content (see redirect above), but Netlify
+# matches header rules against the REQUESTED path, not the rewrite target — so a
+# rule scoped to literally "/index.html" never applies to real traffic hitting
+# "/", "/calendar", etc. Scope broadly, then carve out the content-hashed static
+# assets (safe to cache forever — their filename changes on every build).
 [[headers]]
-  for = "/index.html"
+  for = "/*"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/_expo/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
