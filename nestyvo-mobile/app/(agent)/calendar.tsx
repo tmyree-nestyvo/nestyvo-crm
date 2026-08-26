@@ -53,10 +53,11 @@ const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function CalendarScreen() {
-  const { initialProviderId, bookingPatientId, bookingPatientName } = useLocalSearchParams<{
+  const { initialProviderId, bookingPatientId, bookingPatientName, callbackId } = useLocalSearchParams<{
     initialProviderId?: string;
     bookingPatientId?: string;
     bookingPatientName?: string;
+    callbackId?: string;
   }>();
   const today = todayPT();
   const [year, setYear] = useState(() => new Date().getFullYear());
@@ -298,6 +299,7 @@ export default function CalendarScreen() {
                             slotEndAt: slot.endAt,
                             patientId: bookingPatientId,
                             patientName: bookingPatientName ?? '',
+                            callbackId: callbackId ?? '',
                           },
                         })
                       : router.push({

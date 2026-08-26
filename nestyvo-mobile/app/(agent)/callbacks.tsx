@@ -1,8 +1,8 @@
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Linking } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 
 function useCallbacks() {
@@ -30,6 +30,25 @@ function daysAgo(iso: string) {
 
 export default function CallbacksScreen() {
   const { data = [], isLoading, refetch, isRefetching } = useCallbacks();
+  const queryClient = useQueryClient();
+
+  const dismiss = useMutation({
+    mutationFn: (id: string) => api.patch(`/dashboard/agent/callbacks/${id}/dismiss`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-callbacks'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
+    },
+    onError: (err: any) => {
+      Alert.alert('Couldn\'t dismiss callback', err?.response?.data?.message || 'Please try again.');
+    },
+  });
+
+  const confirmDismiss = (id: string) => {
+    Alert.alert('Dismiss callback?', 'This marks the callback as resolved without scheduling anything.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Dismiss', style: 'destructive', onPress: () => dismiss.mutate(id) },
+    ]);
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
@@ -125,6 +144,36 @@ export default function CallbacksScreen() {
                       <Text className="text-gray-500 text-xs">{cb.patient.email}</Text>
                     </View>
                   ) : null}
+                </View>
+
+                <View className="flex-row items-center gap-2 mt-3">
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(agent)/calendar',
+                        params: {
+                          bookingPatientId: cb.patient.id,
+                          bookingPatientName: cb.patient.name,
+                          initialProviderId: cb.provider?.id ?? '',
+                          callbackId: cb.id,
+                        },
+                      })
+                    }
+                    className="flex-1 bg-primary-50 border border-primary-100 rounded-xl py-2 items-center flex-row justify-center gap-1.5"
+                  >
+                    <Ionicons name="calendar-outline" size={14} color="#2563eb" />
+                    <Text className="text-primary-700 text-xs font-semibold">
+                      {cb.source === 'rescheduling_request' ? 'Reschedule' : 'Schedule'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => confirmDismiss(cb.id)}
+                    disabled={dismiss.isPending}
+                    className="flex-1 bg-gray-50 border border-gray-100 rounded-xl py-2 items-center flex-row justify-center gap-1.5"
+                  >
+                    <Ionicons name="close-outline" size={14} color="#6b7280" />
+                    <Text className="text-gray-600 text-xs font-semibold">Dismiss</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>

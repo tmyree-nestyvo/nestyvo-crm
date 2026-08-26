@@ -16,24 +16,29 @@ function fmt(iso: string) {
 }
 
 export default function BookSlotScreen() {
-  const { providerId, providerName, slotStartAt, slotEndAt, patientId, patientName } = useLocalSearchParams<{
+  const { providerId, providerName, slotStartAt, slotEndAt, patientId, patientName, callbackId } = useLocalSearchParams<{
     providerId: string;
     providerName: string;
     slotStartAt: string;
     slotEndAt: string;
     patientId: string;
     patientName: string;
+    callbackId?: string;
   }>();
   const [booked, setBooked] = useState(false);
 
   const bookAppointment = useMutation({
-    mutationFn: () =>
-      api.post(`/providers/${providerId}/appointments`, {
+    mutationFn: async () => {
+      await api.post(`/providers/${providerId}/appointments`, {
         patientId,
         startAt: slotStartAt,
         endAt: slotEndAt,
         locationType: 'in_person',
-      }),
+      });
+      if (callbackId) {
+        await api.patch(`/dashboard/agent/callbacks/${callbackId}/dismiss`).catch(() => {});
+      }
+    },
     onSuccess: () => setBooked(true),
     onError: (err: any) => {
       Alert.alert('Couldn\'t book appointment', err?.response?.data?.message || 'Please try again.');
