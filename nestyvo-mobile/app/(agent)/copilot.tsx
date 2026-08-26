@@ -15,8 +15,8 @@ type MessageItem =
 const STARTER_PROMPTS = [
   "Who's on Dr. Smith's waitlist for Tuesdays?",
   "Fill today's open cancellation slot",
-  "Look up patient Maria Gonzalez",
-  "What's available this week for new patients?",
+  "Look up client Maria Gonzalez",
+  "What's available this week for new clients?",
 ];
 
 export default function CopilotScreen() {

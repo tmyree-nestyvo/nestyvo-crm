@@ -31,7 +31,7 @@ export default function PatientsScreen() {
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
       <View className="px-5 pt-4 pb-3">
         <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-xl font-bold text-gray-900">Patients</Text>
+          <Text className="text-xl font-bold text-gray-900">Clients</Text>
           {canCreate && (
             <TouchableOpacity
               onPress={() => router.push('/(agent)/patients/new')}
@@ -76,7 +76,7 @@ export default function PatientsScreen() {
           contentContainerClassName="px-5 pb-8"
           ListEmptyComponent={
             <View className="items-center pt-12">
-              <Text className="text-gray-400 text-sm">No patients found</Text>
+              <Text className="text-gray-400 text-sm">No clients found</Text>
             </View>
           }
           renderItem={({ item }) => {

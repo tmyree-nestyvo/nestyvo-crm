@@ -31,7 +31,7 @@ function buildWeek() {
 }
 
 export default function ProviderScheduleScreen() {
-  const { name, clearAuth } = useAuthStore();
+  const { name, role, clearAuth } = useAuthStore();
   const week = buildWeek();
   const [selectedDate, setSelectedDate] = useState(isoDate(week[0]));
   const { data, isLoading, refetch, isRefetching } = useProviderDashboard();
@@ -49,9 +49,16 @@ export default function ProviderScheduleScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
       <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
-        <View>
-          <Text className="text-gray-500 text-sm">Provider View</Text>
-          <Text className="text-xl font-bold text-gray-900">Dr. {name?.split(' ').pop()}</Text>
+        <View className="flex-row items-center gap-2">
+          {role === 'administrator' && (
+            <TouchableOpacity onPress={() => router.replace('/(agent)')} className="p-1 -ml-1">
+              <Ionicons name="arrow-back" size={22} color="#374151" />
+            </TouchableOpacity>
+          )}
+          <View>
+            <Text className="text-gray-500 text-sm">Provider View</Text>
+            <Text className="text-xl font-bold text-gray-900">Dr. {name?.split(' ').pop()}</Text>
+          </View>
         </View>
         <View className="flex-row items-center gap-2">
           <TouchableOpacity

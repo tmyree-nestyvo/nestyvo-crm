@@ -38,7 +38,7 @@ export default function AgentLayout() {
       <Tabs.Screen
         name="patients/index"
         options={{
-          title: 'Patients',
+          title: 'Clients',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people-outline" size={size} color={color} />
           ),

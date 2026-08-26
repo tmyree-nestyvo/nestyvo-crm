@@ -371,7 +371,7 @@ export default function FillSlotScreen() {
           </Text>
         </View>
         <Text className="text-gray-400 text-xs mt-1">
-          {candidates?.length ?? 0} patients to call · ranked by priority
+          {candidates?.length ?? 0} clients to call · ranked by priority
         </Text>
       </View>
 
