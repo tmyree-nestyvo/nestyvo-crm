@@ -90,6 +90,14 @@ export default function CancellationsScreen() {
                     {opp.appointmentType ? (
                       <Text className="text-gray-400 text-xs mt-0.5">{opp.appointmentType}</Text>
                     ) : null}
+                    {opp.waitlistCount > 0 ? (
+                      <View className="flex-row items-center gap-1 mt-1.5">
+                        <Ionicons name="list-outline" size={12} color="#7c3aed" />
+                        <Text className="text-purple-700 text-xs font-medium">
+                          {opp.waitlistCount} on waitlist for this provider
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
 
                   <TouchableOpacity
