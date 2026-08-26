@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Param, Query, Body, UseGuards, ForbiddenException } from '@nestjs/common';
-import { IsString, IsOptional, IsEnum, IsDateString } from 'class-validator';
+import { Controller, Get, Post, Put, Delete, Param, Query, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { IsString, IsOptional, IsEnum, IsDateString, IsInt, Min, Max, Matches, ValidateNested, ArrayMaxSize } from 'class-validator';
+import { Type } from 'class-transformer';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -34,6 +35,29 @@ class CreateBlockDto {
   @IsDateString() startAt: string;
   @IsDateString() endAt: string;
   @IsOptional() @IsEnum(BlockType) blockType?: BlockType;
+  @IsOptional() @IsString() reason?: string;
+}
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+class AvailabilityWindowDto {
+  @IsInt() @Min(0) @Max(6) dayOfWeek: number;
+  @Matches(TIME_RE, { message: 'startTime must be HH:mm' }) startTime: string;
+  @Matches(TIME_RE, { message: 'endTime must be HH:mm' }) endTime: string;
+}
+
+class ReplaceAvailabilityDto {
+  @ValidateNested({ each: true })
+  @Type(() => AvailabilityWindowDto)
+  @ArrayMaxSize(21)
+  windows: AvailabilityWindowDto[];
+}
+
+class RecurringBlockDto {
+  @IsInt() @Min(0) @Max(6) dayOfWeek: number;
+  @Matches(TIME_RE, { message: 'startTime must be HH:mm' }) startTime: string;
+  @Matches(TIME_RE, { message: 'endTime must be HH:mm' }) endTime: string;
+  @IsOptional() @IsInt() @Min(1) @Max(26) weeks?: number;
   @IsOptional() @IsString() reason?: string;
 }
 
@@ -133,6 +157,52 @@ export class ProvidersController {
       }),
     );
     return { success: true };
+  }
+
+  @Get(':id/availability')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.PRACTICE_MANAGER)
+  getAvailability(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.providersService.getAvailability(id, user);
+  }
+
+  @Put(':id/availability')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.PRACTICE_MANAGER)
+  replaceAvailability(
+    @Param('id') id: string,
+    @Body() dto: ReplaceAvailabilityDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.providersService.replaceAvailability(id, dto.windows, user);
+  }
+
+  @Get(':id/blocks')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.PRACTICE_MANAGER)
+  getBlocksForAdmin(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.providersService.getBlocksForAdmin(id, user);
+  }
+
+  @Post(':id/recurring-block')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.PRACTICE_MANAGER)
+  createRecurringBlock(
+    @Param('id') id: string,
+    @Body() dto: RecurringBlockDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.providersService.createRecurringBlock(
+      id,
+      { dayOfWeek: dto.dayOfWeek, startTime: dto.startTime, endTime: dto.endTime, weeks: dto.weeks ?? 12, reason: dto.reason },
+      user,
+    );
+  }
+
+  @Delete(':id/blocks/:blockId')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.PRACTICE_MANAGER)
+  deleteBlock(
+    @Param('id') id: string,
+    @Param('blockId') blockId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.providersService.deleteBlock(id, blockId, user);
   }
 
   @Post('self/blocks')

@@ -7,6 +7,7 @@ import { WaitlistEntry } from '../../database/entities/waitlist-entry.entity';
 import { Patient } from '../../database/entities/patient.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { ProviderBlock } from '../../database/entities/provider-block.entity';
+import { ProviderAvailability } from '../../database/entities/provider-availability.entity';
 import { User } from '../../database/entities/user.entity';
 import { ProvidersService } from './providers.service';
 import { FillCandidatesService } from './fill-candidates.service';
@@ -17,7 +18,7 @@ import { SmsModule } from '../sms/sms.module';
   imports: [
     TypeOrmModule.forFeature([
       Provider, Appointment, AgentProviderAssignment,
-      WaitlistEntry, Patient, AuditLog, ProviderBlock, User,
+      WaitlistEntry, Patient, AuditLog, ProviderBlock, ProviderAvailability, User,
     ]),
     SmsModule,
   ],
