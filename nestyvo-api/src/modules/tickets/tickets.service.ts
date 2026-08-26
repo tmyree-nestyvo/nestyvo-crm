@@ -3,12 +3,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Ticket, TicketCategory, TicketPriority, TicketStatus } from '../../database/entities/ticket.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
+import { Provider } from '../../database/entities/provider.entity';
 
 const OFFICE_ROLES = [UserRole.ADMINISTRATOR, UserRole.PRACTICE_MANAGER];
 
 @Injectable()
 export class TicketsService {
-  constructor(@InjectRepository(Ticket) private ticketRepo: Repository<Ticket>) {}
+  constructor(
+    @InjectRepository(Ticket) private ticketRepo: Repository<Ticket>,
+    @InjectRepository(Provider) private providerRepo: Repository<Provider>,
+  ) {}
 
   create(
     input: { patientId?: string; category: TicketCategory; priority?: TicketPriority; subject: string; description: string },
@@ -27,11 +31,19 @@ export class TicketsService {
     );
   }
 
-  list(status: TicketStatus | undefined, user: User) {
+  async list(status: TicketStatus | undefined, patientId: string | undefined, user: User) {
     const isOffice = OFFICE_ROLES.includes(user.role);
     const where: any = { practiceId: user.practiceId };
     if (status) where.status = status;
-    if (!isOffice) where.createdByUserId = user.id;
+    if (patientId) where.patientId = patientId;
+
+    if (user.role === UserRole.PROVIDER) {
+      const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
+      if (!provider) return [];
+      where.patient = { assignedProviderId: provider.id };
+    } else if (!isOffice) {
+      where.createdByUserId = user.id;
+    }
 
     return this.ticketRepo.find({
       where,
@@ -46,7 +58,13 @@ export class TicketsService {
       relations: { patient: true, createdByUser: true, assignedToUser: true },
     });
     if (!ticket) throw new NotFoundException('Ticket not found');
-    if (!OFFICE_ROLES.includes(user.role) && ticket.createdByUserId !== user.id) {
+
+    if (user.role === UserRole.PROVIDER) {
+      const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
+      if (!provider || ticket.patient?.assignedProviderId !== provider.id) {
+        throw new ForbiddenException('Not one of your patients');
+      }
+    } else if (!OFFICE_ROLES.includes(user.role) && ticket.createdByUserId !== user.id) {
       throw new ForbiddenException('Not your ticket');
     }
     return ticket;

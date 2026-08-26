@@ -34,11 +34,17 @@ export class TicketsController {
   }
 
   @Get()
-  list(@Query('status') status: TicketStatus | undefined, @CurrentUser() user: User) {
-    return this.ticketsService.list(status, user);
+  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER, UserRole.PROVIDER)
+  list(
+    @Query('status') status: TicketStatus | undefined,
+    @Query('patientId') patientId: string | undefined,
+    @CurrentUser() user: User,
+  ) {
+    return this.ticketsService.list(status, patientId, user);
   }
 
   @Get(':id')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER, UserRole.PROVIDER)
   findOne(@Param('id') id: string, @CurrentUser() user: User) {
     return this.ticketsService.findOne(id, user);
   }
