@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -27,6 +27,12 @@ export class DashboardController {
   @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
   getAgentCallbacks(@CurrentUser() user: User) {
     return this.dashboardService.getAgentCallbacks(user);
+  }
+
+  @Patch('agent/callbacks/:id/dismiss')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  dismissCallback(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.dashboardService.dismissCallback(user, id);
   }
 
   @Get('agent/cancellations')

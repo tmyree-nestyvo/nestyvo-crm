@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Between, MoreThanOrEqual } from 'typeorm';
 import { User, UserRole } from '../../database/entities/user.entity';
@@ -180,7 +180,7 @@ export class DashboardService {
         status: In([CallbackStatus.OPEN, CallbackStatus.IN_PROGRESS, CallbackStatus.OVERDUE]),
       },
       relations: { patient: { assignedProvider: true } },
-      order: { status: 'DESC', createdAt: 'ASC' },
+      order: { createdAt: 'ASC' },
     });
 
     return callbacks.map((c) => ({
@@ -192,6 +192,7 @@ export class DashboardService {
       createdAt: c.createdAt,
       provider: c.patient?.assignedProvider
         ? {
+            id: c.patient.assignedProvider.id,
             name: `${c.patient.assignedProvider.firstName} ${c.patient.assignedProvider.lastName}`,
             credentials: c.patient.assignedProvider.credentials,
           }
@@ -204,6 +205,21 @@ export class DashboardService {
         preferredContact: c.patient.preferredContact,
       },
     }));
+  }
+
+  async dismissCallback(user: User, id: string): Promise<{ success: boolean }> {
+    const callback = await this.callbackRepo.findOne({ where: { id } });
+    if (!callback) throw new NotFoundException('Callback not found');
+    if (
+      user.role === UserRole.SCHEDULING_AGENT &&
+      callback.assignedAgentId !== user.id
+    ) {
+      throw new ForbiddenException('This callback is not assigned to you');
+    }
+    callback.status = CallbackStatus.COMPLETED;
+    callback.completedAt = new Date();
+    await this.callbackRepo.save(callback);
+    return { success: true };
   }
 
   async getAgentCancellations(user: User): Promise<any[]> {
