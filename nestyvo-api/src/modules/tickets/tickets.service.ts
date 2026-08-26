@@ -33,16 +33,20 @@ export class TicketsService {
 
   async list(status: TicketStatus | undefined, patientId: string | undefined, user: User) {
     const isOffice = OFFICE_ROLES.includes(user.role);
-    const where: any = { practiceId: user.practiceId };
+    const where: any = {};
     if (status) where.status = status;
     if (patientId) where.patientId = patientId;
 
     if (user.role === UserRole.PROVIDER) {
+      // Providers don't carry a practiceId on their User row — theirs lives
+      // on the Provider record, and scoping by assignedProviderId already
+      // implies the correct practice.
       const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
       if (!provider) return [];
       where.patient = { assignedProviderId: provider.id };
-    } else if (!isOffice) {
-      where.createdByUserId = user.id;
+    } else {
+      where.practiceId = user.practiceId;
+      if (!isOffice) where.createdByUserId = user.id;
     }
 
     return this.ticketRepo.find({
@@ -53,13 +57,14 @@ export class TicketsService {
   }
 
   async findOne(id: string, user: User) {
+    const isProvider = user.role === UserRole.PROVIDER;
     const ticket = await this.ticketRepo.findOne({
-      where: { id, practiceId: user.practiceId },
+      where: isProvider ? { id } : { id, practiceId: user.practiceId },
       relations: { patient: true, createdByUser: true, assignedToUser: true },
     });
     if (!ticket) throw new NotFoundException('Ticket not found');
 
-    if (user.role === UserRole.PROVIDER) {
+    if (isProvider) {
       const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
       if (!provider || ticket.patient?.assignedProviderId !== provider.id) {
         throw new ForbiddenException('Not one of your patients');
