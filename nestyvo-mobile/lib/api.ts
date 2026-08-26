@@ -72,6 +72,16 @@ export const providersApi = {
   list: (practiceId?: string) => api.get('/providers', { params: { practiceId } }).then((r) => r.data),
   getSchedule: (id: string, date?: string) =>
     api.get(`/providers/${id}/schedule`, { params: { date } }).then((r) => r.data),
+  getAvailability: (id: string) => api.get(`/providers/${id}/availability`).then((r) => r.data),
+  replaceAvailability: (id: string, windows: { dayOfWeek: number; startTime: string; endTime: string }[]) =>
+    api.put(`/providers/${id}/availability`, { windows }).then((r) => r.data),
+  getBlocks: (id: string) => api.get(`/providers/${id}/blocks`).then((r) => r.data),
+  createRecurringBlock: (
+    id: string,
+    input: { dayOfWeek: number; startTime: string; endTime: string; weeks?: number; reason?: string },
+  ) => api.post(`/providers/${id}/recurring-block`, input).then((r) => r.data),
+  deleteBlock: (id: string, blockId: string) =>
+    api.delete(`/providers/${id}/blocks/${blockId}`).then((r) => r.data),
 };
 
 // Practices (admin/agent cross-practice picker)
