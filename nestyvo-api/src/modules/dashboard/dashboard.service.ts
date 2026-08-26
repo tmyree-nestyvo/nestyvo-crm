@@ -35,18 +35,7 @@ export class DashboardService {
     const thirtyDaysOut = new Date(startOfToday);
     thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30);
 
-    let providerIds: string[];
-    if (user.role === UserRole.ADMINISTRATOR) {
-      // Admin works across every partner practice — not tied to an agent
-      // assignment, so show every active provider rather than none.
-      const allProviders = await this.providerRepo.find({ where: { status: ProviderStatus.ACTIVE } });
-      providerIds = allProviders.map((p) => p.id);
-    } else {
-      const assignments = await this.assignmentRepo.find({
-        where: { agentUserId: user.id, isActive: true },
-      });
-      providerIds = assignments.map((a) => a.providerId);
-    }
+    const providerIds = await this.getScopedProviderIds(user);
 
     if (!providerIds.length) {
       return { totalOpenSlots: 0, openCallbacks: 0, openCancellations: 0, waitlistOpportunities: 0, providers: [] };
@@ -222,18 +211,38 @@ export class DashboardService {
     return { success: true };
   }
 
-  async getAgentCancellations(user: User): Promise<any[]> {
+  // Admin works across every partner practice; other roles stay scoped to
+  // their own assigned providers. Mirrors getAgentDashboard's scoping.
+  private async getScopedProviderIds(user: User): Promise<string[]> {
+    if (user.role === UserRole.ADMINISTRATOR) {
+      const allProviders = await this.providerRepo.find({ where: { status: ProviderStatus.ACTIVE } });
+      return allProviders.map((p) => p.id);
+    }
     const assignments = await this.assignmentRepo.find({
       where: { agentUserId: user.id, isActive: true },
     });
-    const providerIds = assignments.map((a) => a.providerId);
+    return assignments.map((a) => a.providerId);
+  }
+
+  async getAgentCancellations(user: User): Promise<any[]> {
+    const providerIds = await this.getScopedProviderIds(user);
     if (!providerIds.length) return [];
 
-    const opps = await this.fillOpRepo.find({
-      where: { providerId: In(providerIds), status: FillOpportunityStatus.OPEN },
-      relations: { provider: true, sourceAppointment: { patient: true }, appointmentType: true },
-      order: { slotStartAt: 'ASC' },
-    });
+    const [opps, waitlistEntries] = await Promise.all([
+      this.fillOpRepo.find({
+        where: { providerId: In(providerIds), status: FillOpportunityStatus.OPEN },
+        relations: { provider: true, sourceAppointment: { patient: true }, appointmentType: true },
+        order: { slotStartAt: 'ASC' },
+      }),
+      this.waitlistRepo.find({
+        where: { providerId: In(providerIds), status: WaitlistEntryStatus.ACTIVE },
+      }),
+    ]);
+
+    const waitlistCountByProvider = new Map<string, number>();
+    for (const w of waitlistEntries) {
+      waitlistCountByProvider.set(w.providerId, (waitlistCountByProvider.get(w.providerId) ?? 0) + 1);
+    }
 
     return opps.map((o) => ({
       id: o.id,
@@ -254,45 +263,62 @@ export class DashboardService {
         : null,
       cancellationReason: o.sourceAppointment?.cancellationReason ?? null,
       cancelledAt: o.sourceAppointment?.cancelledAt ?? null,
+      waitlistCount: waitlistCountByProvider.get(o.providerId) ?? 0,
     }));
   }
 
   async getAgentWaitlist(user: User): Promise<any[]> {
-    const assignments = await this.assignmentRepo.find({
-      where: { agentUserId: user.id, isActive: true },
-    });
-    const providerIds = assignments.map((a) => a.providerId);
+    const providerIds = await this.getScopedProviderIds(user);
     if (!providerIds.length) return [];
 
-    const entries = await this.waitlistRepo.find({
-      where: { providerId: In(providerIds), status: WaitlistEntryStatus.ACTIVE },
-      relations: { provider: true, patient: true, appointmentType: true },
-      order: { providerId: 'ASC', priorityScore: 'DESC', dateAdded: 'ASC' },
-    });
+    const [entries, openOpps] = await Promise.all([
+      this.waitlistRepo.find({
+        where: { providerId: In(providerIds), status: WaitlistEntryStatus.ACTIVE },
+        relations: { provider: true, patient: true, appointmentType: true },
+        order: { providerId: 'ASC', priorityScore: 'DESC', dateAdded: 'ASC' },
+      }),
+      this.fillOpRepo.find({
+        where: { providerId: In(providerIds), status: FillOpportunityStatus.OPEN },
+        order: { slotStartAt: 'ASC' },
+      }),
+    ]);
 
-    return entries.map((e) => ({
-      id: e.id,
-      waitlistType: e.waitlistType,
-      priorityScore: e.priorityScore,
-      preferredDays: e.preferredDays,
-      preferredTimes: e.preferredTimes,
-      dateAdded: e.dateAdded,
-      notes: e.notes,
-      daysWaiting: Math.floor((Date.now() - new Date(e.dateAdded).getTime()) / 86_400_000),
-      provider: {
-        id: e.provider.id,
-        name: `${e.provider.firstName} ${e.provider.lastName}`,
-        credentials: e.provider.credentials,
-      },
-      patient: {
-        id: e.patient.id,
-        name: `${e.patient.firstName} ${e.patient.lastName}`,
-        phone: e.patient.phone,
-        email: e.patient.email,
-        preferredContact: e.patient.preferredContact,
-      },
-      appointmentType: e.appointmentType?.name,
-    }));
+    const nearestOppByProvider = new Map<string, { slotStartAt: Date; slotEndAt: Date }>();
+    for (const o of openOpps) {
+      if (!nearestOppByProvider.has(o.providerId)) {
+        nearestOppByProvider.set(o.providerId, { slotStartAt: o.slotStartAt, slotEndAt: o.slotEndAt });
+      }
+    }
+
+    return entries.map((e) => {
+      const nearestOpp = nearestOppByProvider.get(e.providerId) ?? null;
+      return {
+        id: e.id,
+        waitlistType: e.waitlistType,
+        priorityScore: e.priorityScore,
+        preferredDays: e.preferredDays,
+        preferredTimes: e.preferredTimes,
+        dateAdded: e.dateAdded,
+        notes: e.notes,
+        daysWaiting: Math.floor((Date.now() - new Date(e.dateAdded).getTime()) / 86_400_000),
+        provider: {
+          id: e.provider.id,
+          name: `${e.provider.firstName} ${e.provider.lastName}`,
+          credentials: e.provider.credentials,
+        },
+        patient: {
+          id: e.patient.id,
+          name: `${e.patient.firstName} ${e.patient.lastName}`,
+          phone: e.patient.phone,
+          email: e.patient.email,
+          preferredContact: e.patient.preferredContact,
+        },
+        appointmentType: e.appointmentType?.name,
+        matchingCancellation: nearestOpp
+          ? { slotStartAt: nearestOpp.slotStartAt, slotEndAt: nearestOpp.slotEndAt }
+          : null,
+      };
+    });
   }
 
   async getAgentStats(user: User, period: string): Promise<any> {
