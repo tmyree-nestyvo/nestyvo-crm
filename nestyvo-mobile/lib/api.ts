@@ -109,7 +109,7 @@ export const clientTagsApi = {
 
 // Tickets (agent → office escalation)
 export const ticketsApi = {
-  list: (status?: string) => api.get('/tickets', { params: { status } }).then((r) => r.data),
+  list: (status?: string, patientId?: string) => api.get('/tickets', { params: { status, patientId } }).then((r) => r.data),
   get: (id: string) => api.get(`/tickets/${id}`).then((r) => r.data),
   create: (input: { patientId?: string; category: string; priority?: string; subject: string; description: string }) =>
     api.post('/tickets', input).then((r) => r.data),

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
@@ -47,7 +48,16 @@ function ClientTile({ patient }: { patient: any }) {
   const contactIcon = CONTACT_ICON[patient.preferredContact] ?? 'call-outline';
 
   return (
-    <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-3">
+    <TouchableOpacity
+      onPress={() =>
+        router.push({
+          pathname: '/(provider)/clients/[id]',
+          params: { id: patient.id, name: `${patient.firstName} ${patient.lastName}` },
+        })
+      }
+      activeOpacity={0.7}
+      className="bg-white rounded-2xl border border-gray-100 p-4 mb-3"
+    >
       <View className="flex-row items-start gap-3">
         {/* Avatar */}
         <View className="w-11 h-11 rounded-full bg-primary-100 items-center justify-center flex-shrink-0">
@@ -102,7 +112,13 @@ function ClientTile({ patient }: { patient: any }) {
           ) : null}
         </View>
       ) : null}
-    </View>
+
+      <View className="flex-row items-center gap-1.5 mt-3 pt-3 border-t border-gray-50">
+        <Ionicons name="chatbox-ellipses-outline" size={12} color="#9ca3af" />
+        <Text className="text-gray-400 text-xs">View ticket &amp; interaction history</Text>
+        <Ionicons name="chevron-forward" size={14} color="#d1d5db" style={{ marginLeft: 'auto' }} />
+      </View>
+    </TouchableOpacity>
   );
 }
 
