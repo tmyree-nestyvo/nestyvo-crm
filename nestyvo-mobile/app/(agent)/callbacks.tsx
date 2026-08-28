@@ -1,9 +1,10 @@
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Linking, Alert } from 'react-native';
+import { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Linking, Alert, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api, patientsApi } from '../../lib/api';
 
 function useCallbacks() {
   return useQuery({
@@ -21,6 +22,141 @@ const SOURCE_LABEL: Record<string, string> = {
   agent_created: 'Agent created',
 };
 
+const LOGGABLE_SOURCES = ['missed_call', 'voicemail', 'website', 'agent_created'];
+
+function LogCallbackModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const [query, setQuery] = useState('');
+  const [patient, setPatient] = useState<{ id: string; name: string } | null>(null);
+  const [source, setSource] = useState('missed_call');
+  const [notes, setNotes] = useState('');
+  const queryClient = useQueryClient();
+
+  const { data: results = [], isLoading } = useQuery({
+    queryKey: ['patients', query],
+    queryFn: () => patientsApi.search(query),
+    enabled: query.length >= 2 && !patient,
+  });
+
+  const reset = () => {
+    setQuery('');
+    setPatient(null);
+    setSource('missed_call');
+    setNotes('');
+    onClose();
+  };
+
+  const logCallback = useMutation({
+    mutationFn: () => api.post('/dashboard/agent/callbacks', { patientId: patient!.id, source, notes: notes || undefined }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent-callbacks'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
+      reset();
+    },
+    onError: (err: any) => {
+      Alert.alert('Couldn\'t log callback', err?.response?.data?.message || 'Please try again.');
+    },
+  });
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={reset}>
+      <View className="flex-1 justify-end bg-black/40">
+        <View className="bg-white rounded-t-3xl px-5 pt-5 pb-10 max-h-[85%]">
+          <Text className="text-base font-bold text-gray-900 mb-1">Log a Callback</Text>
+          <Text className="text-gray-400 text-sm mb-4">For a missed call, voicemail, or inquiry that came in outside the app.</Text>
+
+          {!patient ? (
+            <>
+              <Text className="text-gray-500 text-xs font-medium mb-2">Client</Text>
+              <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-3 mb-2">
+                <Ionicons name="search" size={16} color="#9ca3af" />
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="Search by name, phone, or email…"
+                  placeholderTextColor="#9ca3af"
+                  className="flex-1 py-2.5 px-2 text-sm text-gray-900"
+                  autoCapitalize="none"
+                />
+              </View>
+              {query.length >= 2 ? (
+                <ScrollView className="max-h-48 mb-4">
+                  {isLoading ? (
+                    <ActivityIndicator color="#2563eb" style={{ marginVertical: 12 }} />
+                  ) : results.length === 0 ? (
+                    <Text className="text-gray-400 text-sm text-center py-3">No clients found</Text>
+                  ) : (
+                    results.map((p: any) => (
+                      <TouchableOpacity
+                        key={p.id}
+                        onPress={() => setPatient({ id: p.id, name: p.name })}
+                        className="px-3 py-2.5 rounded-xl border border-gray-100 bg-gray-50 mb-1.5"
+                      >
+                        <Text className="text-gray-800 font-medium text-sm">{p.name}</Text>
+                        <Text className="text-gray-400 text-xs mt-0.5">{p.phone}{p.practiceName ? ` · ${p.practiceName}` : ''}</Text>
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </ScrollView>
+              ) : (
+                <View className="mb-4" />
+              )}
+            </>
+          ) : (
+            <>
+              <Text className="text-gray-500 text-xs font-medium mb-2">Client</Text>
+              <View className="flex-row items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 mb-4">
+                <Text className="text-gray-900 text-sm font-medium">{patient.name}</Text>
+                <TouchableOpacity onPress={() => setPatient(null)}>
+                  <Text className="text-primary-600 text-xs font-medium">Change</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text className="text-gray-500 text-xs font-medium mb-2">Source</Text>
+              <View className="flex-row flex-wrap gap-2 mb-4">
+                {LOGGABLE_SOURCES.map((s) => (
+                  <TouchableOpacity
+                    key={s}
+                    onPress={() => setSource(s)}
+                    className={`px-3 py-1.5 rounded-full border ${source === s ? 'bg-primary-600 border-primary-600' : 'bg-gray-50 border-gray-200'}`}
+                  >
+                    <Text className={`text-xs font-medium ${source === s ? 'text-white' : 'text-gray-600'}`}>{SOURCE_LABEL[s]}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text className="text-gray-500 text-xs font-medium mb-2">Notes (optional)</Text>
+              <TextInput
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="What do they need?"
+                multiline
+                numberOfLines={2}
+                className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 mb-5"
+                style={{ textAlignVertical: 'top', minHeight: 56 }}
+              />
+
+              <TouchableOpacity
+                onPress={() => logCallback.mutate()}
+                disabled={logCallback.isPending}
+                className="bg-primary-600 rounded-xl py-3 items-center"
+              >
+                {logCallback.isPending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text className="text-white font-semibold text-sm">Log Callback</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
+          <TouchableOpacity onPress={reset} className="mt-3 items-center py-1">
+            <Text className="text-gray-400 text-sm">Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function daysAgo(iso: string) {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
   if (d === 0) return 'Today';
@@ -31,6 +167,7 @@ function daysAgo(iso: string) {
 export default function CallbacksScreen() {
   const { data = [], isLoading, refetch, isRefetching } = useCallbacks();
   const queryClient = useQueryClient();
+  const [logModal, setLogModal] = useState(false);
 
   const dismiss = useMutation({
     mutationFn: (id: string) => api.patch(`/dashboard/agent/callbacks/${id}/dismiss`),
@@ -62,6 +199,13 @@ export default function CallbacksScreen() {
             {data.length} patient{data.length !== 1 ? 's' : ''} to call back
           </Text>
         </View>
+        <TouchableOpacity
+          onPress={() => setLogModal(true)}
+          className="flex-row items-center gap-1.5 bg-primary-600 px-3 py-1.5 rounded-full"
+        >
+          <Ionicons name="add" size={16} color="#fff" />
+          <Text className="text-white text-xs font-semibold">Log Callback</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -180,6 +324,8 @@ export default function CallbacksScreen() {
           ))
         )}
       </ScrollView>
+
+      <LogCallbackModal visible={logModal} onClose={() => setLogModal(false)} />
     </SafeAreaView>
   );
 }

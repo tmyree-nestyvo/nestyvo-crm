@@ -89,6 +89,18 @@ export const practicesApi = {
   list: () => api.get('/practices').then((r) => r.data),
 };
 
+// Waitlist
+export const waitlistApi = {
+  add: (input: {
+    patientId: string;
+    providerId?: string;
+    waitlistType: string;
+    preferredDays?: number[];
+    preferredTimes?: Record<string, boolean>;
+    notes?: string;
+  }) => api.post('/waitlist', input).then((r) => r.data),
+};
+
 // Reminders (public, unauthenticated — patient self-service cancel link)
 export const remindersApi = {
   get: (reminderId: string) => api.get(`/reminders/${reminderId}`).then((r) => r.data),

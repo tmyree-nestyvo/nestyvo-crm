@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, patientLinksApi, clientTagsApi, ticketsApi } from '../../../lib/api';
+import { api, patientLinksApi, clientTagsApi, ticketsApi, waitlistApi } from '../../../lib/api';
 import { AppointmentCard } from '../../../components/dashboard/AppointmentCard';
 import { useAuthStore } from '../../../lib/store';
 
@@ -101,6 +101,12 @@ export default function PatientDetailScreen() {
         </View>
 
         <TagSection patientId={id} tag={patient?.tag ?? null} practiceId={patient?.practiceId} practiceName={patient?.practiceName} />
+
+        <WaitlistSection
+          patientId={id}
+          waitlistStatus={patient?.waitlistStatus}
+          assignedProviderId={patient?.assignedProviderId}
+        />
 
         {/* Contact History */}
         {attempts.length > 0 && (
@@ -266,6 +272,169 @@ function TicketModal({ visible, onClose, patientId }: { visible: boolean; onClos
         </View>
       </View>
     </Modal>
+  );
+}
+
+const WAITLIST_TYPES: { value: string; label: string }[] = [
+  { value: 'new_patient', label: 'New patient' },
+  { value: 'followup', label: 'Follow-up' },
+  { value: 'urgent', label: 'Urgent' },
+];
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function WaitlistSection({
+  patientId,
+  waitlistStatus,
+  assignedProviderId,
+}: {
+  patientId: string;
+  waitlistStatus?: string;
+  assignedProviderId?: string | null;
+}) {
+  const [modal, setModal] = useState(false);
+  const [waitlistType, setWaitlistType] = useState('followup');
+  const [days, setDays] = useState<number[]>([]);
+  const [times, setTimes] = useState<Record<string, boolean>>({ morning: false, afternoon: false, evening: false });
+  const [notes, setNotes] = useState('');
+  const queryClient = useQueryClient();
+
+  const toggleDay = (d: number) => setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
+  const toggleTime = (t: string) => setTimes((prev) => ({ ...prev, [t]: !prev[t] }));
+
+  const reset = () => {
+    setWaitlistType('followup');
+    setDays([]);
+    setTimes({ morning: false, afternoon: false, evening: false });
+    setNotes('');
+    setModal(false);
+  };
+
+  const addToWaitlist = useMutation({
+    mutationFn: () =>
+      waitlistApi.add({
+        patientId,
+        providerId: assignedProviderId ?? undefined,
+        waitlistType,
+        preferredDays: days.length ? days : undefined,
+        preferredTimes: Object.values(times).some(Boolean) ? times : undefined,
+        notes: notes || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
+      reset();
+      Alert.alert('Added to waitlist');
+    },
+    onError: (err: any) => {
+      Alert.alert('Couldn\'t add to waitlist', err?.response?.data?.message || 'Please try again.');
+    },
+  });
+
+  const isActive = waitlistStatus === 'active';
+
+  return (
+    <>
+      <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
+        <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Waitlist</Text>
+        {isActive ? (
+          <View className="flex-row items-center gap-3">
+            <View className="w-7 h-7 bg-amber-50 rounded-lg items-center justify-center">
+              <Ionicons name="list-outline" size={14} color="#d97706" />
+            </View>
+            <Text className="text-gray-700 text-sm">Already on the waitlist</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            onPress={() => {
+              if (!assignedProviderId) {
+                Alert.alert('No provider assigned', 'Assign this client to a provider first — the waitlist is provider-specific.');
+                return;
+              }
+              setModal(true);
+            }}
+            className="flex-row items-center gap-3"
+          >
+            <View className="w-7 h-7 bg-gray-50 rounded-lg items-center justify-center">
+              <Ionicons name="add-circle-outline" size={16} color="#2563eb" />
+            </View>
+            <Text className="text-primary-600 text-sm font-medium">Add to Waitlist</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <Modal visible={modal} transparent animationType="slide" onRequestClose={reset}>
+        <View className="flex-1 justify-end bg-black/40">
+          <View className="bg-white rounded-t-3xl px-5 pt-5 pb-10">
+            <Text className="text-base font-bold text-gray-900 mb-1">Add to Waitlist</Text>
+            <Text className="text-gray-400 text-sm mb-4">They'll be matched automatically when a slot opens up.</Text>
+
+            <Text className="text-gray-500 text-xs font-medium mb-2">Type</Text>
+            <View className="flex-row flex-wrap gap-2 mb-4">
+              {WAITLIST_TYPES.map((t) => (
+                <TouchableOpacity
+                  key={t.value}
+                  onPress={() => setWaitlistType(t.value)}
+                  className={`px-3 py-1.5 rounded-full border ${waitlistType === t.value ? 'bg-primary-600 border-primary-600' : 'bg-gray-50 border-gray-200'}`}
+                >
+                  <Text className={`text-xs font-medium ${waitlistType === t.value ? 'text-white' : 'text-gray-600'}`}>{t.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text className="text-gray-500 text-xs font-medium mb-2">Preferred days (optional)</Text>
+            <View className="flex-row flex-wrap gap-2 mb-4">
+              {DAY_LABELS.map((label, i) => (
+                <TouchableOpacity
+                  key={i}
+                  onPress={() => toggleDay(i)}
+                  className={`px-3 py-1.5 rounded-full border ${days.includes(i) ? 'bg-primary-600 border-primary-600' : 'bg-gray-50 border-gray-200'}`}
+                >
+                  <Text className={`text-xs font-medium ${days.includes(i) ? 'text-white' : 'text-gray-600'}`}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text className="text-gray-500 text-xs font-medium mb-2">Preferred times (optional)</Text>
+            <View className="flex-row flex-wrap gap-2 mb-4">
+              {(['morning', 'afternoon', 'evening'] as const).map((t) => (
+                <TouchableOpacity
+                  key={t}
+                  onPress={() => toggleTime(t)}
+                  className={`px-3 py-1.5 rounded-full border capitalize ${times[t] ? 'bg-primary-600 border-primary-600' : 'bg-gray-50 border-gray-200'}`}
+                >
+                  <Text className={`text-xs font-medium capitalize ${times[t] ? 'text-white' : 'text-gray-600'}`}>{t}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text className="text-gray-500 text-xs font-medium mb-2">Notes (optional)</Text>
+            <TextInput
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Anything else worth knowing?"
+              multiline
+              numberOfLines={2}
+              className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 mb-5"
+              style={{ textAlignVertical: 'top', minHeight: 56 }}
+            />
+
+            <TouchableOpacity
+              onPress={() => addToWaitlist.mutate()}
+              disabled={addToWaitlist.isPending}
+              className="bg-primary-600 rounded-xl py-3 items-center"
+            >
+              {addToWaitlist.isPending ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text className="text-white font-semibold text-sm">Add to Waitlist</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={reset} className="mt-3 items-center py-1">
+              <Text className="text-gray-400 text-sm">Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
