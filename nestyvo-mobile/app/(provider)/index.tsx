@@ -21,9 +21,9 @@ function isoDate(d: Date) {
   return d.toISOString().split('T')[0];
 }
 
-function buildWeek() {
+function buildDays() {
   const today = new Date();
-  return Array.from({ length: 7 }, (_, i) => {
+  return Array.from({ length: 30 }, (_, i) => {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     return d;
@@ -32,9 +32,11 @@ function buildWeek() {
 
 export default function ProviderScheduleScreen() {
   const { name, role, clearAuth } = useAuthStore();
-  const week = buildWeek();
-  const [selectedDate, setSelectedDate] = useState(isoDate(week[0]));
+  const days = buildDays();
+  const [selectedDate, setSelectedDate] = useState(isoDate(days[0]));
   const { data, isLoading, refetch, isRefetching } = useProviderDashboard();
+
+  const datesWithAppts = new Set((data?.schedule ?? []).map((a: any) => a.startAt.slice(0, 10)));
 
   const handleSignOut = async () => {
     await signOut();
@@ -82,18 +84,31 @@ export default function ProviderScheduleScreen() {
         {/* Stats */}
         <View className="flex-row gap-3 px-5 mb-4">
           <StatCard label="Available Slots" value={data?.availableSlots ?? '—'} icon="time-outline" color="#16a34a" />
-          <StatCard label="Waitlist" value={data?.waitlistCount ?? '—'} icon="list-outline" color="#d97706" />
+          <StatCard
+            label="Waitlist"
+            value={data?.waitlistCount ?? '—'}
+            icon="list-outline"
+            color="#d97706"
+            onPress={() => router.push('/(provider)/waitlist')}
+          />
         </View>
         <View className="flex-row gap-3 px-5 mb-5">
           <StatCard label="Utilization" value={data?.utilizationRate ? `${data.utilizationRate}%` : '—'} icon="stats-chart-outline" color="#7c3aed" />
-          <StatCard label="Cancellations" value={data?.cancellationCount ?? '—'} icon="close-circle-outline" color="#dc2626" />
+          <StatCard
+            label="Cancellations"
+            value={data?.cancellationCount ?? '—'}
+            icon="close-circle-outline"
+            color="#dc2626"
+            onPress={() => router.push('/(provider)/cancellations')}
+          />
         </View>
 
-        {/* Week strip */}
+        {/* Day strip — next 30 days */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-4 mb-4">
-          {week.map((d) => {
+          {days.map((d) => {
             const iso = isoDate(d);
             const active = iso === selectedDate;
+            const hasAppts = datesWithAppts.has(iso);
             return (
               <TouchableOpacity
                 key={iso}
@@ -108,6 +123,9 @@ export default function ProviderScheduleScreen() {
                 <Text className={`text-lg font-bold mt-0.5 ${active ? 'text-white' : 'text-gray-900'}`}>
                   {d.getDate()}
                 </Text>
+                {hasAppts && !active ? (
+                  <View className="w-1 h-1 rounded-full bg-primary-500 mt-0.5" />
+                ) : null}
               </TouchableOpacity>
             );
           })}
@@ -125,7 +143,18 @@ export default function ProviderScheduleScreen() {
               <Text className="text-gray-400 text-sm">Loading…</Text>
             </View>
           ) : dayAppts.length ? (
-            dayAppts.map((appt: any) => <AppointmentCard key={appt.id} appt={appt} />)
+            dayAppts.map((appt: any) => (
+              <AppointmentCard
+                key={appt.id}
+                appt={appt}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(provider)/clients/[id]',
+                    params: { id: appt.patientId, name: appt.patient },
+                  })
+                }
+              />
+            ))
           ) : (
             <View className="bg-white rounded-xl border border-gray-100 p-6 items-center">
               <Ionicons name="calendar-outline" size={32} color="#d1d5db" />

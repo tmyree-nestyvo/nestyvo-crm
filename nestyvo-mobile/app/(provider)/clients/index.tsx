@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api } from '../../../lib/api';
 
 const TZ = 'America/Los_Angeles';
 
@@ -124,17 +124,54 @@ function ClientTile({ patient }: { patient: any }) {
 
 export default function ClientsScreen() {
   const [tab, setTab] = useState<'active' | 'inactive'>('active');
+  const [query, setQuery] = useState('');
   const { data, isLoading, refetch, isRefetching } = useRoster();
 
   const active: any[] = data?.active ?? [];
   const inactive: any[] = data?.inactive ?? [];
   const shown = tab === 'active' ? active : inactive;
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return shown;
+    const digits = q.replace(/\D/g, '');
+    return shown.filter((p: any) => {
+      const name = `${p.firstName} ${p.lastName}`.toLowerCase();
+      const phoneDigits = (p.phone ?? '').replace(/\D/g, '');
+      const email = (p.email ?? '').toLowerCase();
+      return (
+        name.includes(q) ||
+        email.includes(q) ||
+        (digits.length > 0 && phoneDigits.includes(digits))
+      );
+    });
+  }, [shown, query]);
+
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
       {/* Header */}
       <View className="px-5 pt-4 pb-2">
         <Text className="text-2xl font-bold text-gray-900">My Clients</Text>
+      </View>
+
+      {/* Search */}
+      <View className="px-5 pb-3">
+        <View className="flex-row items-center bg-white border border-gray-200 rounded-xl px-4 gap-3">
+          <Ionicons name="search" size={16} color="#9ca3af" />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search by name, phone, or email…"
+            placeholderTextColor="#9ca3af"
+            className="flex-1 py-3 text-sm text-gray-800"
+            autoCapitalize="none"
+          />
+          {query.length > 0 && (
+            <TouchableOpacity onPress={() => setQuery('')}>
+              <Ionicons name="close-circle" size={16} color="#9ca3af" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Active / Inactive tab switcher */}
@@ -185,15 +222,15 @@ export default function ClientsScreen() {
           <View className="items-center py-16">
             <Text className="text-gray-400">Loading…</Text>
           </View>
-        ) : shown.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <View className="bg-white rounded-2xl border border-gray-100 p-8 items-center mt-4">
             <Ionicons name="people-outline" size={36} color="#d1d5db" />
             <Text className="text-gray-400 text-sm mt-3">
-              No {tab} clients
+              {query ? 'No clients match your search' : `No ${tab} clients`}
             </Text>
           </View>
         ) : (
-          shown.map((p: any) => <ClientTile key={p.id} patient={p} />)
+          filtered.map((p: any) => <ClientTile key={p.id} patient={p} />)
         )}
       </ScrollView>
     </SafeAreaView>

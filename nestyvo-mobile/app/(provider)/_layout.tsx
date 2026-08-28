@@ -20,7 +20,7 @@ export default function ProviderLayout() {
         }}
       />
       <Tabs.Screen
-        name="clients"
+        name="clients/index"
         options={{
           title: 'Clients',
           tabBarIcon: ({ color, size }) => <Ionicons name="people" size={size} color={color} />,
@@ -34,6 +34,8 @@ export default function ProviderLayout() {
         }}
       />
       <Tabs.Screen name="block-time" options={{ href: null }} />
+      <Tabs.Screen name="clients/[id]" options={{ href: null }} />
+      <Tabs.Screen name="cancellations" options={{ href: null }} />
     </Tabs>
   );
 }
