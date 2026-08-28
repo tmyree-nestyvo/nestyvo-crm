@@ -89,6 +89,7 @@ export class PatientsService {
       waitlistStatus: patient.waitlistStatus,
       practiceId: patient.practiceId,
       practiceName: patient.practice.name,
+      assignedProviderId: patient.assignedProviderId ?? null,
       assignedProvider: patient.assignedProvider
         ? `${patient.assignedProvider.firstName} ${patient.assignedProvider.lastName}`
         : null,

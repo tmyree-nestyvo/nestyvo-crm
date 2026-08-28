@@ -1,10 +1,18 @@
-import { Controller, Get, Patch, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards } from '@nestjs/common';
+import { IsString, IsOptional, IsEnum } from 'class-validator';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { User, UserRole } from '../../database/entities/user.entity';
+import { CallbackSource } from '../../database/entities/callback-request.entity';
 import { DashboardService } from './dashboard.service';
+
+class CreateCallbackDto {
+  @IsString() patientId: string;
+  @IsEnum(CallbackSource) source: CallbackSource;
+  @IsOptional() @IsString() notes?: string;
+}
 
 @Controller('dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -33,6 +41,12 @@ export class DashboardController {
   @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
   getAgentCallbacks(@CurrentUser() user: User) {
     return this.dashboardService.getAgentCallbacks(user);
+  }
+
+  @Post('agent/callbacks')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  createCallback(@CurrentUser() user: User, @Body() dto: CreateCallbackDto) {
+    return this.dashboardService.createCallback(user, dto);
   }
 
   @Patch('agent/callbacks/:id/dismiss')

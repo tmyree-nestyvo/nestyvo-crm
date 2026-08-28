@@ -1,9 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { WaitlistEntry, WaitlistEntryStatus } from '../../database/entities/waitlist-entry.entity';
+import { WaitlistEntry, WaitlistEntryStatus, WaitlistType } from '../../database/entities/waitlist-entry.entity';
 import { Provider } from '../../database/entities/provider.entity';
-import { User } from '../../database/entities/user.entity';
+import { User, UserRole } from '../../database/entities/user.entity';
 
 @Injectable()
 export class WaitlistService {
@@ -11,6 +11,42 @@ export class WaitlistService {
     @InjectRepository(WaitlistEntry) private waitlistRepo: Repository<WaitlistEntry>,
     @InjectRepository(Provider) private providerRepo: Repository<Provider>,
   ) {}
+
+  async addEntry(
+    input: {
+      patientId: string;
+      providerId?: string;
+      waitlistType: WaitlistType;
+      preferredDays?: number[];
+      preferredTimes?: Record<string, boolean>;
+      notes?: string;
+    },
+    user: User,
+  ) {
+    let providerId = input.providerId;
+
+    // Providers can only add to their own waitlist — ignore whatever
+    // providerId came from the client and use their own record instead.
+    if (user.role === UserRole.PROVIDER) {
+      const own = await this.providerRepo.findOne({ where: { userId: user.id } });
+      if (!own) throw new BadRequestException('Not a provider account');
+      providerId = own.id;
+    }
+    if (!providerId) throw new BadRequestException('providerId is required');
+
+    const entry = this.waitlistRepo.create({
+      patientId: input.patientId,
+      providerId,
+      waitlistType: input.waitlistType ?? WaitlistType.FOLLOWUP,
+      preferredDays: input.preferredDays,
+      preferredTimes: input.preferredTimes,
+      notes: input.notes,
+      dateAdded: new Date(),
+      createdBy: user.id,
+    });
+    const saved = await this.waitlistRepo.save(entry);
+    return { id: saved.id };
+  }
 
   async getForProvider(user: User): Promise<any[]> {
     const provider = await this.providerRepo.findOne({ where: { userId: user.id } });

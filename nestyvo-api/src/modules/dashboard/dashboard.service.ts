@@ -6,7 +6,7 @@ import { Provider, ProviderStatus } from '../../database/entities/provider.entit
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
 import { FillOpportunity, FillOpportunityStatus } from '../../database/entities/fill-opportunity.entity';
 import { WaitlistEntry, WaitlistEntryStatus } from '../../database/entities/waitlist-entry.entity';
-import { CallbackRequest, CallbackStatus } from '../../database/entities/callback-request.entity';
+import { CallbackRequest, CallbackStatus, CallbackSource } from '../../database/entities/callback-request.entity';
 import { AgentProviderAssignment } from '../../database/entities/agent-provider-assignment.entity';
 import { ProviderAvailability } from '../../database/entities/provider-availability.entity';
 import { ProviderBlock } from '../../database/entities/provider-block.entity';
@@ -195,11 +195,19 @@ export class DashboardService {
   }
 
   async getAgentCallbacks(user: User): Promise<any[]> {
+    // Shared work queue, not a personal inbox — an admin or agent previously
+    // only ever saw callbacks whose assignedAgentId matched their own user
+    // id, which meant anyone other than the one agent named in the seed data
+    // saw an empty list regardless of how many callbacks actually existed.
+    const where: any = {
+      status: In([CallbackStatus.OPEN, CallbackStatus.IN_PROGRESS, CallbackStatus.OVERDUE]),
+    };
+    if (user.role === UserRole.PRACTICE_MANAGER) {
+      where.patient = { practiceId: user.practiceId };
+    }
+
     const callbacks = await this.callbackRepo.find({
-      where: {
-        assignedAgentId: user.id,
-        status: In([CallbackStatus.OPEN, CallbackStatus.IN_PROGRESS, CallbackStatus.OVERDUE]),
-      },
+      where,
       relations: { patient: { assignedProvider: true } },
       order: { createdAt: 'ASC' },
     });
@@ -229,18 +237,30 @@ export class DashboardService {
   }
 
   async dismissCallback(user: User, id: string): Promise<{ success: boolean }> {
-    const callback = await this.callbackRepo.findOne({ where: { id } });
+    const callback = await this.callbackRepo.findOne({ where: { id }, relations: { patient: true } });
     if (!callback) throw new NotFoundException('Callback not found');
-    if (
-      user.role === UserRole.SCHEDULING_AGENT &&
-      callback.assignedAgentId !== user.id
-    ) {
-      throw new ForbiddenException('This callback is not assigned to you');
+    if (user.role === UserRole.PRACTICE_MANAGER && callback.patient?.practiceId !== user.practiceId) {
+      throw new ForbiddenException('Not your practice');
     }
     callback.status = CallbackStatus.COMPLETED;
     callback.completedAt = new Date();
     await this.callbackRepo.save(callback);
     return { success: true };
+  }
+
+  async createCallback(
+    user: User,
+    input: { patientId: string; source: CallbackSource; notes?: string },
+  ): Promise<{ id: string }> {
+    const callback = this.callbackRepo.create({
+      patientId: input.patientId,
+      source: input.source,
+      notes: input.notes,
+      status: CallbackStatus.OPEN,
+      assignedAgentId: user.id,
+    });
+    const saved = await this.callbackRepo.save(callback);
+    return { id: saved.id };
   }
 
   // Admin works across every partner practice; other roles stay scoped to
