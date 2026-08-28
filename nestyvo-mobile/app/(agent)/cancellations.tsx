@@ -98,6 +98,41 @@ export default function CancellationsScreen() {
                         </Text>
                       </View>
                     ) : null}
+
+                    {opp.suggestedPatients?.length > 0 ? (
+                      <View className="flex-row items-center gap-1.5 mt-1.5 flex-wrap">
+                        <Text className="text-gray-400 text-xs">Suggested:</Text>
+                        {opp.suggestedPatients.map((sp: any) => (
+                          <TouchableOpacity
+                            key={sp.patientId}
+                            onPress={() =>
+                              router.push({
+                                pathname: '/(agent)/book-slot',
+                                params: {
+                                  providerId: opp.provider.id,
+                                  providerName: opp.provider.name,
+                                  slotStartAt: opp.slotStartAt,
+                                  slotEndAt: opp.slotEndAt,
+                                  patientId: sp.patientId,
+                                  patientName: sp.name,
+                                },
+                              })
+                            }
+                            className={`px-2 py-1 rounded-full border ${
+                              sp.tagFit === 'match' ? 'bg-green-50 border-green-100' : 'bg-gray-50 border-gray-100'
+                            }`}
+                          >
+                            <Text
+                              className={`text-xs font-medium ${
+                                sp.tagFit === 'match' ? 'text-green-700' : 'text-gray-600'
+                              }`}
+                            >
+                              {sp.name}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    ) : null}
                   </View>
 
                   <TouchableOpacity
