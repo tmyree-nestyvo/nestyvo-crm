@@ -14,13 +14,20 @@ export class TicketsService {
     @InjectRepository(Provider) private providerRepo: Repository<Provider>,
   ) {}
 
-  create(
+  async create(
     input: { patientId?: string; category: TicketCategory; priority?: TicketPriority; subject: string; description: string },
     user: User,
   ) {
+    let practiceId = user.practiceId;
+    if (user.role === UserRole.PROVIDER) {
+      const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
+      if (!provider) throw new ForbiddenException('Not a provider account');
+      practiceId = provider.practiceId;
+    }
+
     return this.ticketRepo.save(
       this.ticketRepo.create({
-        practiceId: user.practiceId,
+        practiceId,
         patientId: input.patientId ?? null,
         category: input.category,
         priority: input.priority ?? TicketPriority.NORMAL,
@@ -80,12 +87,25 @@ export class TicketsService {
     updates: { status?: TicketStatus; assignedToUserId?: string | null; resolutionNotes?: string },
     user: User,
   ) {
-    const ticket = await this.ticketRepo.findOne({ where: { id, practiceId: user.practiceId } });
+    const isProvider = user.role === UserRole.PROVIDER;
+    const ticket = await this.ticketRepo.findOne({
+      where: isProvider ? { id } : { id, practiceId: user.practiceId },
+      relations: isProvider ? { patient: true } : {},
+    });
     if (!ticket) throw new NotFoundException('Ticket not found');
 
-    const isOffice = OFFICE_ROLES.includes(user.role);
-    if (!isOffice && ticket.createdByUserId !== user.id) {
-      throw new ForbiddenException('Not your ticket');
+    if (isProvider) {
+      const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
+      const ownsPatient = provider && ticket.patient?.assignedProviderId === provider.id;
+      const isCreator = ticket.createdByUserId === user.id;
+      if (!ownsPatient && !isCreator) {
+        throw new ForbiddenException('Not one of your patients or tickets');
+      }
+    } else {
+      const isOffice = OFFICE_ROLES.includes(user.role);
+      if (!isOffice && ticket.createdByUserId !== user.id) {
+        throw new ForbiddenException('Not your ticket');
+      }
     }
 
     if (updates.status !== undefined) {

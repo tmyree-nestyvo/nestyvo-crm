@@ -29,6 +29,7 @@ export class TicketsController {
   constructor(private ticketsService: TicketsService) {}
 
   @Post()
+  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER, UserRole.PROVIDER)
   create(@Body() dto: CreateTicketDto, @CurrentUser() user: User) {
     return this.ticketsService.create(dto, user);
   }
@@ -50,6 +51,7 @@ export class TicketsController {
   }
 
   @Patch(':id')
+  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER, UserRole.PROVIDER)
   update(@Param('id') id: string, @Body() dto: UpdateTicketDto, @CurrentUser() user: User) {
     return this.ticketsService.update(id, dto, user);
   }
