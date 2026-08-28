@@ -10,6 +10,8 @@ import { AppointmentCard } from '../../components/dashboard/AppointmentCard';
 import { StatCard } from '../../components/dashboard/StatCard';
 import { signOut } from '../../lib/auth';
 
+const TZ = 'America/Los_Angeles';
+
 function useProviderDashboard() {
   return useQuery({
     queryKey: ['provider-dashboard'],
@@ -18,7 +20,10 @@ function useProviderDashboard() {
 }
 
 function isoDate(d: Date) {
-  return d.toISOString().split('T')[0];
+  // toISOString() converts to UTC first, which can roll the date to the
+  // next/previous day depending on local offset — use the Pacific-time
+  // calendar date instead, matching the rest of the app's TZ convention.
+  return d.toLocaleDateString('en-CA', { timeZone: TZ });
 }
 
 function buildDays() {
@@ -36,7 +41,7 @@ export default function ProviderScheduleScreen() {
   const [selectedDate, setSelectedDate] = useState(isoDate(days[0]));
   const { data, isLoading, refetch, isRefetching } = useProviderDashboard();
 
-  const datesWithAppts = new Set((data?.schedule ?? []).map((a: any) => a.startAt.slice(0, 10)));
+  const datesWithAppts = new Set((data?.schedule ?? []).map((a: any) => isoDate(new Date(a.startAt))));
 
   const handleSignOut = async () => {
     await signOut();
@@ -45,7 +50,7 @@ export default function ProviderScheduleScreen() {
   };
 
   const dayAppts = data?.schedule?.filter(
-    (a: any) => a.startAt?.startsWith(selectedDate),
+    (a: any) => a.startAt && isoDate(new Date(a.startAt)) === selectedDate,
   ) ?? [];
 
   return (
