@@ -23,6 +23,12 @@ export class DashboardController {
     return this.dashboardService.getProviderDashboard(user);
   }
 
+  @Get('provider/cancellations')
+  @Roles(UserRole.PROVIDER)
+  getProviderCancellations(@CurrentUser() user: User) {
+    return this.dashboardService.getProviderCancellations(user);
+  }
+
   @Get('agent/callbacks')
   @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
   getAgentCallbacks(@CurrentUser() user: User) {

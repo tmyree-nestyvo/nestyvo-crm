@@ -125,11 +125,15 @@ export class DashboardService {
 
     const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
     const sevenDaysOut = new Date(startOfToday); sevenDaysOut.setDate(sevenDaysOut.getDate() + 7);
+    const thirtyDaysOut = new Date(startOfToday); thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30);
     const startOfWeek = new Date(startOfToday); startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
 
+    // Schedule is fetched out to 30 days so the day-strip UI can show
+    // appointments further out than this week — utilization/available-slots
+    // below stay scoped to the current 7-day window they were designed for.
     const [schedule, waitlistCount, weekCancellations] = await Promise.all([
       this.appointmentRepo.find({
-        where: { providerId: provider.id, startAt: Between(startOfToday, sevenDaysOut), status: AppointmentStatus.SCHEDULED },
+        where: { providerId: provider.id, startAt: Between(startOfToday, thirtyDaysOut), status: AppointmentStatus.SCHEDULED },
         relations: { patient: true, appointmentType: true },
         order: { startAt: 'ASC' },
       }),
@@ -139,13 +143,15 @@ export class DashboardService {
       }),
     ]);
 
+    const weekSchedule = schedule.filter((a) => new Date(a.startAt) < sevenDaysOut);
+
     const weeklyAvailability = await this.availabilityRepo.find({ where: { providerId: provider.id, isActive: true } });
     const totalWeeklyMinutes = weeklyAvailability.reduce((acc, a) => {
       const [sh, sm] = a.startTime.split(':').map(Number);
       const [eh, em] = a.endTime.split(':').map(Number);
       return acc + (eh * 60 + em) - (sh * 60 + sm);
     }, 0);
-    const bookedMinutes = schedule.reduce((acc, a) => acc + (new Date(a.endAt).getTime() - new Date(a.startAt).getTime()) / 60_000, 0);
+    const bookedMinutes = weekSchedule.reduce((acc, a) => acc + (new Date(a.endAt).getTime() - new Date(a.startAt).getTime()) / 60_000, 0);
     const utilizationRate = totalWeeklyMinutes > 0 ? Math.round((bookedMinutes / totalWeeklyMinutes) * 100) : 0;
     const availableSlots = totalWeeklyMinutes > 0 ? Math.max(0, Math.floor((totalWeeklyMinutes - bookedMinutes) / 50)) : 0;
 
@@ -156,10 +162,36 @@ export class DashboardService {
       cancellationCount: weekCancellations,
       schedule: schedule.map((a) => ({
         id: a.id, startAt: a.startAt, endAt: a.endAt,
+        patientId: a.patientId,
         patient: `${a.patient.firstName} ${a.patient.lastName}`,
         type: a.appointmentType?.name, status: a.status, locationType: a.locationType,
       })),
     };
+  }
+
+  async getProviderCancellations(user: User): Promise<any[]> {
+    const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
+    if (!provider) return [];
+
+    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+    const startOfWeek = new Date(startOfToday); startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+
+    const cancelled = await this.appointmentRepo.find({
+      where: { providerId: provider.id, status: AppointmentStatus.CANCELLED, cancelledAt: Between(startOfWeek, new Date()) },
+      relations: { patient: true, appointmentType: true },
+      order: { cancelledAt: 'DESC' },
+    });
+
+    return cancelled.map((a) => ({
+      id: a.id,
+      patientId: a.patientId,
+      patient: `${a.patient.firstName} ${a.patient.lastName}`,
+      startAt: a.startAt,
+      endAt: a.endAt,
+      type: a.appointmentType?.name,
+      cancelledAt: a.cancelledAt,
+      cancellationReason: a.cancellationReason,
+    }));
   }
 
   async getAgentCallbacks(user: User): Promise<any[]> {
