@@ -11,6 +11,7 @@ import { ProviderBlock } from '../../database/entities/provider-block.entity';
 import { Patient } from '../../database/entities/patient.entity';
 import { User } from '../../database/entities/user.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
+import { ProvidersModule } from '../providers/providers.module';
 import { DashboardService } from './dashboard.service';
 import { DashboardController } from './dashboard.controller';
 
@@ -29,6 +30,7 @@ import { DashboardController } from './dashboard.controller';
       User,
       AuditLog,
     ]),
+    ProvidersModule,
   ],
   providers: [DashboardService],
   controllers: [DashboardController],

@@ -12,6 +12,7 @@ import { ProviderAvailability } from '../../database/entities/provider-availabil
 import { ProviderBlock } from '../../database/entities/provider-block.entity';
 import { Patient } from '../../database/entities/patient.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
+import { FillCandidatesService } from '../providers/fill-candidates.service';
 
 @Injectable()
 export class DashboardService {
@@ -26,6 +27,7 @@ export class DashboardService {
     @InjectRepository(ProviderBlock) private blockRepo: Repository<ProviderBlock>,
     @InjectRepository(Patient) private patientRepo: Repository<Patient>,
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
+    private fillCandidatesService: FillCandidatesService,
   ) {}
 
   async getAgentDashboard(user: User): Promise<any> {
@@ -296,27 +298,43 @@ export class DashboardService {
       waitlistCountByProvider.set(w.providerId, (waitlistCountByProvider.get(w.providerId) ?? 0) + 1);
     }
 
-    return opps.map((o) => ({
-      id: o.id,
-      slotStartAt: o.slotStartAt,
-      slotEndAt: o.slotEndAt,
-      appointmentType: o.appointmentType?.name,
-      createdAt: o.createdAt,
-      provider: {
-        id: o.provider.id,
-        name: `${o.provider.firstName} ${o.provider.lastName}`,
-        credentials: o.provider.credentials,
-      },
-      cancelledPatient: o.sourceAppointment?.patient
-        ? {
-            name: `${o.sourceAppointment.patient.firstName} ${o.sourceAppointment.patient.lastName}`,
-            phone: o.sourceAppointment.patient.phone,
-          }
-        : null,
-      cancellationReason: o.sourceAppointment?.cancellationReason ?? null,
-      cancelledAt: o.sourceAppointment?.cancelledAt ?? null,
-      waitlistCount: waitlistCountByProvider.get(o.providerId) ?? 0,
-    }));
+    return Promise.all(
+      opps.map(async (o) => {
+        // Same ranking used by the Fill screen — a top-3 preview here saves
+        // a trip into Fill just to see who'd be a good match.
+        const candidates = await this.fillCandidatesService
+          .getCandidates(o.providerId, o.slotStartAt, o.slotEndAt)
+          .catch(() => []);
+
+        return {
+          id: o.id,
+          slotStartAt: o.slotStartAt,
+          slotEndAt: o.slotEndAt,
+          appointmentType: o.appointmentType?.name,
+          createdAt: o.createdAt,
+          provider: {
+            id: o.provider.id,
+            name: `${o.provider.firstName} ${o.provider.lastName}`,
+            credentials: o.provider.credentials,
+          },
+          cancelledPatient: o.sourceAppointment?.patient
+            ? {
+                name: `${o.sourceAppointment.patient.firstName} ${o.sourceAppointment.patient.lastName}`,
+                phone: o.sourceAppointment.patient.phone,
+              }
+            : null,
+          cancellationReason: o.sourceAppointment?.cancellationReason ?? null,
+          cancelledAt: o.sourceAppointment?.cancelledAt ?? null,
+          waitlistCount: waitlistCountByProvider.get(o.providerId) ?? 0,
+          suggestedPatients: candidates.slice(0, 3).map((c) => ({
+            patientId: c.patientId,
+            name: c.name,
+            source: c.source,
+            tagFit: c.tagFit,
+          })),
+        };
+      }),
+    );
   }
 
   async getAgentWaitlist(user: User): Promise<any[]> {
