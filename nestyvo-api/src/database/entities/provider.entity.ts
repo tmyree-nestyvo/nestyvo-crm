@@ -71,7 +71,7 @@ export class Provider {
   // feed endpoint is unauthenticated (calendar apps can't do a login flow),
   // so this token — not a JWT — is what protects it; keep it out of any
   // authenticated response except the provider's own "get my feed URL" call.
-  @Column({ nullable: true, unique: true })
+  @Column({ type: 'varchar', nullable: true, unique: true })
   calendarFeedToken: string | null;
 
   @CreateDateColumn()
