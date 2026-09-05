@@ -21,14 +21,20 @@ export class DashboardController {
 
   @Get('agent')
   @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
-  getAgentDashboard(@CurrentUser() user: User) {
-    return this.dashboardService.getAgentDashboard(user);
+  getAgentDashboard(@CurrentUser() user: User, @Query('days') days?: string) {
+    return this.dashboardService.getAgentDashboard(user, days ? parseInt(days, 10) : 30);
   }
 
   @Get('provider')
   @Roles(UserRole.PROVIDER)
   getProviderDashboard(@CurrentUser() user: User) {
     return this.dashboardService.getProviderDashboard(user);
+  }
+
+  @Get('provider/available-slots')
+  @Roles(UserRole.PROVIDER)
+  getProviderAvailableSlots(@CurrentUser() user: User, @Query('days') days?: string) {
+    return this.dashboardService.getProviderAvailableSlots(user, days ? parseInt(days, 10) : 30);
   }
 
   @Get('provider/cancellations')

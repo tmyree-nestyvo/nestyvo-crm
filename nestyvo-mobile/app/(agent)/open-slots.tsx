@@ -5,19 +5,22 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { HomeButton } from '../../components/HomeButton';
 
 const TZ = 'America/Los_Angeles';
 function fmt(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: TZ });
 }
 
-function useProviders() {
+function useProviders(days: number) {
   return useQuery({
-    queryKey: ['agent-dashboard'],
-    queryFn: () => api.get('/dashboard/agent').then((r) => r.data),
+    queryKey: ['agent-dashboard', days],
+    queryFn: () => api.get('/dashboard/agent', { params: { days } }).then((r) => r.data),
     staleTime: 60_000,
   });
 }
+
+const DAY_OPTIONS = [7, 14, 30] as const;
 
 function initialsFor(name: string) {
   return name
@@ -52,7 +55,8 @@ function FillButton({ providerId, providerName, slot }: { providerId: string; pr
 }
 
 export default function OpenSlotsScreen() {
-  const { data, isLoading, refetch, isRefetching } = useProviders();
+  const [days, setDays] = useState<number>(30);
+  const { data, isLoading, refetch, isRefetching } = useProviders(days);
   const providers: any[] = data?.providers ?? [];
   const [expandedId, setExpandedId] = useState<string | null>(providers[0]?.id ?? null);
   const [viewMode, setViewMode] = useState<'provider' | 'chronological'>('provider');
@@ -88,13 +92,14 @@ export default function OpenSlotsScreen() {
         <View className="flex-1">
           <Text className="text-xl font-bold text-gray-900">Open Slots</Text>
           <Text className="text-xs text-gray-400 mt-0.5">
-            {totalSlots} available · next 30 days
+            {totalSlots} available · next {days} days
           </Text>
         </View>
+        <HomeButton href="/(agent)" />
       </View>
 
       {/* View toggle */}
-      <View className="px-5 pb-3 flex-row">
+      <View className="px-5 pb-2 flex-row">
         <View className="flex-row bg-gray-100 rounded-xl p-1">
           <TouchableOpacity
             onPress={() => setViewMode('provider')}
@@ -113,6 +118,21 @@ export default function OpenSlotsScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+      </View>
+
+      {/* Time-frame toggle */}
+      <View className="px-5 pb-3 flex-row gap-2">
+        {DAY_OPTIONS.map((d) => (
+          <TouchableOpacity
+            key={d}
+            onPress={() => setDays(d)}
+            className={`px-3 py-1 rounded-full border ${days === d ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`}
+          >
+            <Text className={`text-xs font-medium ${days === d ? 'text-white' : 'text-gray-600'}`}>
+              Next {d} days
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <ScrollView
@@ -205,7 +225,7 @@ export default function OpenSlotsScreen() {
                   <View className="border-t border-gray-100">
                     {slotsByDate.length === 0 ? (
                       <View className="px-4 py-4 items-center">
-                        <Text className="text-gray-400 text-sm">No open slots in the next 30 days</Text>
+                        <Text className="text-gray-400 text-sm">No open slots in the next {days} days</Text>
                       </View>
                     ) : (
                       slotsByDate.map((day: any) => (

@@ -69,6 +69,18 @@ export default function ProviderScheduleScreen() {
         </View>
         <View className="flex-row items-center gap-2">
           <TouchableOpacity
+            onPress={() => router.push('/(provider)/calendar')}
+            className="p-2 bg-gray-100 rounded-xl"
+          >
+            <Ionicons name="calendar-outline" size={18} color="#374151" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push('/(provider)/calendar-export')}
+            className="p-2 bg-gray-100 rounded-xl"
+          >
+            <Ionicons name="download-outline" size={18} color="#374151" />
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={() => router.push('/(provider)/block-time')}
             className="flex-row items-center gap-1.5 bg-gray-100 px-3 py-2 rounded-xl"
           >
@@ -88,7 +100,13 @@ export default function ProviderScheduleScreen() {
       >
         {/* Stats */}
         <View className="flex-row gap-3 px-5 mb-4">
-          <StatCard label="Available Slots" value={data?.availableSlots ?? '—'} icon="time-outline" color="#16a34a" />
+          <StatCard
+            label="Available Slots"
+            value={data?.availableSlots ?? '—'}
+            icon="time-outline"
+            color="#16a34a"
+            onPress={() => router.push('/(provider)/available-slots')}
+          />
           <StatCard
             label="Waitlist"
             value={data?.waitlistCount ?? '—'}
@@ -98,7 +116,14 @@ export default function ProviderScheduleScreen() {
           />
         </View>
         <View className="flex-row gap-3 px-5 mb-5">
-          <StatCard label="Utilization" value={data?.utilizationRate ? `${data.utilizationRate}%` : '—'} icon="stats-chart-outline" color="#7c3aed" />
+          <StatCard
+            label="Requests"
+            value={data?.openRequestCount ?? '—'}
+            icon="chatbubble-ellipses-outline"
+            color="#7c3aed"
+            badge={data?.openRequestCount}
+            onPress={() => router.push('/(provider)/tickets')}
+          />
           <StatCard
             label="Cancellations"
             value={data?.cancellationCount ?? '—'}

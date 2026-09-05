@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Put, Delete, Param, Query, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Query, Body, Req, UseGuards, ForbiddenException } from '@nestjs/common';
 import { IsString, IsOptional, IsEnum, IsDateString, IsInt, Min, Max, Matches, ValidateNested, ArrayMaxSize } from 'class-validator';
 import { Type } from 'class-transformer';
+import type { Request } from 'express';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -54,9 +55,12 @@ class ReplaceAvailabilityDto {
 }
 
 class RecurringBlockDto {
-  @IsInt() @Min(0) @Max(6) dayOfWeek: number;
+  @IsOptional() @IsEnum(['daily', 'weekly', 'monthly']) frequency?: 'daily' | 'weekly' | 'monthly';
+  @IsOptional() @IsInt() @Min(0) @Max(6) dayOfWeek?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(31) dayOfMonth?: number;
   @Matches(TIME_RE, { message: 'startTime must be HH:mm' }) startTime: string;
   @Matches(TIME_RE, { message: 'endTime must be HH:mm' }) endTime: string;
+  @IsOptional() @IsDateString() endDate?: string;
   @IsOptional() @IsInt() @Min(1) @Max(26) weeks?: number;
   @IsOptional() @IsString() reason?: string;
 }
@@ -190,7 +194,16 @@ export class ProvidersController {
   ) {
     return this.providersService.createRecurringBlock(
       id,
-      { dayOfWeek: dto.dayOfWeek, startTime: dto.startTime, endTime: dto.endTime, weeks: dto.weeks ?? 12, reason: dto.reason },
+      {
+        frequency: dto.frequency,
+        dayOfWeek: dto.dayOfWeek,
+        dayOfMonth: dto.dayOfMonth,
+        startTime: dto.startTime,
+        endTime: dto.endTime,
+        endDate: dto.endDate,
+        weeks: dto.weeks,
+        reason: dto.reason,
+      },
       user,
     );
   }
@@ -225,6 +238,30 @@ export class ProvidersController {
       }),
     );
     return { id: block.id, startAt: block.startAt, endAt: block.endAt };
+  }
+
+  @Get('self/calendar-feed')
+  @Roles(UserRole.PROVIDER)
+  async getSelfCalendarFeed(@CurrentUser() user: User, @Req() req: Request) {
+    const token = await this.providersService.getOrCreateCalendarFeedToken(user);
+    const origin = `${req.protocol}://${req.get('host')}`;
+    const path = `/api/v1/calendar/feed/${token}.ics`;
+    return { url: `${origin}${path}`, webcalUrl: `webcal://${req.get('host')}${path}` };
+  }
+
+  @Post('self/recurring-block')
+  @Roles(UserRole.PROVIDER)
+  createSelfRecurringBlock(@Body() dto: RecurringBlockDto, @CurrentUser() user: User) {
+    return this.providersService.createSelfRecurringBlock(user, {
+      frequency: dto.frequency,
+      dayOfWeek: dto.dayOfWeek,
+      dayOfMonth: dto.dayOfMonth,
+      startTime: dto.startTime,
+      endTime: dto.endTime,
+      endDate: dto.endDate,
+      weeks: dto.weeks,
+      reason: dto.reason,
+    });
   }
 
   @Get('self/blocks')

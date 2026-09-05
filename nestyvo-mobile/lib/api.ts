@@ -78,7 +78,16 @@ export const providersApi = {
   getBlocks: (id: string) => api.get(`/providers/${id}/blocks`).then((r) => r.data),
   createRecurringBlock: (
     id: string,
-    input: { dayOfWeek: number; startTime: string; endTime: string; weeks?: number; reason?: string },
+    input: {
+      frequency?: 'daily' | 'weekly' | 'monthly';
+      dayOfWeek?: number;
+      dayOfMonth?: number;
+      startTime: string;
+      endTime: string;
+      endDate?: string;
+      weeks?: number;
+      reason?: string;
+    },
   ) => api.post(`/providers/${id}/recurring-block`, input).then((r) => r.data),
   deleteBlock: (id: string, blockId: string) =>
     api.delete(`/providers/${id}/blocks/${blockId}`).then((r) => r.data),

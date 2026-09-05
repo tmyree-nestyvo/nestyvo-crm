@@ -66,6 +66,14 @@ export class Provider {
   @Column({ type: 'jsonb', nullable: true })
   schedulingPreferences: Record<string, any>;
 
+  // Unguessable token for the provider's calendar-export feed (Sep 5 2026
+  // ask — subscribe Nestyvo's schedule into iPhone/Google Calendar). The
+  // feed endpoint is unauthenticated (calendar apps can't do a login flow),
+  // so this token — not a JWT — is what protects it; keep it out of any
+  // authenticated response except the provider's own "get my feed URL" call.
+  @Column({ nullable: true, unique: true })
+  calendarFeedToken: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

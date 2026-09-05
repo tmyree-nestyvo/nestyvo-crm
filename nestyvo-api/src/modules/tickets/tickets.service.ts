@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not, In } from 'typeorm';
 import { Ticket, TicketCategory, TicketPriority, TicketStatus } from '../../database/entities/ticket.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Provider } from '../../database/entities/provider.entity';
@@ -41,7 +41,12 @@ export class TicketsService {
   async list(status: TicketStatus | undefined, patientId: string | undefined, user: User) {
     const isOffice = OFFICE_ROLES.includes(user.role);
     const where: any = {};
+    // No status filter = "Open" view: active tickets only. Resolved/closed
+    // ones drop out of the default list and only show when explicitly
+    // filtered for (matches Charlene's Sep 5 ask — resolved tickets should
+    // disappear from the open list, not stay mixed in).
     if (status) where.status = status;
+    else where.status = Not(In([TicketStatus.RESOLVED, TicketStatus.CLOSED]));
     if (patientId) where.patientId = patientId;
 
     if (user.role === UserRole.PROVIDER) {

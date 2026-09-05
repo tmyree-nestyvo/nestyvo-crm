@@ -8,6 +8,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { HomeButton } from '../../components/HomeButton';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -356,10 +357,13 @@ export default function FillSlotScreen() {
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
       {/* Header */}
       <View className="px-5 pt-3 pb-4 bg-white border-b border-gray-100">
-        <TouchableOpacity onPress={() => router.back()} className="flex-row items-center gap-1 mb-3">
-          <Ionicons name="arrow-back" size={20} color="#6b7280" />
-          <Text className="text-gray-500 text-sm">Back</Text>
-        </TouchableOpacity>
+        <View className="flex-row items-center justify-between mb-3">
+          <TouchableOpacity onPress={() => router.back()} className="flex-row items-center gap-1">
+            <Ionicons name="arrow-back" size={20} color="#6b7280" />
+            <Text className="text-gray-500 text-sm">Back</Text>
+          </TouchableOpacity>
+          <HomeButton href="/(agent)" />
+        </View>
         <Text className="text-lg font-bold text-gray-900">{providerName}</Text>
         <View className="flex-row items-center gap-2 mt-1">
           <View className="w-2 h-2 rounded-full bg-green-400" />

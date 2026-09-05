@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Generated, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Practice } from './practice.entity';
 import { Patient } from './patient.entity';
 import { User } from './user.entity';
@@ -28,6 +28,13 @@ export enum TicketStatus {
 export class Ticket {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  // Human-readable sequential ticket number (display as "T-1042"), separate
+  // from the UUID primary key — Charlene's Sep 5 ask, so agents/providers/
+  // partners have something to reference on a call instead of a UUID.
+  @Column({ type: 'int' })
+  @Generated('increment')
+  ticketNumber: number;
 
   @Column()
   practiceId: string;

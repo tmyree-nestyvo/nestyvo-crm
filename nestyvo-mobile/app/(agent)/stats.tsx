@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { HomeButton } from '../../components/HomeButton';
 
 type Period = 'month' | '30d' | '7d';
 
@@ -52,6 +53,7 @@ export default function StatsScreen() {
         <TouchableOpacity onPress={() => router.back()} className="p-1 -ml-1">
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
+        <HomeButton href="/(agent)" />
         <View className="flex-1">
           <Text className="text-xl font-bold text-gray-900">Stats & Reports</Text>
           {data?.periodLabel ? (

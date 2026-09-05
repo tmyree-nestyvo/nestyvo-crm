@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Between } from 'typeorm';
+import { randomBytes } from 'crypto';
 import { Provider } from '../../database/entities/provider.entity';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
 import { AgentProviderAssignment } from '../../database/entities/agent-provider-assignment.entity';
@@ -9,6 +10,7 @@ import { ProviderBlock, BlockType } from '../../database/entities/provider-block
 import { User, UserRole } from '../../database/entities/user.entity';
 
 const MAX_RECURRING_WEEKS = 26;
+const MAX_RECURRING_OCCURRENCES = 52;
 
 @Injectable()
 export class ProvidersService {
@@ -72,44 +74,135 @@ export class ProvidersService {
     }).then((blocks) => blocks.filter((b) => b.endAt >= now && b.startAt <= sixMonthsOut));
   }
 
+  // Recurring blocks (extended Sep 5 2026 — Charlene wanted daily/weekly/
+  // monthly cadence plus an explicit end date, not just weekly-capped-at-26).
+  // Still not a true recurring *rule* — this generates individual
+  // ProviderBlock rows up front, capped at MAX_RECURRING_OCCURRENCES, same
+  // trade-off as the original weekly-only version.
   async createRecurringBlock(
     providerId: string,
-    input: { dayOfWeek: number; startTime: string; endTime: string; weeks: number; reason?: string },
+    input: {
+      frequency?: 'daily' | 'weekly' | 'monthly';
+      dayOfWeek?: number;
+      dayOfMonth?: number;
+      startTime: string;
+      endTime: string;
+      endDate?: string;
+      weeks?: number;
+      reason?: string;
+    },
     user: User,
   ) {
     await this.assertCanManage(providerId, user);
-    if (input.dayOfWeek < 0 || input.dayOfWeek > 6) throw new BadRequestException('dayOfWeek must be 0-6');
+    const rows = this.buildRecurringOccurrences(providerId, input, user.id);
+    return this.blockRepo.save(rows);
+  }
+
+  // Same generation used by the admin path above and the provider's own
+  // self-service recurring block (self/recurring-block) — the two differ
+  // only in how providerId is authorized, not in how occurrences are built.
+  private buildRecurringOccurrences(
+    providerId: string,
+    input: {
+      frequency?: 'daily' | 'weekly' | 'monthly';
+      dayOfWeek?: number;
+      dayOfMonth?: number;
+      startTime: string;
+      endTime: string;
+      endDate?: string;
+      weeks?: number;
+      reason?: string;
+    },
+    createdByUserId: string,
+  ): ProviderBlock[] {
     if (input.startTime >= input.endTime) throw new BadRequestException('startTime must be before endTime');
-    const weeks = Math.min(Math.max(input.weeks ?? 12, 1), MAX_RECURRING_WEEKS);
+    const frequency = input.frequency ?? 'weekly';
 
     const [startH, startM] = input.startTime.split(':').map(Number);
     const [endH, endM] = input.endTime.split(':').map(Number);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const daysUntilTarget = (input.dayOfWeek - today.getDay() + 7) % 7;
-    const firstOccurrence = new Date(today);
-    firstOccurrence.setDate(today.getDate() + daysUntilTarget);
+    const explicitEnd = input.endDate ? new Date(input.endDate) : null;
+    if (explicitEnd) explicitEnd.setHours(23, 59, 59, 999);
 
-    const rows: ProviderBlock[] = [];
-    for (let i = 0; i < weeks; i++) {
-      const day = new Date(firstOccurrence);
-      day.setDate(firstOccurrence.getDate() + i * 7);
+    const occurrenceDates: Date[] = [];
+
+    if (frequency === 'daily') {
+      const defaultLimit = new Date(today);
+      defaultLimit.setDate(defaultLimit.getDate() + 90);
+      const limit = explicitEnd ?? defaultLimit;
+      const cursor = new Date(today);
+      while (cursor <= limit && occurrenceDates.length < MAX_RECURRING_OCCURRENCES) {
+        occurrenceDates.push(new Date(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    } else if (frequency === 'monthly') {
+      const dayOfMonth = input.dayOfMonth ?? today.getDate();
+      if (dayOfMonth < 1 || dayOfMonth > 31) throw new BadRequestException('dayOfMonth must be 1-31');
+      const defaultLimit = new Date(today);
+      defaultLimit.setMonth(defaultLimit.getMonth() + 12);
+      const limit = explicitEnd ?? defaultLimit;
+      let cursor = new Date(today.getFullYear(), today.getMonth(), dayOfMonth);
+      if (cursor < today) cursor = new Date(today.getFullYear(), today.getMonth() + 1, dayOfMonth);
+      while (cursor <= limit && occurrenceDates.length < MAX_RECURRING_OCCURRENCES) {
+        occurrenceDates.push(new Date(cursor));
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, dayOfMonth);
+      }
+    } else {
+      if (input.dayOfWeek === undefined || input.dayOfWeek < 0 || input.dayOfWeek > 6) {
+        throw new BadRequestException('dayOfWeek (0-6) is required for weekly recurrence');
+      }
+      const weeksCap = Math.min(Math.max(input.weeks ?? 12, 1), MAX_RECURRING_WEEKS);
+      const daysUntilTarget = (input.dayOfWeek - today.getDay() + 7) % 7;
+      const firstOccurrence = new Date(today);
+      firstOccurrence.setDate(today.getDate() + daysUntilTarget);
+      const defaultLimit = new Date(firstOccurrence);
+      defaultLimit.setDate(defaultLimit.getDate() + (weeksCap - 1) * 7);
+      const limit = explicitEnd ?? defaultLimit;
+      const cursor = new Date(firstOccurrence);
+      while (cursor <= limit && occurrenceDates.length < MAX_RECURRING_OCCURRENCES) {
+        occurrenceDates.push(new Date(cursor));
+        cursor.setDate(cursor.getDate() + 7);
+      }
+    }
+
+    return occurrenceDates.map((day) => {
       const startAt = new Date(day);
       startAt.setHours(startH, startM, 0, 0);
       const endAt = new Date(day);
       endAt.setHours(endH, endM, 0, 0);
-      rows.push(
-        this.blockRepo.create({
-          providerId,
-          startAt,
-          endAt,
-          blockType: BlockType.ADMINISTRATIVE,
-          reason: input.reason ?? 'Recurring block',
-          createdBy: user.id,
-        }),
-      );
-    }
+      return this.blockRepo.create({
+        providerId,
+        startAt,
+        endAt,
+        blockType: BlockType.ADMINISTRATIVE,
+        reason: input.reason ?? 'Recurring block',
+        createdBy: createdByUserId,
+      });
+    });
+  }
+
+  // Provider's own self-service recurring block — no assertCanManage (the
+  // provider role has no practiceId to check, see [[project_decisions]]
+  // Provider User rows carry no practiceId), authorization comes from
+  // resolving providerId off the current user instead.
+  async createSelfRecurringBlock(
+    user: User,
+    input: {
+      frequency?: 'daily' | 'weekly' | 'monthly';
+      dayOfWeek?: number;
+      dayOfMonth?: number;
+      startTime: string;
+      endTime: string;
+      endDate?: string;
+      weeks?: number;
+      reason?: string;
+    },
+  ) {
+    const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
+    if (!provider) throw new ForbiddenException('Not a provider account');
+    const rows = this.buildRecurringOccurrences(provider.id, input, user.id);
     return this.blockRepo.save(rows);
   }
 
@@ -184,5 +277,18 @@ export class ProvidersService {
 
   async findByUserId(userId: string): Promise<Provider | null> {
     return this.providerRepo.findOne({ where: { userId } });
+  }
+
+  // Generates the token on first request rather than at provider creation —
+  // most providers will never use this, no reason to mint tokens for
+  // everyone up front.
+  async getOrCreateCalendarFeedToken(user: User): Promise<string> {
+    const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
+    if (!provider) throw new ForbiddenException('Not a provider account');
+    if (!provider.calendarFeedToken) {
+      provider.calendarFeedToken = randomBytes(24).toString('hex');
+      await this.providerRepo.save(provider);
+    }
+    return provider.calendarFeedToken;
   }
 }

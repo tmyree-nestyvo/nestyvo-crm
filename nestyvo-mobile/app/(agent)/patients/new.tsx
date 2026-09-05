@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { patientsApi, providersApi, practicesApi, clientTagsApi } from '../../../lib/api';
 import { useAuthStore } from '../../../lib/store';
+import { HomeButton } from '../../../components/HomeButton';
 
 type Option = { id: string; label: string; sublabel?: string };
 
@@ -187,6 +188,7 @@ export default function NewClientScreen() {
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
         <Text className="text-lg font-bold text-gray-900 flex-1">New Client</Text>
+        <HomeButton href="/(agent)" />
       </View>
 
       <ScrollView className="flex-1" contentContainerClassName="px-5 py-5 pb-10">

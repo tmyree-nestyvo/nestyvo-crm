@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, patientLinksApi, clientTagsApi, ticketsApi, waitlistApi } from '../../../lib/api';
 import { AppointmentCard } from '../../../components/dashboard/AppointmentCard';
+import { HomeButton } from '../../../components/HomeButton';
 import { useAuthStore } from '../../../lib/store';
 
 function usePatient(id: string) {
@@ -66,6 +67,7 @@ export default function PatientDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} className="p-1">
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
+        <HomeButton href="/(agent)" />
         <Text className="text-lg font-bold text-gray-900 flex-1">{patient?.name}</Text>
         <TouchableOpacity
           onPress={() => setTicketModal(true)}

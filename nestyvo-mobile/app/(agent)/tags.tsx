@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientTagsApi } from '../../lib/api';
 import { useAuthStore } from '../../lib/store';
+import { HomeButton } from '../../components/HomeButton';
 
 export default function TagsScreen() {
   const { role } = useAuthStore();
@@ -48,6 +49,7 @@ export default function TagsScreen() {
         <TouchableOpacity onPress={() => router.back()} className="p-1 -ml-1">
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
+        <HomeButton href="/(agent)" />
         <View className="flex-1">
           <Text className="text-xl font-bold text-gray-900">Client Tags</Text>
           <Text className="text-xs text-gray-400 mt-0.5">Block-size classifications used to size and match slots</Text>

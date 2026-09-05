@@ -18,6 +18,7 @@ import { PatientLinksModule } from './modules/patient-links/patient-links.module
 import { ClientTagsModule } from './modules/client-tags/client-tags.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { PracticesModule } from './modules/practices/practices.module';
+import { CalendarModule } from './modules/calendar/calendar.module';
 import { JwtAuthGuard } from './auth/auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 
@@ -111,6 +112,7 @@ const ALL_ENTITIES = [
     ClientTagsModule,
     TicketsModule,
     PracticesModule,
+    CalendarModule,
   ],
   controllers: [AppController],
   providers: [

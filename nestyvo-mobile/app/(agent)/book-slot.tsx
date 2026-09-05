@@ -5,6 +5,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { HomeButton } from '../../components/HomeButton';
 
 const TZ = 'America/Los_Angeles';
 function fmt(iso: string) {
@@ -52,6 +53,7 @@ export default function BookSlotScreen() {
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
         <Text className="text-lg font-bold text-gray-900 flex-1">Book Appointment</Text>
+        <HomeButton href="/(agent)" />
       </View>
 
       <View className="flex-1 items-center justify-center px-6">

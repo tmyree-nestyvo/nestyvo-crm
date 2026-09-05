@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { ticketsApi } from '../../../lib/api';
+import { HomeButton } from '../../../components/HomeButton';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   open: { label: 'Open', color: '#d97706', bg: '#fffbeb' },
@@ -36,6 +37,7 @@ export default function ProviderClientDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} className="p-1 -ml-1">
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
+        <HomeButton href="/(provider)" />
         <View className="flex-1">
           <Text className="text-xl font-bold text-gray-900">{name ?? 'Client'}</Text>
           <Text className="text-xs text-gray-400 mt-0.5">Interaction &amp; ticket history with Nestyvo</Text>
@@ -64,7 +66,10 @@ export default function ProviderClientDetailScreen() {
                 className="bg-white rounded-2xl border border-gray-100 mb-3 px-4 py-3.5"
               >
                 <View className="flex-row items-start justify-between gap-2">
-                  <Text className="text-gray-900 font-semibold text-sm flex-1">{t.subject}</Text>
+                  <View className="flex-1">
+                    <Text className="text-gray-300 text-[10px] font-semibold tracking-wide mb-0.5">#T-{t.ticketNumber}</Text>
+                    <Text className="text-gray-900 font-semibold text-sm">{t.subject}</Text>
+                  </View>
                   <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: cfg.bg }}>
                     <Text className="text-xs font-medium" style={{ color: cfg.color }}>{cfg.label}</Text>
                   </View>

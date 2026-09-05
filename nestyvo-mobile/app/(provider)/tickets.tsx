@@ -60,7 +60,7 @@ export default function ProviderTicketsScreen() {
         <View className="flex-1">
           <Text className="text-xl font-bold text-gray-900">Requests</Text>
           <Text className="text-xs text-gray-400 mt-0.5">
-            {data.length} ticket{data.length !== 1 ? 's' : ''}{filter ? ` · ${STATUS_CONFIG[filter]?.label}` : ''}
+            {data.length} ticket{data.length !== 1 ? 's' : ''} · {filter ? STATUS_CONFIG[filter]?.label : 'Open'}
           </Text>
         </View>
         <TouchableOpacity
@@ -75,12 +75,12 @@ export default function ProviderTicketsScreen() {
       <View className="flex-row gap-2 px-5 pb-3">
         {[undefined, 'open', 'in_progress', 'resolved'].map((s) => (
           <TouchableOpacity
-            key={s ?? 'all'}
+            key={s ?? 'active'}
             onPress={() => setFilter(s)}
             className={`px-3 py-1.5 rounded-full border ${filter === s ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`}
           >
             <Text className={`text-xs font-medium ${filter === s ? 'text-white' : 'text-gray-600'}`}>
-              {s ? STATUS_CONFIG[s].label : 'All'}
+              {s ? STATUS_CONFIG[s].label : 'Open'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -112,6 +112,7 @@ export default function ProviderTicketsScreen() {
               >
                 <View className="flex-row items-start justify-between gap-2">
                   <View className="flex-1">
+                    <Text className="text-gray-300 text-[10px] font-semibold tracking-wide mb-0.5">#T-{t.ticketNumber}</Text>
                     <Text className="text-gray-900 font-semibold text-sm">{t.subject}</Text>
                     {t.patient ? (
                       <Text className="text-gray-400 text-xs mt-0.5">{t.patient.firstName} {t.patient.lastName}</Text>
@@ -138,6 +139,7 @@ export default function ProviderTicketsScreen() {
       <Modal visible={!!active} transparent animationType="slide" onRequestClose={() => setActive(null)}>
         <View className="flex-1 justify-end bg-black/40">
           <View className="bg-white rounded-t-3xl px-5 pt-5 pb-10">
+            <Text className="text-gray-400 text-xs font-semibold tracking-wide mb-1">#T-{active?.ticketNumber}</Text>
             <Text className="text-base font-bold text-gray-900 mb-1">{active?.subject}</Text>
             {active?.patient ? (
               <Text className="text-gray-400 text-sm mb-1">{active.patient.firstName} {active.patient.lastName}</Text>

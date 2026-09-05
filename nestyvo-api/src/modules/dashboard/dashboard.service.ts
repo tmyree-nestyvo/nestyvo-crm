@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, Between, MoreThanOrEqual } from 'typeorm';
+import { Repository, In, Not, Between, MoreThanOrEqual } from 'typeorm';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Provider, ProviderStatus } from '../../database/entities/provider.entity';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
@@ -12,6 +12,7 @@ import { ProviderAvailability } from '../../database/entities/provider-availabil
 import { ProviderBlock } from '../../database/entities/provider-block.entity';
 import { Patient } from '../../database/entities/patient.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
+import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
 import { FillCandidatesService } from '../providers/fill-candidates.service';
 
 @Injectable()
@@ -27,15 +28,16 @@ export class DashboardService {
     @InjectRepository(ProviderBlock) private blockRepo: Repository<ProviderBlock>,
     @InjectRepository(Patient) private patientRepo: Repository<Patient>,
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
+    @InjectRepository(Ticket) private ticketRepo: Repository<Ticket>,
     private fillCandidatesService: FillCandidatesService,
   ) {}
 
-  async getAgentDashboard(user: User): Promise<any> {
+  async getAgentDashboard(user: User, days = 30): Promise<any> {
     const now = new Date();
     const startOfToday = new Date(now);
     startOfToday.setHours(0, 0, 0, 0);
     const thirtyDaysOut = new Date(startOfToday);
-    thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30);
+    thirtyDaysOut.setDate(thirtyDaysOut.getDate() + days);
 
     const providerIds = await this.getScopedProviderIds(user);
 
@@ -123,7 +125,7 @@ export class DashboardService {
 
   async getProviderDashboard(user: User): Promise<any> {
     const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
-    if (!provider) return { availableSlots: 0, waitlistCount: 0, utilizationRate: 0, cancellationCount: 0, schedule: [] };
+    if (!provider) return { availableSlots: 0, waitlistCount: 0, utilizationRate: 0, cancellationCount: 0, openRequestCount: 0, schedule: [] };
 
     const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
     const sevenDaysOut = new Date(startOfToday); sevenDaysOut.setDate(sevenDaysOut.getDate() + 7);
@@ -133,7 +135,7 @@ export class DashboardService {
     // Schedule is fetched out to 30 days so the day-strip UI can show
     // appointments further out than this week — utilization/available-slots
     // below stay scoped to the current 7-day window they were designed for.
-    const [schedule, waitlistCount, weekCancellations] = await Promise.all([
+    const [schedule, waitlistCount, weekCancellations, openRequestCount] = await Promise.all([
       this.appointmentRepo.find({
         where: { providerId: provider.id, startAt: Between(startOfToday, thirtyDaysOut), status: AppointmentStatus.SCHEDULED },
         relations: { patient: true, appointmentType: true },
@@ -142,6 +144,12 @@ export class DashboardService {
       this.waitlistRepo.count({ where: { providerId: provider.id, status: WaitlistEntryStatus.ACTIVE } }),
       this.appointmentRepo.count({
         where: { providerId: provider.id, status: AppointmentStatus.CANCELLED, cancelledAt: Between(startOfWeek, new Date()) },
+      }),
+      // Open Requests card (replaces Utilization, Sep 5 2026) — tickets tied
+      // to this provider's own patients, same scoping TicketsService uses
+      // for the provider role, minus resolved/closed.
+      this.ticketRepo.count({
+        where: { patient: { assignedProviderId: provider.id }, status: Not(In([TicketStatus.RESOLVED, TicketStatus.CLOSED])) },
       }),
     ]);
 
@@ -162,6 +170,7 @@ export class DashboardService {
       waitlistCount,
       utilizationRate: Math.min(utilizationRate, 100),
       cancellationCount: weekCancellations,
+      openRequestCount,
       schedule: schedule.map((a) => ({
         id: a.id, startAt: a.startAt, endAt: a.endAt,
         patientId: a.patientId,
@@ -169,6 +178,35 @@ export class DashboardService {
         type: a.appointmentType?.name, status: a.status, locationType: a.locationType,
       })),
     };
+  }
+
+  // Available Slots card drill-in (Sep 5 2026) — a real list/calendar of this
+  // provider's own open slots, day-range toggle (7/14/30). Previously the
+  // card had no onPress at all.
+  async getProviderAvailableSlots(user: User, days = 30): Promise<any> {
+    const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
+    if (!provider) return { totalSlots: 0, slotsByDate: [] };
+
+    const now = new Date();
+    const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
+    const daysOut = new Date(startOfToday); daysOut.setDate(daysOut.getDate() + days);
+
+    const [availability, booked, blocks] = await Promise.all([
+      this.availabilityRepo.find({ where: { providerId: provider.id, isActive: true } }),
+      this.appointmentRepo.find({
+        where: {
+          providerId: provider.id,
+          startAt: Between(startOfToday, daysOut),
+          status: In([AppointmentStatus.SCHEDULED, AppointmentStatus.COMPLETED]),
+        },
+      }),
+      this.blockRepo.find({ where: { providerId: provider.id, startAt: Between(startOfToday, daysOut) } }),
+    ]);
+
+    const slotsByDate = computeSlotsByDate(provider.id, startOfToday, daysOut, now, availability, booked, blocks);
+    const totalSlots = slotsByDate.reduce((sum, d) => sum + d.slots.length, 0);
+
+    return { totalSlots, slotsByDate };
   }
 
   async getProviderCancellations(user: User): Promise<any[]> {

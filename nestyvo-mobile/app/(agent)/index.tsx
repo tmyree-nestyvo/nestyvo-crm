@@ -237,23 +237,6 @@ export default function AgentDashboard() {
           />
         </View>
 
-        {/* Copilot CTA */}
-        <TouchableOpacity
-          onPress={() => router.push('/(agent)/copilot')}
-          className="bg-primary-600 rounded-2xl p-4 mb-6 flex-row items-center gap-3"
-        >
-          <View className="w-10 h-10 bg-white/20 rounded-xl items-center justify-center">
-            <Ionicons name="sparkles" size={20} color="#fff" />
-          </View>
-          <View className="flex-1">
-            <Text className="text-white font-semibold">Open AI Copilot</Text>
-            <Text className="text-white/70 text-xs mt-0.5">
-              Ask about scheduling, patients, waitlists…
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#fff" />
-        </TouchableOpacity>
-
         {/* Available slots — all providers, rolling 30 days */}
         <View className="flex-row items-center justify-between mb-3">
           <View>
