@@ -244,9 +244,13 @@ export class ProvidersController {
   @Roles(UserRole.PROVIDER)
   async getSelfCalendarFeed(@CurrentUser() user: User, @Req() req: Request) {
     const token = await this.providersService.getOrCreateCalendarFeedToken(user);
-    const origin = `${req.protocol}://${req.get('host')}`;
+    const host = req.get('host') ?? '';
+    // req.protocol reports http behind Railway's edge proxy without an
+    // explicit "trust proxy" setting — assume https except on localhost,
+    // rather than relying on that.
+    const scheme = host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https';
     const path = `/api/v1/calendar/feed/${token}.ics`;
-    return { url: `${origin}${path}`, webcalUrl: `webcal://${req.get('host')}${path}` };
+    return { url: `${scheme}://${host}${path}`, webcalUrl: `webcal://${host}${path}` };
   }
 
   @Post('self/recurring-block')
