@@ -96,6 +96,78 @@ export class ProvidersController {
     }));
   }
 
+  // Literal "self/*" routes MUST be declared before any ":id/*" routes below
+  // — Express/Nest matches routes in declaration order, and ":id/blocks" /
+  // ":id/recurring-block" would otherwise swallow "self/blocks" / "self/
+  // recurring-block" (matching with id="self") and reject every provider
+  // self-service call with a 403 from the admin-only @Roles guard on those
+  // routes. This bit production: both self/recurring-block and self/blocks
+  // (GET) were silently 403'ing for every provider before this fix.
+  @Post('self/blocks')
+  @Roles(UserRole.PROVIDER)
+  async createBlock(
+    @Body() dto: CreateBlockDto,
+    @CurrentUser() user: User,
+  ) {
+    const provider = await this.providersService.findByUserId(user.id);
+    if (!provider) throw new ForbiddenException('Not a provider account');
+
+    const block = await this.blockRepo.save(
+      this.blockRepo.create({
+        providerId: provider.id,
+        startAt: new Date(dto.startAt),
+        endAt: new Date(dto.endAt),
+        blockType: dto.blockType ?? BlockType.OTHER,
+        reason: dto.reason,
+        createdBy: user.id,
+      }),
+    );
+    return { id: block.id, startAt: block.startAt, endAt: block.endAt };
+  }
+
+  @Get('self/calendar-feed')
+  @Roles(UserRole.PROVIDER)
+  async getSelfCalendarFeed(@CurrentUser() user: User, @Req() req: Request) {
+    const token = await this.providersService.getOrCreateCalendarFeedToken(user);
+    const host = req.get('host') ?? '';
+    // req.protocol reports http behind Railway's edge proxy without an
+    // explicit "trust proxy" setting — assume https except on localhost,
+    // rather than relying on that.
+    const scheme = host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https';
+    const path = `/api/v1/calendar/feed/${token}.ics`;
+    return { url: `${scheme}://${host}${path}`, webcalUrl: `webcal://${host}${path}` };
+  }
+
+  @Post('self/recurring-block')
+  @Roles(UserRole.PROVIDER)
+  createSelfRecurringBlock(@Body() dto: RecurringBlockDto, @CurrentUser() user: User) {
+    return this.providersService.createSelfRecurringBlock(user, {
+      frequency: dto.frequency,
+      daysOfWeek: dto.daysOfWeek,
+      dayOfMonth: dto.dayOfMonth,
+      startTime: dto.startTime,
+      endTime: dto.endTime,
+      endDate: dto.endDate,
+      weeks: dto.weeks,
+      reason: dto.reason,
+    });
+  }
+
+  @Get('self/blocks')
+  @Roles(UserRole.PROVIDER)
+  async getBlocks(@CurrentUser() user: User) {
+    const provider = await this.providersService.findByUserId(user.id);
+    if (!provider) throw new ForbiddenException('Not a provider account');
+
+    const now = new Date();
+    const thirtyDays = new Date(now.getTime() + 30 * 86_400_000);
+    const blocks = await this.blockRepo.find({
+      where: { providerId: provider.id },
+      order: { startAt: 'ASC' },
+    });
+    return blocks.filter((b) => b.endAt >= now && b.startAt <= thirtyDays);
+  }
+
   @Get(':id/schedule')
   @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER, UserRole.PROVIDER)
   getSchedule(@Param('id') id: string, @Query('date') date?: string) {
@@ -221,68 +293,4 @@ export class ProvidersController {
     return this.providersService.deleteBlock(id, blockId, user);
   }
 
-  @Post('self/blocks')
-  @Roles(UserRole.PROVIDER)
-  async createBlock(
-    @Body() dto: CreateBlockDto,
-    @CurrentUser() user: User,
-  ) {
-    const provider = await this.providersService.findByUserId(user.id);
-    if (!provider) throw new ForbiddenException('Not a provider account');
-
-    const block = await this.blockRepo.save(
-      this.blockRepo.create({
-        providerId: provider.id,
-        startAt: new Date(dto.startAt),
-        endAt: new Date(dto.endAt),
-        blockType: dto.blockType ?? BlockType.OTHER,
-        reason: dto.reason,
-        createdBy: user.id,
-      }),
-    );
-    return { id: block.id, startAt: block.startAt, endAt: block.endAt };
-  }
-
-  @Get('self/calendar-feed')
-  @Roles(UserRole.PROVIDER)
-  async getSelfCalendarFeed(@CurrentUser() user: User, @Req() req: Request) {
-    const token = await this.providersService.getOrCreateCalendarFeedToken(user);
-    const host = req.get('host') ?? '';
-    // req.protocol reports http behind Railway's edge proxy without an
-    // explicit "trust proxy" setting — assume https except on localhost,
-    // rather than relying on that.
-    const scheme = host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https';
-    const path = `/api/v1/calendar/feed/${token}.ics`;
-    return { url: `${scheme}://${host}${path}`, webcalUrl: `webcal://${host}${path}` };
-  }
-
-  @Post('self/recurring-block')
-  @Roles(UserRole.PROVIDER)
-  createSelfRecurringBlock(@Body() dto: RecurringBlockDto, @CurrentUser() user: User) {
-    return this.providersService.createSelfRecurringBlock(user, {
-      frequency: dto.frequency,
-      daysOfWeek: dto.daysOfWeek,
-      dayOfMonth: dto.dayOfMonth,
-      startTime: dto.startTime,
-      endTime: dto.endTime,
-      endDate: dto.endDate,
-      weeks: dto.weeks,
-      reason: dto.reason,
-    });
-  }
-
-  @Get('self/blocks')
-  @Roles(UserRole.PROVIDER)
-  async getBlocks(@CurrentUser() user: User) {
-    const provider = await this.providersService.findByUserId(user.id);
-    if (!provider) throw new ForbiddenException('Not a provider account');
-
-    const now = new Date();
-    const thirtyDays = new Date(now.getTime() + 30 * 86_400_000);
-    const blocks = await this.blockRepo.find({
-      where: { providerId: provider.id },
-      order: { startAt: 'ASC' },
-    });
-    return blocks.filter((b) => b.endAt >= now && b.startAt <= thirtyDays);
-  }
 }
