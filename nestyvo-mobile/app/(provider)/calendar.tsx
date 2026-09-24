@@ -31,6 +31,17 @@ function todayPT() {
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: TZ });
 }
+// Compact form for the tight month-grid cells, e.g. "10a" / "2:30p" — no
+// room there for fmtTime's full "10:00 AM".
+function fmtTimeCompact(iso: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric', minute: 'numeric', hour12: true, timeZone: TZ,
+  }).formatToParts(new Date(iso));
+  const hour = parts.find((p) => p.type === 'hour')?.value ?? '';
+  const minute = parts.find((p) => p.type === 'minute')?.value ?? '00';
+  const ampm = parts.find((p) => p.type === 'dayPeriod')?.value?.charAt(0).toLowerCase() ?? '';
+  return minute === '00' ? `${hour}${ampm}` : `${hour}:${minute}${ampm}`;
+}
 function daysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
 }
@@ -136,6 +147,19 @@ function DayDot({ count }: { count: number }) {
   return <View className="w-1.5 h-1.5 rounded-full bg-primary-500 mt-0.5" />;
 }
 
+// Month view: Charlene asked for "a bigger distinction" than a dot — the
+// earliest appointment's start time, plus a "+N" for any additional ones
+// that day.
+function DayApptTime({ appts }: { appts: any[] }) {
+  if (!appts.length) return null;
+  const label = fmtTimeCompact(appts[0].startAt);
+  return (
+    <Text className="text-[9px] font-bold text-primary-600 mt-0.5" numberOfLines={1}>
+      {label}{appts.length > 1 ? ` +${appts.length - 1}` : ''}
+    </Text>
+  );
+}
+
 function MonthView({
   year, month, today, selectedDate, apptsByDate, onPrevMonth, onNextMonth, onSelectDay,
 }: {
@@ -167,7 +191,7 @@ function MonthView({
           const iso = isoOf(year, month, day);
           const isToday = iso === today;
           const isSelected = iso === selectedDate;
-          const count = apptsByDate[iso]?.length ?? 0;
+          const appts = apptsByDate[iso] ?? [];
           return (
             <TouchableOpacity
               key={iso}
@@ -180,7 +204,7 @@ function MonthView({
                   {day}
                 </Text>
               </View>
-              <DayDot count={count} />
+              <DayApptTime appts={appts} />
             </TouchableOpacity>
           );
         })}
