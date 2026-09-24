@@ -80,7 +80,7 @@ export const providersApi = {
     id: string,
     input: {
       frequency?: 'daily' | 'weekly' | 'monthly';
-      dayOfWeek?: number;
+      daysOfWeek?: number[];
       dayOfMonth?: number;
       startTime: string;
       endTime: string;

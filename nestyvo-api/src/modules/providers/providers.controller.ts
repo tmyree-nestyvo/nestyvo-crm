@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Put, Delete, Param, Query, Body, Req, UseGuards, ForbiddenException } from '@nestjs/common';
-import { IsString, IsOptional, IsEnum, IsDateString, IsInt, Min, Max, Matches, ValidateNested, ArrayMaxSize } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsDateString, IsInt, Min, Max, Matches, ValidateNested, ArrayMaxSize, IsArray, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../../auth/auth.guard';
@@ -56,7 +56,10 @@ class ReplaceAvailabilityDto {
 
 class RecurringBlockDto {
   @IsOptional() @IsEnum(['daily', 'weekly', 'monthly']) frequency?: 'daily' | 'weekly' | 'monthly';
-  @IsOptional() @IsInt() @Min(0) @Max(6) dayOfWeek?: number;
+  // Weekly recurrence — one or more weekdays per block (Charlene Sep 6 2026:
+  // recurring blocks needed to span multiple days a week, not just one).
+  @IsOptional() @IsArray() @ArrayMinSize(1) @IsInt({ each: true }) @Min(0, { each: true }) @Max(6, { each: true })
+  daysOfWeek?: number[];
   @IsOptional() @IsInt() @Min(1) @Max(31) dayOfMonth?: number;
   @Matches(TIME_RE, { message: 'startTime must be HH:mm' }) startTime: string;
   @Matches(TIME_RE, { message: 'endTime must be HH:mm' }) endTime: string;
@@ -196,7 +199,7 @@ export class ProvidersController {
       id,
       {
         frequency: dto.frequency,
-        dayOfWeek: dto.dayOfWeek,
+        daysOfWeek: dto.daysOfWeek,
         dayOfMonth: dto.dayOfMonth,
         startTime: dto.startTime,
         endTime: dto.endTime,
@@ -258,7 +261,7 @@ export class ProvidersController {
   createSelfRecurringBlock(@Body() dto: RecurringBlockDto, @CurrentUser() user: User) {
     return this.providersService.createSelfRecurringBlock(user, {
       frequency: dto.frequency,
-      dayOfWeek: dto.dayOfWeek,
+      daysOfWeek: dto.daysOfWeek,
       dayOfMonth: dto.dayOfMonth,
       startTime: dto.startTime,
       endTime: dto.endTime,

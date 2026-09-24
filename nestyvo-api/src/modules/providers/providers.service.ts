@@ -83,7 +83,7 @@ export class ProvidersService {
     providerId: string,
     input: {
       frequency?: 'daily' | 'weekly' | 'monthly';
-      dayOfWeek?: number;
+      daysOfWeek?: number[];
       dayOfMonth?: number;
       startTime: string;
       endTime: string;
@@ -105,7 +105,7 @@ export class ProvidersService {
     providerId: string,
     input: {
       frequency?: 'daily' | 'weekly' | 'monthly';
-      dayOfWeek?: number;
+      daysOfWeek?: number[];
       dayOfMonth?: number;
       startTime: string;
       endTime: string;
@@ -150,21 +150,31 @@ export class ProvidersService {
         cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, dayOfMonth);
       }
     } else {
-      if (input.dayOfWeek === undefined || input.dayOfWeek < 0 || input.dayOfWeek > 6) {
-        throw new BadRequestException('dayOfWeek (0-6) is required for weekly recurrence');
+      const daysOfWeek = [...new Set(input.daysOfWeek ?? [])];
+      if (daysOfWeek.length === 0 || daysOfWeek.some((d) => d < 0 || d > 6)) {
+        throw new BadRequestException('daysOfWeek (0-6, at least one) is required for weekly recurrence');
       }
       const weeksCap = Math.min(Math.max(input.weeks ?? 12, 1), MAX_RECURRING_WEEKS);
-      const daysUntilTarget = (input.dayOfWeek - today.getDay() + 7) % 7;
-      const firstOccurrence = new Date(today);
-      firstOccurrence.setDate(today.getDate() + daysUntilTarget);
-      const defaultLimit = new Date(firstOccurrence);
-      defaultLimit.setDate(defaultLimit.getDate() + (weeksCap - 1) * 7);
-      const limit = explicitEnd ?? defaultLimit;
-      const cursor = new Date(firstOccurrence);
-      while (cursor <= limit && occurrenceDates.length < MAX_RECURRING_OCCURRENCES) {
-        occurrenceDates.push(new Date(cursor));
-        cursor.setDate(cursor.getDate() + 7);
+      // Each selected weekday gets its own weeksCap-week span measured from
+      // its own first occurrence, same as the single-day version — then all
+      // days' dates are merged and sorted below. MAX_RECURRING_OCCURRENCES
+      // is a shared cap across every day combined, so e.g. 5 days x 12 weeks
+      // gets capped to 52 total rows rather than 60.
+      for (const dayOfWeek of daysOfWeek) {
+        if (occurrenceDates.length >= MAX_RECURRING_OCCURRENCES) break;
+        const daysUntilTarget = (dayOfWeek - today.getDay() + 7) % 7;
+        const firstOccurrence = new Date(today);
+        firstOccurrence.setDate(today.getDate() + daysUntilTarget);
+        const defaultLimit = new Date(firstOccurrence);
+        defaultLimit.setDate(defaultLimit.getDate() + (weeksCap - 1) * 7);
+        const limit = explicitEnd ?? defaultLimit;
+        const cursor = new Date(firstOccurrence);
+        while (cursor <= limit && occurrenceDates.length < MAX_RECURRING_OCCURRENCES) {
+          occurrenceDates.push(new Date(cursor));
+          cursor.setDate(cursor.getDate() + 7);
+        }
       }
+      occurrenceDates.sort((a, b) => a.getTime() - b.getTime());
     }
 
     return occurrenceDates.map((day) => {
@@ -191,7 +201,7 @@ export class ProvidersService {
     user: User,
     input: {
       frequency?: 'daily' | 'weekly' | 'monthly';
-      dayOfWeek?: number;
+      daysOfWeek?: number[];
       dayOfMonth?: number;
       startTime: string;
       endTime: string;

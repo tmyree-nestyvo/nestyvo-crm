@@ -80,7 +80,9 @@ export default function ProviderSettingsScreen() {
   const [days, setDays] = useState<DayWindow[]>(defaultDays());
 
   const [blockFrequency, setBlockFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
-  const [blockDay, setBlockDay] = useState(4); // Thursday default
+  const [blockDays, setBlockDays] = useState<number[]>([4]); // Thursday default; multi-select
+  const toggleBlockDay = (i: number) =>
+    setBlockDays((prev) => (prev.includes(i) ? prev.filter((d) => d !== i) : [...prev, i].sort()));
   const [blockDayOfMonth, setBlockDayOfMonth] = useState('1');
   const [blockStart, setBlockStart] = useState('10:00');
   const [blockEnd, setBlockEnd] = useState('12:00');
@@ -145,7 +147,7 @@ export default function ProviderSettingsScreen() {
     mutationFn: () =>
       providersApi.createRecurringBlock(provider!.id, {
         frequency: blockFrequency,
-        dayOfWeek: blockFrequency === 'weekly' ? blockDay : undefined,
+        daysOfWeek: blockFrequency === 'weekly' ? blockDays : undefined,
         dayOfMonth: blockFrequency === 'monthly' ? Number(blockDayOfMonth) || 1 : undefined,
         startTime: blockStart,
         endTime: blockEnd,
@@ -281,17 +283,23 @@ export default function ProviderSettingsScreen() {
               </View>
 
               {blockFrequency === 'weekly' && (
-                <View className="flex-row flex-wrap gap-1.5 mb-3">
-                  {DAY_SHORT.map((label, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      onPress={() => setBlockDay(i)}
-                      className={`px-3 py-1.5 rounded-full border ${blockDay === i ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`}
-                    >
-                      <Text className={`text-xs font-medium ${blockDay === i ? 'text-white' : 'text-gray-600'}`}>{label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <>
+                  <Text className="text-gray-400 text-xs mb-1.5">Repeats on (pick one or more days)</Text>
+                  <View className="flex-row flex-wrap gap-1.5 mb-3">
+                    {DAY_SHORT.map((label, i) => {
+                      const active = blockDays.includes(i);
+                      return (
+                        <TouchableOpacity
+                          key={i}
+                          onPress={() => toggleBlockDay(i)}
+                          className={`px-3 py-1.5 rounded-full border ${active ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`}
+                        >
+                          <Text className={`text-xs font-medium ${active ? 'text-white' : 'text-gray-600'}`}>{label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
               )}
 
               {blockFrequency === 'monthly' && (
@@ -355,8 +363,10 @@ export default function ProviderSettingsScreen() {
 
               <TouchableOpacity
                 onPress={() => addRecurringBlock.mutate()}
-                disabled={addRecurringBlock.isPending}
-                className="bg-gray-900 rounded-xl py-2.5 items-center mb-1"
+                disabled={addRecurringBlock.isPending || (blockFrequency === 'weekly' && blockDays.length === 0)}
+                className={`rounded-xl py-2.5 items-center mb-1 ${
+                  blockFrequency === 'weekly' && blockDays.length === 0 ? 'bg-gray-300' : 'bg-gray-900'
+                }`}
               >
                 {addRecurringBlock.isPending ? (
                   <ActivityIndicator color="#fff" />
@@ -366,7 +376,9 @@ export default function ProviderSettingsScreen() {
                       ? `Every day${blockEndDate ? ` through ${blockEndDate}` : ''}`
                       : blockFrequency === 'monthly'
                       ? `Monthly on the ${blockDayOfMonth || '1'}${blockEndDate ? ` through ${blockEndDate}` : ''}`
-                      : `Every ${DAY_LABELS[blockDay]}${blockEndDate ? ` through ${blockEndDate}` : `, ${blockWeeks || '12'} weeks`}`}
+                      : blockDays.length === 0
+                      ? 'Pick at least one day'
+                      : `Every ${blockDays.map((d) => DAY_LABELS[d]).join(', ')}${blockEndDate ? ` through ${blockEndDate}` : `, ${blockWeeks || '12'} weeks`}`}
                   </Text>
                 )}
               </TouchableOpacity>

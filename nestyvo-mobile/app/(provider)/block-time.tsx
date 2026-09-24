@@ -44,6 +44,9 @@ const FREQUENCIES = [
   { value: 'monthly', label: 'Monthly' },
 ] as const;
 
+const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 export default function BlockTimeScreen() {
   const days = buildDays();
   const [selectedDate, setSelectedDate] = useState(days[0].iso);
@@ -54,6 +57,11 @@ export default function BlockTimeScreen() {
   const [repeats, setRepeats] = useState(false);
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [endDate, setEndDate] = useState(''); // optional YYYY-MM-DD
+  // Weekly recurrence — one or more weekdays (Charlene: needed to block e.g.
+  // Mon/Wed/Fri in one go, not three separate recurring blocks).
+  const [weeklyDays, setWeeklyDays] = useState<number[]>([new Date().getDay()]);
+  const toggleWeeklyDay = (i: number) =>
+    setWeeklyDays((prev) => (prev.includes(i) ? prev.filter((d) => d !== i) : [...prev, i].sort()));
 
   const queryClient = useQueryClient();
 
@@ -63,7 +71,7 @@ export default function BlockTimeScreen() {
         const [y, m, d] = selectedDate.split('-').map(Number);
         return api.post('/providers/self/recurring-block', {
           frequency,
-          dayOfWeek: frequency === 'weekly' ? new Date(y, m - 1, d).getDay() : undefined,
+          daysOfWeek: frequency === 'weekly' ? weeklyDays : undefined,
           dayOfMonth: frequency === 'monthly' ? d : undefined,
           startTime,
           endTime,
@@ -82,7 +90,9 @@ export default function BlockTimeScreen() {
       Alert.alert(
         'Time Blocked',
         repeats
-          ? `${startLabel} – ${endLabel}, repeating ${frequency}${endDate ? ` through ${endDate}` : ''}.`
+          ? `${startLabel} – ${endLabel}, repeating ${
+              frequency === 'weekly' ? `every ${weeklyDays.map((d) => DAY_LABELS[d]).join(', ')}` : frequency
+            }${endDate ? ` through ${endDate}` : ''}.`
           : `${selectedLabel} ${startLabel} – ${endLabel} is now blocked.`,
         [{ text: 'OK', onPress: () => router.back() }],
       );
@@ -240,9 +250,32 @@ export default function BlockTimeScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            {frequency === 'weekly' ? (
+              <>
+                <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                  Repeats on <Text className="font-normal normal-case">(pick one or more days)</Text>
+                </Text>
+                <View className="flex-row flex-wrap gap-1.5 mb-3">
+                  {DAY_SHORT.map((label, i) => {
+                    const active = weeklyDays.includes(i);
+                    return (
+                      <TouchableOpacity
+                        key={i}
+                        onPress={() => toggleWeeklyDay(i)}
+                        className={`px-4 py-2 rounded-full border ${active ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`}
+                      >
+                        <Text className={`text-sm font-medium ${active ? 'text-white' : 'text-gray-700'}`}>{label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            ) : null}
             <Text className="text-xs text-gray-400 mb-2">
               {frequency === 'weekly'
-                ? `Repeats every ${selectedLabel === 'Today' || selectedLabel === 'Tomorrow' ? '' : selectedLabel + ' '}week on the same day.`
+                ? weeklyDays.length === 0
+                  ? 'Pick at least one day above.'
+                  : `Repeats every week on ${weeklyDays.map((d) => DAY_LABELS[d]).join(', ')}.`
                 : frequency === 'monthly'
                 ? 'Repeats monthly on this date.'
                 : 'Repeats every day.'}
@@ -264,7 +297,11 @@ export default function BlockTimeScreen() {
         <View className="bg-primary-50 border border-primary-100 rounded-2xl p-4 mb-4">
           <Text className="text-primary-800 text-sm font-semibold mb-1">Block summary</Text>
           <Text className="text-primary-700 text-sm">
-            {selectedLabel} · {startLabel} – {endLabel}
+            {repeats && frequency === 'weekly'
+              ? weeklyDays.length > 0
+                ? weeklyDays.map((d) => DAY_LABELS[d]).join(', ')
+                : 'No days selected'
+              : selectedLabel} · {startLabel} – {endLabel}
             {repeats ? ` · repeats ${frequency}${endDate ? ` through ${endDate}` : ''}` : ''}
           </Text>
           <Text className="text-primary-500 text-xs mt-0.5 capitalize">{blockType}</Text>
@@ -272,11 +309,17 @@ export default function BlockTimeScreen() {
 
         <TouchableOpacity
           onPress={() => createBlock.mutate()}
-          disabled={createBlock.isPending}
-          className="bg-primary-600 rounded-2xl py-4 items-center"
+          disabled={createBlock.isPending || (repeats && frequency === 'weekly' && weeklyDays.length === 0)}
+          className={`rounded-2xl py-4 items-center ${
+            repeats && frequency === 'weekly' && weeklyDays.length === 0 ? 'bg-gray-300' : 'bg-primary-600'
+          }`}
         >
           <Text className="text-white font-semibold text-base">
-            {createBlock.isPending ? 'Saving…' : 'Block This Time'}
+            {createBlock.isPending
+              ? 'Saving…'
+              : repeats && frequency === 'weekly' && weeklyDays.length === 0
+              ? 'Pick at least one day'
+              : 'Block This Time'}
           </Text>
         </TouchableOpacity>
       </ScrollView>
