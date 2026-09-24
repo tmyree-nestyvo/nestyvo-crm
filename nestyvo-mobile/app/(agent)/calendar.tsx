@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { api } from '../../lib/api';
+import { HomeButton } from '../../components/HomeButton';
 
 // ── Data ────────────────────────────────────────────────────────────────────
 
@@ -112,8 +113,9 @@ export default function CalendarScreen() {
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
       <ScrollView className="flex-1" contentContainerClassName="pb-10">
         {/* Header */}
-        <View className="px-5 pt-4 pb-2">
-          <Text className="text-xl font-bold text-gray-900">Calendar</Text>
+        <View className="px-5 pt-4 pb-2 flex-row items-center gap-3">
+          <Text className="text-xl font-bold text-gray-900 flex-1">Calendar</Text>
+          <HomeButton href="/(agent)" />
         </View>
 
         {bookingPatientId && (

@@ -7,6 +7,7 @@ import { ChatBubble } from '../../components/chat/ChatBubble';
 import { ChatInput } from '../../components/chat/ChatInput';
 import { PendingActionCard } from '../../components/chat/PendingActionCard';
 import { agentChat, agentConfirm, AgentMessage } from '../../lib/api';
+import { HomeButton } from '../../components/HomeButton';
 
 type MessageItem =
   | { type: 'message'; id: string; role: 'user' | 'assistant'; content: string }
@@ -153,11 +154,14 @@ export default function CopilotScreen() {
             <Text className="text-xs text-green-500">● Online</Text>
           </View>
         </View>
-        {messages.length > 0 && (
-          <TouchableOpacity onPress={clearChat} className="p-2">
-            <Ionicons name="trash-outline" size={18} color="#9ca3af" />
-          </TouchableOpacity>
-        )}
+        <View className="flex-row items-center gap-1">
+          {messages.length > 0 && (
+            <TouchableOpacity onPress={clearChat} className="p-2">
+              <Ionicons name="trash-outline" size={18} color="#9ca3af" />
+            </TouchableOpacity>
+          )}
+          <HomeButton href="/(agent)" />
+        </View>
       </View>
 
       <KeyboardAvoidingView

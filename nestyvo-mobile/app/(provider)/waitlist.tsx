@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { HomeButton } from '../../components/HomeButton';
 
 function useWaitlist() {
   return useQuery({
@@ -22,11 +23,14 @@ export default function ProviderWaitlistScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
-      <View className="px-5 pt-4 pb-3">
-        <Text className="text-xl font-bold text-gray-900">My Waitlist</Text>
-        <Text className="text-gray-500 text-sm mt-0.5">
-          {data?.length ?? 0} patients waiting
-        </Text>
+      <View className="px-5 pt-4 pb-3 flex-row items-center gap-3">
+        <View className="flex-1">
+          <Text className="text-xl font-bold text-gray-900">My Waitlist</Text>
+          <Text className="text-gray-500 text-sm mt-0.5">
+            {data?.length ?? 0} patients waiting
+          </Text>
+        </View>
+        <HomeButton href="/(provider)" />
       </View>
 
       {isLoading ? (

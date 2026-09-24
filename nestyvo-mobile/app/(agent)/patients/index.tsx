@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
 import { useAuthStore } from '../../../lib/store';
+import { HomeButton } from '../../../components/HomeButton';
 
 function usePatientSearch(query: string) {
   return useQuery({
@@ -32,15 +33,18 @@ export default function PatientsScreen() {
       <View className="px-5 pt-4 pb-3">
         <View className="flex-row items-center justify-between mb-3">
           <Text className="text-xl font-bold text-gray-900">Clients</Text>
-          {canCreate && (
-            <TouchableOpacity
-              onPress={() => router.push('/(agent)/patients/new')}
-              className="flex-row items-center gap-1.5 bg-primary-600 px-3 py-1.5 rounded-full"
-            >
-              <Ionicons name="add" size={16} color="#fff" />
-              <Text className="text-white text-xs font-semibold">New Client</Text>
-            </TouchableOpacity>
-          )}
+          <View className="flex-row items-center gap-2">
+            {canCreate && (
+              <TouchableOpacity
+                onPress={() => router.push('/(agent)/patients/new')}
+                className="flex-row items-center gap-1.5 bg-primary-600 px-3 py-1.5 rounded-full"
+              >
+                <Ionicons name="add" size={16} color="#fff" />
+                <Text className="text-white text-xs font-semibold">New Client</Text>
+              </TouchableOpacity>
+            )}
+            <HomeButton href="/(agent)" />
+          </View>
         </View>
         <View className="flex-row items-center bg-white border border-gray-200 rounded-xl px-4 gap-3">
           <Ionicons name="search" size={18} color="#9ca3af" />

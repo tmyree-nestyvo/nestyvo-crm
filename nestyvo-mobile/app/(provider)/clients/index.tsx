@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
+import { HomeButton } from '../../../components/HomeButton';
 
 const TZ = 'America/Los_Angeles';
 
@@ -150,8 +151,9 @@ export default function ClientsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
       {/* Header */}
-      <View className="px-5 pt-4 pb-2">
-        <Text className="text-2xl font-bold text-gray-900">My Clients</Text>
+      <View className="px-5 pt-4 pb-2 flex-row items-center gap-3">
+        <Text className="text-2xl font-bold text-gray-900 flex-1">My Clients</Text>
+        <HomeButton href="/(provider)" />
       </View>
 
       {/* Search */}

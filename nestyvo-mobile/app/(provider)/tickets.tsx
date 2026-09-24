@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ticketsApi, api } from '../../lib/api';
+import { HomeButton } from '../../components/HomeButton';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   open: { label: 'Open', color: '#d97706', bg: '#fffbeb' },
@@ -70,6 +71,7 @@ export default function ProviderTicketsScreen() {
           <Ionicons name="add" size={16} color="#fff" />
           <Text className="text-white text-xs font-semibold">New</Text>
         </TouchableOpacity>
+        <HomeButton href="/(provider)" />
       </View>
 
       <View className="flex-row gap-2 px-5 pb-3">
