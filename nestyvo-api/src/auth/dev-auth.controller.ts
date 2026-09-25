@@ -1,9 +1,13 @@
-import { Controller, Post, Body, Get, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Body, Get, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../database/entities/user.entity';
 import { Public } from './decorators/public.decorator';
+import { JwtAuthGuard } from './auth.guard';
+import { RolesGuard } from './roles.guard';
+import { Roles } from './decorators/roles.decorator';
+import { ADMIN_ONLY } from './role-groups';
 
 // Intended as a dev-only bypass (real Cognito is still unconfigured in
 // production as of Sep 24 2026 — see [[project_decisions]]), gated behind
@@ -33,7 +37,12 @@ export class DevAuthController {
     @InjectRepository(User) private userRepo: Repository<User>,
   ) {}
 
-  @Public()
+  // Was @Public() — an unauthenticated user-directory enumeration endpoint,
+  // fixed alongside the mockLogin holes above (same incident: dev-only
+  // conveniences left wide open because "it's just for dev" while actually
+  // live in production).
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...ADMIN_ONLY)
   @Get('users')
   async listUsers() {
     return this.userRepo.find({ select: { id: true, email: true, role: true, firstName: true, lastName: true } });
