@@ -15,7 +15,11 @@ const DEV_BYPASS = process.env.DEV_AUTH_BYPASS === 'true';
     ConfigModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
-      secret: 'nestyvo-dev-secret',
+      // Required at boot when DEV_AUTH_BYPASS=true (see DevStrategy) —
+      // never a hardcoded literal. Real Cognito mode doesn't sign tokens
+      // with this at all (CognitoStrategy verifies against AWS's own
+      // JWKS), so this only matters while the bypass is in use.
+      secret: process.env.JWT_SECRET ?? 'unset-jwt-secret-cognito-mode-only',
       signOptions: { expiresIn: '8h' },
     }),
     TypeOrmModule.forFeature([User]),
