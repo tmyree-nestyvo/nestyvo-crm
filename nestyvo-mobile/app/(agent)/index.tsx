@@ -174,6 +174,14 @@ export default function AgentDashboard() {
           >
             <Ionicons name="flag-outline" size={22} color="#6b7280" />
           </TouchableOpacity>
+          {hasRole(role, ADMIN_ONLY) && (
+            <TouchableOpacity
+              onPress={() => router.push('/(agent)/partners')}
+              className="p-2"
+            >
+              <Ionicons name="briefcase-outline" size={22} color="#6b7280" />
+            </TouchableOpacity>
+          )}
           {hasRole(role, PRACTICE_MANAGEMENT) && (
             <TouchableOpacity
               onPress={() => router.push('/(agent)/provider-settings')}

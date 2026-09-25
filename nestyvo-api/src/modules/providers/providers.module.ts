@@ -13,6 +13,7 @@ import { ProvidersService } from './providers.service';
 import { FillCandidatesService } from './fill-candidates.service';
 import { ProvidersController } from './providers.controller';
 import { SmsModule } from '../sms/sms.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { SmsModule } from '../sms/sms.module';
       WaitlistEntry, Patient, AuditLog, ProviderBlock, ProviderAvailability, User,
     ]),
     SmsModule,
+    UsersModule,
   ],
   providers: [ProvidersService, FillCandidatesService],
   controllers: [ProvidersController],

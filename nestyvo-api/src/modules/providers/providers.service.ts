@@ -8,9 +8,25 @@ import { AgentProviderAssignment } from '../../database/entities/agent-provider-
 import { ProviderAvailability } from '../../database/entities/provider-availability.entity';
 import { ProviderBlock, BlockType } from '../../database/entities/provider-block.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
+import { UsersService } from '../users/users.service';
 
 const MAX_RECURRING_WEEKS = 26;
 const MAX_RECURRING_OCCURRENCES = 52;
+
+export interface CreateProviderInput {
+  practiceId: string;
+  firstName: string;
+  lastName: string;
+  credentials?: string;
+  specialty?: string;
+  phone?: string;
+  email?: string;
+  officeLocation?: string;
+  isVirtual?: boolean;
+  isInPerson?: boolean;
+  /** If set, also creates a PROVIDER-role login for this person (see UsersService.create). */
+  loginEmail?: string;
+}
 
 @Injectable()
 export class ProvidersService {
@@ -20,7 +36,41 @@ export class ProvidersService {
     @InjectRepository(AgentProviderAssignment) private assignmentRepo: Repository<AgentProviderAssignment>,
     @InjectRepository(ProviderAvailability) private availabilityRepo: Repository<ProviderAvailability>,
     @InjectRepository(ProviderBlock) private blockRepo: Repository<ProviderBlock>,
+    private usersService: UsersService,
   ) {}
+
+  // Partner onboarding (Charlene, Sep 24 2026): create a provider's business/
+  // clinical profile and, optionally, their login in one call. Login is
+  // created FIRST (when requested) so a duplicate-email failure never leaves
+  // an orphan Provider row with no way to log in — see UsersService.create.
+  async create(input: CreateProviderInput): Promise<Provider> {
+    let userId: string | undefined;
+    if (input.loginEmail) {
+      const user = await this.usersService.create({
+        email: input.loginEmail,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        role: UserRole.PROVIDER,
+        phone: input.phone,
+      });
+      userId = user.id;
+    }
+
+    const provider = this.providerRepo.create({
+      practiceId: input.practiceId,
+      userId,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      credentials: input.credentials,
+      specialty: input.specialty,
+      phone: input.phone,
+      email: input.email,
+      officeLocation: input.officeLocation,
+      isVirtual: input.isVirtual ?? false,
+      isInPerson: input.isInPerson ?? true,
+    });
+    return this.providerRepo.save(provider);
+  }
 
   // Admins manage every partner; practice managers only their own practice.
   private async assertCanManage(providerId: string, user: User): Promise<Provider> {

@@ -65,6 +65,7 @@ export default function AgentLayout() {
       <Tabs.Screen name="tags" options={{ href: null }} />
       <Tabs.Screen name="tickets" options={{ href: null }} />
       <Tabs.Screen name="provider-settings" options={{ href: null }} />
+      <Tabs.Screen name="partners" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -76,6 +76,19 @@ export const providersApi = {
   replaceAvailability: (id: string, windows: { dayOfWeek: number; startTime: string; endTime: string }[]) =>
     api.put(`/providers/${id}/availability`, { windows }).then((r) => r.data),
   getBlocks: (id: string) => api.get(`/providers/${id}/blocks`).then((r) => r.data),
+  create: (input: {
+    practiceId: string;
+    firstName: string;
+    lastName: string;
+    credentials?: string;
+    specialty?: string;
+    phone?: string;
+    email?: string;
+    officeLocation?: string;
+    isVirtual?: boolean;
+    isInPerson?: boolean;
+    loginEmail?: string;
+  }) => api.post('/providers', input).then((r) => r.data),
   createRecurringBlock: (
     id: string,
     input: {
@@ -93,9 +106,40 @@ export const providersApi = {
     api.delete(`/providers/${id}/blocks/${blockId}`).then((r) => r.data),
 };
 
-// Practices (admin/agent cross-practice picker)
+// Practices
+export interface UpsertPracticeInput {
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  contactName?: string;
+  notes?: string;
+  timezone?: string;
+  subscriptionStatus?: 'trial' | 'active' | 'past_due' | 'canceled';
+  subscriptionExpiresAt?: string;
+}
+
 export const practicesApi = {
+  // Minimal fields — admin/agent cross-practice picker (unchanged shape).
   list: () => api.get('/practices').then((r) => r.data),
+  // Full fields — admin partner-management screen only.
+  listAdmin: () => api.get('/practices/admin').then((r) => r.data),
+  get: (id: string) => api.get(`/practices/${id}`).then((r) => r.data),
+  create: (input: UpsertPracticeInput) => api.post('/practices', input).then((r) => r.data),
+  update: (id: string, input: Partial<UpsertPracticeInput>) =>
+    api.patch(`/practices/${id}`, input).then((r) => r.data),
+};
+
+// Users (admin-only login creation — partner providers, staff hires)
+export const usersApi = {
+  create: (input: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: 'administrator' | 'scheduling_agent' | 'provider' | 'practice_manager';
+    practiceId?: string;
+    phone?: string;
+  }) => api.post('/users', input).then((r) => r.data),
 };
 
 // Waitlist

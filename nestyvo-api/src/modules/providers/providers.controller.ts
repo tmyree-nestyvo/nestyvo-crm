@@ -5,7 +5,7 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { ALL_STAFF, OFFICE_STAFF, PRACTICE_MANAGEMENT, PROVIDER_ONLY } from '../../auth/role-groups';
+import { ADMIN_ONLY, ALL_STAFF, OFFICE_STAFF, PRACTICE_MANAGEMENT, PROVIDER_ONLY } from '../../auth/role-groups';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { User } from '../../database/entities/user.entity';
 import { ProvidersService } from './providers.service';
@@ -31,6 +31,21 @@ class LogAttemptDto {
   @IsEnum(['call', 'sms', 'email', 'voicemail']) attemptType: string;
   @IsEnum(['reached', 'no_answer', 'voicemail', 'busy', 'wrong_number', 'scheduled', 'declined']) outcome: string;
   @IsOptional() @IsString() notes?: string;
+}
+
+class CreateProviderDto {
+  @IsString() practiceId: string;
+  @IsString() firstName: string;
+  @IsString() lastName: string;
+  @IsOptional() @IsString() credentials?: string;
+  @IsOptional() @IsString() specialty?: string;
+  @IsOptional() @IsString() phone?: string;
+  @IsOptional() @IsString() email?: string;
+  @IsOptional() @IsString() officeLocation?: string;
+  @IsOptional() isVirtual?: boolean;
+  @IsOptional() isInPerson?: boolean;
+  // If set, also creates their PROVIDER-role login (see UsersService.create).
+  @IsOptional() @IsString() loginEmail?: string;
 }
 
 class CreateBlockDto {
@@ -95,6 +110,14 @@ export class ProvidersController {
       isVirtual: p.isVirtual,
       isInPerson: p.isInPerson,
     }));
+  }
+
+  // Partner onboarding (Charlene, Sep 24 2026) — admin-only, creates a
+  // provider's business/clinical profile and optionally their login.
+  @Post()
+  @Roles(...ADMIN_ONLY)
+  createProvider(@Body() dto: CreateProviderDto) {
+    return this.providersService.create(dto);
   }
 
   // Literal "self/*" routes MUST be declared before any ":id/*" routes below
