@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../lib/store';
+import { hasRole, ADMIN_ONLY } from '../../lib/role-groups';
 import { api } from '../../lib/api';
 import { AppointmentCard } from '../../components/dashboard/AppointmentCard';
 import { StatCard } from '../../components/dashboard/StatCard';
@@ -57,7 +58,7 @@ export default function ProviderScheduleScreen() {
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
       <View className="px-5 pt-4 pb-3 flex-row items-center justify-between">
         <View className="flex-row items-center gap-2">
-          {role === 'administrator' && (
+          {hasRole(role, ADMIN_ONLY) && (
             <TouchableOpacity onPress={() => router.replace('/(agent)')} className="p-1 -ml-1">
               <Ionicons name="arrow-back" size={22} color="#374151" />
             </TouchableOpacity>

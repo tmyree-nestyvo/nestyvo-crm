@@ -8,6 +8,7 @@ import { api, patientLinksApi, clientTagsApi, ticketsApi, waitlistApi } from '..
 import { AppointmentCard } from '../../../components/dashboard/AppointmentCard';
 import { HomeButton } from '../../../components/HomeButton';
 import { useAuthStore } from '../../../lib/store';
+import { hasRole, ADMIN_ONLY, PRACTICE_MANAGEMENT } from '../../../lib/role-groups';
 
 function usePatient(id: string) {
   return useQuery({
@@ -145,7 +146,7 @@ export default function PatientDetailScreen() {
           </>
         )}
 
-        {role === 'administrator' && <LinkedAccounts patientId={id} />}
+        {hasRole(role, ADMIN_ONLY) && <LinkedAccounts patientId={id} />}
 
         {/* Recent Appointments */}
         <Text className="text-base font-semibold text-gray-900 mb-3">Recent Appointments</Text>
@@ -454,7 +455,7 @@ function TagSection({
   const [picker, setPicker] = useState(false);
   const queryClient = useQueryClient();
   const { role, practiceId: myPracticeId } = useAuthStore();
-  const isCrossPractice = role === 'administrator' && practiceId && practiceId !== myPracticeId;
+  const isCrossPractice = hasRole(role, ADMIN_ONLY) && practiceId && practiceId !== myPracticeId;
 
   const { data: tags = [] } = useQuery({
     queryKey: ['client-tags', practiceId],
@@ -521,7 +522,7 @@ function TagSection({
                 <Text className="text-red-500 text-sm">Clear tag</Text>
               </TouchableOpacity>
             ) : null}
-            {(role === 'administrator' || role === 'practice_manager') && !isCrossPractice && (
+            {hasRole(role, PRACTICE_MANAGEMENT) && !isCrossPractice && (
               <TouchableOpacity
                 onPress={() => { setPicker(false); router.push('/(agent)/tags'); }}
                 className="mt-2 items-center py-2"

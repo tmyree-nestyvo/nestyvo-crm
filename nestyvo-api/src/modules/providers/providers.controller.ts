@@ -5,8 +5,9 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { ALL_STAFF, OFFICE_STAFF, PRACTICE_MANAGEMENT, PROVIDER_ONLY } from '../../auth/role-groups';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
-import { User, UserRole } from '../../database/entities/user.entity';
+import { User } from '../../database/entities/user.entity';
 import { ProvidersService } from './providers.service';
 import { FillCandidatesService } from './fill-candidates.service';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -81,7 +82,7 @@ export class ProvidersController {
   ) {}
 
   @Get()
-  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER, UserRole.PROVIDER)
+  @Roles(...ALL_STAFF)
   async list(@Query('practiceId') practiceId: string | undefined, @CurrentUser() user: User) {
     const providers = await this.providersService.listForUser(user, practiceId);
     return providers.map((p) => ({
@@ -104,7 +105,7 @@ export class ProvidersController {
   // routes. This bit production: both self/recurring-block and self/blocks
   // (GET) were silently 403'ing for every provider before this fix.
   @Post('self/blocks')
-  @Roles(UserRole.PROVIDER)
+  @Roles(...PROVIDER_ONLY)
   async createBlock(
     @Body() dto: CreateBlockDto,
     @CurrentUser() user: User,
@@ -126,7 +127,7 @@ export class ProvidersController {
   }
 
   @Get('self/calendar-feed')
-  @Roles(UserRole.PROVIDER)
+  @Roles(...PROVIDER_ONLY)
   async getSelfCalendarFeed(@CurrentUser() user: User, @Req() req: Request) {
     const token = await this.providersService.getOrCreateCalendarFeedToken(user);
     const host = req.get('host') ?? '';
@@ -139,7 +140,7 @@ export class ProvidersController {
   }
 
   @Post('self/recurring-block')
-  @Roles(UserRole.PROVIDER)
+  @Roles(...PROVIDER_ONLY)
   createSelfRecurringBlock(@Body() dto: RecurringBlockDto, @CurrentUser() user: User) {
     return this.providersService.createSelfRecurringBlock(user, {
       frequency: dto.frequency,
@@ -154,7 +155,7 @@ export class ProvidersController {
   }
 
   @Get('self/blocks')
-  @Roles(UserRole.PROVIDER)
+  @Roles(...PROVIDER_ONLY)
   async getBlocks(@CurrentUser() user: User) {
     const provider = await this.providersService.findByUserId(user.id);
     if (!provider) throw new ForbiddenException('Not a provider account');
@@ -169,13 +170,13 @@ export class ProvidersController {
   }
 
   @Get(':id/schedule')
-  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER, UserRole.PROVIDER)
+  @Roles(...ALL_STAFF)
   getSchedule(@Param('id') id: string, @Query('date') date?: string) {
     return this.providersService.getSchedule(id, date);
   }
 
   @Get(':id/fill-candidates')
-  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  @Roles(...OFFICE_STAFF)
   getFillCandidates(
     @Param('id') id: string,
     @Query('slotStartAt') slotStartAt: string,
@@ -189,7 +190,7 @@ export class ProvidersController {
   }
 
   @Post(':id/appointments')
-  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  @Roles(...OFFICE_STAFF)
   async bookAppointment(
     @Param('id') providerId: string,
     @Body() dto: BookAppointmentDto,
@@ -220,7 +221,7 @@ export class ProvidersController {
   }
 
   @Post(':id/log-attempt')
-  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  @Roles(...OFFICE_STAFF)
   async logAttempt(
     @Param('id') providerId: string,
     @Body() dto: LogAttemptDto,
@@ -239,13 +240,13 @@ export class ProvidersController {
   }
 
   @Get(':id/availability')
-  @Roles(UserRole.ADMINISTRATOR, UserRole.PRACTICE_MANAGER)
+  @Roles(...PRACTICE_MANAGEMENT)
   getAvailability(@Param('id') id: string, @CurrentUser() user: User) {
     return this.providersService.getAvailability(id, user);
   }
 
   @Put(':id/availability')
-  @Roles(UserRole.ADMINISTRATOR, UserRole.PRACTICE_MANAGER)
+  @Roles(...PRACTICE_MANAGEMENT)
   replaceAvailability(
     @Param('id') id: string,
     @Body() dto: ReplaceAvailabilityDto,
@@ -255,13 +256,13 @@ export class ProvidersController {
   }
 
   @Get(':id/blocks')
-  @Roles(UserRole.ADMINISTRATOR, UserRole.PRACTICE_MANAGER)
+  @Roles(...PRACTICE_MANAGEMENT)
   getBlocksForAdmin(@Param('id') id: string, @CurrentUser() user: User) {
     return this.providersService.getBlocksForAdmin(id, user);
   }
 
   @Post(':id/recurring-block')
-  @Roles(UserRole.ADMINISTRATOR, UserRole.PRACTICE_MANAGER)
+  @Roles(...PRACTICE_MANAGEMENT)
   createRecurringBlock(
     @Param('id') id: string,
     @Body() dto: RecurringBlockDto,
@@ -284,7 +285,7 @@ export class ProvidersController {
   }
 
   @Delete(':id/blocks/:blockId')
-  @Roles(UserRole.ADMINISTRATOR, UserRole.PRACTICE_MANAGER)
+  @Roles(...PRACTICE_MANAGEMENT)
   deleteBlock(
     @Param('id') id: string,
     @Param('blockId') blockId: string,

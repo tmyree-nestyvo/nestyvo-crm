@@ -3,8 +3,9 @@ import { IsOptional, IsString, IsEnum } from 'class-validator';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { OFFICE_STAFF, ROSTER_ACCESS } from '../../auth/role-groups';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
-import { User, UserRole } from '../../database/entities/user.entity';
+import { User } from '../../database/entities/user.entity';
 import { PreferredContact } from '../../database/entities/patient.entity';
 import { PatientsService } from './patients.service';
 
@@ -31,38 +32,38 @@ export class PatientsController {
   constructor(private patientsService: PatientsService) {}
 
   @Get()
-  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  @Roles(...OFFICE_STAFF)
   search(@Query('q') query: string, @CurrentUser() user: User) {
     if (!query || query.length < 2) return [];
     return this.patientsService.search(query, user);
   }
 
   @Post()
-  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  @Roles(...OFFICE_STAFF)
   create(@Body() dto: CreatePatientDto, @CurrentUser() user: User) {
     return this.patientsService.create(dto as any, user);
   }
 
   @Get('roster')
-  @Roles(UserRole.ADMINISTRATOR, UserRole.PROVIDER, UserRole.PRACTICE_MANAGER)
+  @Roles(...ROSTER_ACCESS)
   getRoster(@CurrentUser() user: User) {
     return this.patientsService.getRoster(user);
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  @Roles(...OFFICE_STAFF)
   findOne(@Param('id') id: string) {
     return this.patientsService.findById(id);
   }
 
   @Get(':id/attempts')
-  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  @Roles(...OFFICE_STAFF)
   getAttempts(@Param('id') id: string) {
     return this.patientsService.getContactAttempts(id);
   }
 
   @Patch(':id/tag')
-  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+  @Roles(...OFFICE_STAFF)
   setTag(@Param('id') id: string, @Body() dto: SetTagDto, @CurrentUser() user: User) {
     return this.patientsService.setTag(id, dto.tagId ?? null, user);
   }

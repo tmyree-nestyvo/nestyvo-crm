@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { patientsApi, providersApi, practicesApi, clientTagsApi } from '../../../lib/api';
 import { useAuthStore } from '../../../lib/store';
+import { hasRole, ADMIN_AND_AGENT } from '../../../lib/role-groups';
 import { HomeButton } from '../../../components/HomeButton';
 
 type Option = { id: string; label: string; sublabel?: string };
@@ -79,7 +80,7 @@ const CONTACT_METHODS = ['phone', 'email', 'sms'];
 
 export default function NewClientScreen() {
   const { role, practiceId: myPracticeId } = useAuthStore();
-  const isCrossPractice = role === 'administrator' || role === 'scheduling_agent';
+  const isCrossPractice = hasRole(role, ADMIN_AND_AGENT);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');

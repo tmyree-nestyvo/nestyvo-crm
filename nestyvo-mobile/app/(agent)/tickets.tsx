@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ticketsApi } from '../../lib/api';
 import { useAuthStore } from '../../lib/store';
+import { hasRole, PRACTICE_MANAGEMENT } from '../../lib/role-groups';
 import { HomeButton } from '../../components/HomeButton';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -26,7 +27,7 @@ function daysAgo(iso: string) {
 
 export default function TicketsScreen() {
   const { role } = useAuthStore();
-  const isOffice = role === 'administrator' || role === 'practice_manager';
+  const isOffice = hasRole(role, PRACTICE_MANAGEMENT);
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<string | undefined>(undefined);
   const [active, setActive] = useState<any | null>(null);

@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore, UserRole } from '../../lib/store';
+import { useAuthStore } from '../../lib/store';
+import { hasRole, ADMIN_ONLY, PRACTICE_MANAGEMENT } from '../../lib/role-groups';
 import { api } from '../../lib/api';
 import { StatCard } from '../../components/dashboard/StatCard';
 import { signOut } from '../../lib/auth';
@@ -173,7 +174,7 @@ export default function AgentDashboard() {
           >
             <Ionicons name="flag-outline" size={22} color="#6b7280" />
           </TouchableOpacity>
-          {(role === 'administrator' || role === 'practice_manager') && (
+          {hasRole(role, PRACTICE_MANAGEMENT) && (
             <TouchableOpacity
               onPress={() => router.push('/(agent)/provider-settings')}
               className="p-2"
@@ -181,7 +182,7 @@ export default function AgentDashboard() {
               <Ionicons name="settings-outline" size={22} color="#6b7280" />
             </TouchableOpacity>
           )}
-          {role === 'administrator' && (
+          {hasRole(role, ADMIN_ONLY) && (
             <TouchableOpacity
               onPress={() => router.push('/(provider)')}
               className="flex-row items-center gap-1 bg-gray-100 px-3 py-1.5 rounded-xl mr-1"

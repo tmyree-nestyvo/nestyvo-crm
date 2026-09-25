@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { clientTagsApi } from '../../lib/api';
 import { useAuthStore } from '../../lib/store';
+import { hasRole, PRACTICE_MANAGEMENT } from '../../lib/role-groups';
 import { HomeButton } from '../../components/HomeButton';
 
 export default function TagsScreen() {
@@ -33,7 +34,7 @@ export default function TagsScreen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['client-tags'] }),
   });
 
-  if (role !== 'administrator' && role !== 'practice_manager') {
+  if (!hasRole(role, PRACTICE_MANAGEMENT)) {
     return (
       <SafeAreaView className="flex-1 bg-surface items-center justify-center px-6">
         <Text className="text-gray-400 text-sm">You don't have access to this page.</Text>

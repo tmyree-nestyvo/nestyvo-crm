@@ -2,12 +2,13 @@ import { Controller, Get, Post, Delete, Param, Body, UseGuards } from '@nestjs/c
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { ADMIN_ONLY } from '../../auth/role-groups';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
-import { User, UserRole } from '../../database/entities/user.entity';
+import { User } from '../../database/entities/user.entity';
 import { PatientLinksService } from './patient-links.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMINISTRATOR)
+@Roles(...ADMIN_ONLY)
 @Controller()
 export class PatientLinksController {
   constructor(private service: PatientLinksService) {}

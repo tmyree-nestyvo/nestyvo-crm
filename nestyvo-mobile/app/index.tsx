@@ -3,6 +3,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuthStore } from '../lib/store';
 import { getStoredToken } from '../lib/auth';
+import { hasRole, OFFICE_STAFF, PROVIDER_ONLY } from '../lib/role-groups';
 
 export default function RootIndex() {
   const { token, role, setAuth } = useAuthStore();
@@ -17,11 +18,11 @@ export default function RootIndex() {
 
   if (!token) return <Redirect href="/(auth)/login" />;
 
-  if (role === 'scheduling_agent' || role === 'administrator' || role === 'practice_manager') {
+  if (hasRole(role, OFFICE_STAFF)) {
     return <Redirect href="/(agent)" />;
   }
 
-  if (role === 'provider') {
+  if (hasRole(role, PROVIDER_ONLY)) {
     return <Redirect href="/(provider)" />;
   }
 

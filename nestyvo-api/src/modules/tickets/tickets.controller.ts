@@ -3,8 +3,9 @@ import { IsString, IsOptional, IsEnum } from 'class-validator';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { ALL_STAFF, OFFICE_STAFF } from '../../auth/role-groups';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
-import { User, UserRole } from '../../database/entities/user.entity';
+import { User } from '../../database/entities/user.entity';
 import { TicketCategory, TicketPriority, TicketStatus } from '../../database/entities/ticket.entity';
 import { TicketsService } from './tickets.service';
 
@@ -24,18 +25,18 @@ class UpdateTicketDto {
 
 @Controller('tickets')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER)
+@Roles(...OFFICE_STAFF)
 export class TicketsController {
   constructor(private ticketsService: TicketsService) {}
 
   @Post()
-  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER, UserRole.PROVIDER)
+  @Roles(...ALL_STAFF)
   create(@Body() dto: CreateTicketDto, @CurrentUser() user: User) {
     return this.ticketsService.create(dto, user);
   }
 
   @Get()
-  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER, UserRole.PROVIDER)
+  @Roles(...ALL_STAFF)
   list(
     @Query('status') status: TicketStatus | undefined,
     @Query('patientId') patientId: string | undefined,
@@ -45,13 +46,13 @@ export class TicketsController {
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER, UserRole.PROVIDER)
+  @Roles(...ALL_STAFF)
   findOne(@Param('id') id: string, @CurrentUser() user: User) {
     return this.ticketsService.findOne(id, user);
   }
 
   @Patch(':id')
-  @Roles(UserRole.ADMINISTRATOR, UserRole.SCHEDULING_AGENT, UserRole.PRACTICE_MANAGER, UserRole.PROVIDER)
+  @Roles(...ALL_STAFF)
   update(@Param('id') id: string, @Body() dto: UpdateTicketDto, @CurrentUser() user: User) {
     return this.ticketsService.update(id, dto, user);
   }

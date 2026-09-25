@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
 import { useAuthStore } from '../../../lib/store';
+import { hasRole, OFFICE_STAFF } from '../../../lib/role-groups';
 import { HomeButton } from '../../../components/HomeButton';
 
 function usePatientSearch(query: string) {
@@ -26,7 +27,7 @@ export default function PatientsScreen() {
   const [query, setQuery] = useState('');
   const { data, isLoading } = usePatientSearch(query);
   const { role } = useAuthStore();
-  const canCreate = role === 'administrator' || role === 'scheduling_agent' || role === 'practice_manager';
+  const canCreate = hasRole(role, OFFICE_STAFF);
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
