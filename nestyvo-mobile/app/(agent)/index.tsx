@@ -176,6 +176,7 @@ export default function AgentDashboard() {
           </TouchableOpacity>
           {hasRole(role, ADMIN_ONLY) && (
             <TouchableOpacity
+              testID="nav-partners"
               onPress={() => router.push('/(agent)/partners')}
               className="p-2"
             >
