@@ -169,6 +169,7 @@ export default function AgentDashboard() {
             <Ionicons name="bar-chart-outline" size={22} color="#6b7280" />
           </TouchableOpacity>
           <TouchableOpacity
+            testID="nav-requests"
             onPress={() => router.push('/(agent)/tickets')}
             className="p-2"
           >
@@ -185,6 +186,7 @@ export default function AgentDashboard() {
           )}
           {hasRole(role, PRACTICE_MANAGEMENT) && (
             <TouchableOpacity
+              testID="nav-provider-settings"
               onPress={() => router.push('/(agent)/provider-settings')}
               className="p-2"
             >
@@ -193,6 +195,7 @@ export default function AgentDashboard() {
           )}
           {hasRole(role, ADMIN_ONLY) && (
             <TouchableOpacity
+              testID="nav-switch-provider"
               onPress={() => router.push('/(provider)')}
               className="flex-row items-center gap-1 bg-gray-100 px-3 py-1.5 rounded-xl mr-1"
             >
