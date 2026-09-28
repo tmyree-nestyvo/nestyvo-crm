@@ -17,6 +17,11 @@ function useProviderDashboard() {
   return useQuery({
     queryKey: ['provider-dashboard'],
     queryFn: () => api.get('/dashboard/provider').then((r) => r.data),
+    // A 403 here means this login has no Provider row of its own (e.g. an
+    // admin using "switch to Provider view" with no linked provider
+    // account) — that's not transient, retrying it can't ever succeed and
+    // just delays showing the real state. Only retry on everything else.
+    retry: (failureCount, error: any) => error?.response?.status !== 403 && failureCount < 1,
   });
 }
 
@@ -40,7 +45,8 @@ export default function ProviderScheduleScreen() {
   const { name, role, clearAuth } = useAuthStore();
   const days = buildDays();
   const [selectedDate, setSelectedDate] = useState(isoDate(days[0]));
-  const { data, isLoading, refetch, isRefetching } = useProviderDashboard();
+  const { data, isLoading, isError, error, refetch, isRefetching } = useProviderDashboard();
+  const noProviderAccount = isError && (error as any)?.response?.status === 403;
 
   const datesWithAppts = new Set((data?.schedule ?? []).map((a: any) => isoDate(new Date(a.startAt))));
 
@@ -65,29 +71,35 @@ export default function ProviderScheduleScreen() {
           )}
           <View>
             <Text className="text-gray-500 text-sm">Provider View</Text>
-            <Text className="text-xl font-bold text-gray-900">Dr. {name?.split(' ').pop()}</Text>
+            <Text className="text-xl font-bold text-gray-900">
+              {noProviderAccount ? 'No provider linked' : `Dr. ${name?.split(' ').pop()}`}
+            </Text>
           </View>
         </View>
         <View className="flex-row items-center gap-2">
-          <TouchableOpacity
-            onPress={() => router.push('/(provider)/calendar')}
-            className="p-2 bg-gray-100 rounded-xl"
-          >
-            <Ionicons name="calendar-outline" size={18} color="#374151" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => router.push('/(provider)/calendar-export')}
-            className="p-2 bg-gray-100 rounded-xl"
-          >
-            <Ionicons name="download-outline" size={18} color="#374151" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => router.push('/(provider)/block-time')}
-            className="flex-row items-center gap-1.5 bg-gray-100 px-3 py-2 rounded-xl"
-          >
-            <Ionicons name="remove-circle-outline" size={16} color="#374151" />
-            <Text className="text-gray-700 text-sm font-medium">Block time</Text>
-          </TouchableOpacity>
+          {!noProviderAccount && (
+            <>
+              <TouchableOpacity
+                onPress={() => router.push('/(provider)/calendar')}
+                className="p-2 bg-gray-100 rounded-xl"
+              >
+                <Ionicons name="calendar-outline" size={18} color="#374151" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push('/(provider)/calendar-export')}
+                className="p-2 bg-gray-100 rounded-xl"
+              >
+                <Ionicons name="download-outline" size={18} color="#374151" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push('/(provider)/block-time')}
+                className="flex-row items-center gap-1.5 bg-gray-100 px-3 py-2 rounded-xl"
+              >
+                <Ionicons name="remove-circle-outline" size={16} color="#374151" />
+                <Text className="text-gray-700 text-sm font-medium">Block time</Text>
+              </TouchableOpacity>
+            </>
+          )}
           <TouchableOpacity onPress={handleSignOut} className="p-2">
             <Ionicons name="log-out-outline" size={22} color="#6b7280" />
           </TouchableOpacity>
@@ -99,100 +111,128 @@ export default function ProviderScheduleScreen() {
         contentContainerClassName="pb-10"
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
       >
-        {/* Stats */}
-        <View className="flex-row gap-3 px-5 mb-4">
-          <StatCard
-            label="Available Slots"
-            value={data?.availableSlots ?? '—'}
-            icon="time-outline"
-            color="#16a34a"
-            onPress={() => router.push('/(provider)/available-slots')}
-          />
-          <StatCard
-            label="Waitlist"
-            value={data?.waitlistCount ?? '—'}
-            icon="list-outline"
-            color="#d97706"
-            onPress={() => router.push('/(provider)/waitlist')}
-          />
-        </View>
-        <View className="flex-row gap-3 px-5 mb-5">
-          <StatCard
-            label="Requests"
-            value={data?.openRequestCount ?? '—'}
-            icon="chatbubble-ellipses-outline"
-            color="#7c3aed"
-            badge={data?.openRequestCount}
-            onPress={() => router.push('/(provider)/tickets')}
-          />
-          <StatCard
-            label="Cancellations"
-            value={data?.cancellationCount ?? '—'}
-            icon="close-circle-outline"
-            color="#dc2626"
-            onPress={() => router.push('/(provider)/cancellations')}
-          />
-        </View>
-
-        {/* Day strip — next 30 days */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-4 mb-4">
-          {days.map((d) => {
-            const iso = isoDate(d);
-            const active = iso === selectedDate;
-            const hasAppts = datesWithAppts.has(iso);
-            return (
+        {noProviderAccount ? (
+          // Admin using "switch to Provider view" with no Provider record of
+          // their own — the previous behavior here was a fake-looking empty
+          // dashboard (every stat card stuck on "—", "No appointments this
+          // day") that looked like a real provider with zero data, not what
+          // was actually true: this login has no provider account at all.
+          <View className="px-5 pt-4">
+            <View className="bg-white rounded-2xl border border-gray-100 p-8 items-center">
+              <Ionicons name="person-circle-outline" size={40} color="#d1d5db" />
+              <Text className="text-gray-900 font-semibold text-base mt-3 text-center">
+                No provider account linked
+              </Text>
+              <Text className="text-gray-400 text-sm mt-1.5 text-center leading-relaxed">
+                This is an admin login with no Provider record of its own, so there's no real schedule to show here.
+                Provider view works for logins that are directly tied to a provider.
+              </Text>
               <TouchableOpacity
-                key={iso}
-                onPress={() => setSelectedDate(iso)}
-                className={`mx-1 w-14 h-16 rounded-xl items-center justify-center ${
-                  active ? 'bg-primary-600' : 'bg-white border border-gray-100'
-                }`}
+                onPress={() => router.replace('/(agent)')}
+                className="bg-primary-600 rounded-xl px-5 py-3 mt-5"
               >
-                <Text className={`text-xs font-medium ${active ? 'text-white/70' : 'text-gray-400'}`}>
-                  {d.toLocaleDateString('en-US', { weekday: 'short' })}
-                </Text>
-                <Text className={`text-lg font-bold mt-0.5 ${active ? 'text-white' : 'text-gray-900'}`}>
-                  {d.getDate()}
-                </Text>
-                {hasAppts && !active ? (
-                  <View className="w-1 h-1 rounded-full bg-primary-500 mt-0.5" />
-                ) : null}
+                <Text className="text-white font-semibold text-sm">Back to Admin Dashboard</Text>
               </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* Schedule for day */}
-        <View className="px-5">
-          <Text className="text-base font-semibold text-gray-900 mb-3">
-            {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', {
-              weekday: 'long', month: 'long', day: 'numeric',
-            })}
-          </Text>
-          {isLoading ? (
-            <View className="bg-white rounded-xl p-6 items-center">
-              <Text className="text-gray-400 text-sm">Loading…</Text>
             </View>
-          ) : dayAppts.length ? (
-            dayAppts.map((appt: any) => (
-              <AppointmentCard
-                key={appt.id}
-                appt={appt}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(provider)/clients/[id]',
-                    params: { id: appt.patientId, name: appt.patient },
-                  })
-                }
+          </View>
+        ) : (
+          <>
+            {/* Stats */}
+            <View className="flex-row gap-3 px-5 mb-4">
+              <StatCard
+                label="Available Slots"
+                value={data?.availableSlots ?? '—'}
+                icon="time-outline"
+                color="#16a34a"
+                onPress={() => router.push('/(provider)/available-slots')}
               />
-            ))
-          ) : (
-            <View className="bg-white rounded-xl border border-gray-100 p-6 items-center">
-              <Ionicons name="calendar-outline" size={32} color="#d1d5db" />
-              <Text className="text-gray-400 text-sm mt-2">No appointments this day</Text>
+              <StatCard
+                label="Waitlist"
+                value={data?.waitlistCount ?? '—'}
+                icon="list-outline"
+                color="#d97706"
+                onPress={() => router.push('/(provider)/waitlist')}
+              />
             </View>
-          )}
-        </View>
+            <View className="flex-row gap-3 px-5 mb-5">
+              <StatCard
+                label="Requests"
+                value={data?.openRequestCount ?? '—'}
+                icon="chatbubble-ellipses-outline"
+                color="#7c3aed"
+                badge={data?.openRequestCount}
+                onPress={() => router.push('/(provider)/tickets')}
+              />
+              <StatCard
+                label="Cancellations"
+                value={data?.cancellationCount ?? '—'}
+                icon="close-circle-outline"
+                color="#dc2626"
+                onPress={() => router.push('/(provider)/cancellations')}
+              />
+            </View>
+
+            {/* Day strip — next 30 days */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-4 mb-4">
+              {days.map((d) => {
+                const iso = isoDate(d);
+                const active = iso === selectedDate;
+                const hasAppts = datesWithAppts.has(iso);
+                return (
+                  <TouchableOpacity
+                    key={iso}
+                    onPress={() => setSelectedDate(iso)}
+                    className={`mx-1 w-14 h-16 rounded-xl items-center justify-center ${
+                      active ? 'bg-primary-600' : 'bg-white border border-gray-100'
+                    }`}
+                  >
+                    <Text className={`text-xs font-medium ${active ? 'text-white/70' : 'text-gray-400'}`}>
+                      {d.toLocaleDateString('en-US', { weekday: 'short' })}
+                    </Text>
+                    <Text className={`text-lg font-bold mt-0.5 ${active ? 'text-white' : 'text-gray-900'}`}>
+                      {d.getDate()}
+                    </Text>
+                    {hasAppts && !active ? (
+                      <View className="w-1 h-1 rounded-full bg-primary-500 mt-0.5" />
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Schedule for day */}
+            <View className="px-5">
+              <Text className="text-base font-semibold text-gray-900 mb-3">
+                {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', {
+                  weekday: 'long', month: 'long', day: 'numeric',
+                })}
+              </Text>
+              {isLoading ? (
+                <View className="bg-white rounded-xl p-6 items-center">
+                  <Text className="text-gray-400 text-sm">Loading…</Text>
+                </View>
+              ) : dayAppts.length ? (
+                dayAppts.map((appt: any) => (
+                  <AppointmentCard
+                    key={appt.id}
+                    appt={appt}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(provider)/clients/[id]',
+                        params: { id: appt.patientId, name: appt.patient },
+                      })
+                    }
+                  />
+                ))
+              ) : (
+                <View className="bg-white rounded-xl border border-gray-100 p-6 items-center">
+                  <Ionicons name="calendar-outline" size={32} color="#d1d5db" />
+                  <Text className="text-gray-400 text-sm mt-2">No appointments this day</Text>
+                </View>
+              )}
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
