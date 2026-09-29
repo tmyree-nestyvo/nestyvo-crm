@@ -207,6 +207,30 @@ export default function ProviderSettingsScreen() {
           onSelect={setProvider}
         />
 
+        {practice && providerOptions.length === 0 ? (
+          // Charlene (Sep 28 2026): hit this exact dead end with a
+          // brand-new partner that had no providers yet — the two pickers
+          // above are all this screen has (it's booking-hours/recurring-
+          // blocks, both provider-level, not partner-level info), so with
+          // no provider there's nothing else to show. Rather than leave
+          // that silent, point her straight at where a provider gets added.
+          <View className="bg-white rounded-2xl border border-gray-100 p-5 items-center mt-1 mb-5">
+            <Ionicons name="person-add-outline" size={26} color="#d1d5db" />
+            <Text className="text-gray-500 text-sm text-center mt-2 mb-3">
+              {practice.label} doesn't have any providers yet. Hours and recurring blocks are set per
+              provider, so add one first — the partner's own business info and subscription status can
+              still be edited from Partners without a provider.
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push('/(agent)/partners')}
+              className="flex-row items-center gap-1.5 bg-primary-600 px-4 py-2.5 rounded-full"
+            >
+              <Ionicons name="briefcase-outline" size={14} color="#fff" />
+              <Text className="text-white text-xs font-semibold">Go to Partners</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {provider ? (
           <>
             {/* Weekly hours */}

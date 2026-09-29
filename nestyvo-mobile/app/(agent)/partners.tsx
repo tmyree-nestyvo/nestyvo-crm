@@ -295,6 +295,12 @@ export default function PartnersScreen() {
       queryClient.invalidateQueries({ queryKey: ['practices'] });
       setSelectedId(created.id);
       setMode('detail');
+      // Charlene (Sep 28 2026): the screen let her create a partner but gave
+      // no confirmation it actually saved — she had to go check Settings'
+      // partner dropdown to infer it worked. Landing on the new partner's
+      // detail screen (above) already showed it existed; this alert makes
+      // that explicit instead of implicit.
+      Alert.alert('Partner added', `${created.name} was created. Add their providers below whenever you're ready.`);
     },
     onError: (err: any) => Alert.alert('Could not create partner', err?.response?.data?.message || 'Please try again.'),
   });
