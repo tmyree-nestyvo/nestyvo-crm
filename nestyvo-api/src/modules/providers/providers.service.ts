@@ -7,6 +7,7 @@ import { Appointment, AppointmentStatus } from '../../database/entities/appointm
 import { AgentProviderAssignment } from '../../database/entities/agent-provider-assignment.entity';
 import { ProviderAvailability } from '../../database/entities/provider-availability.entity';
 import { ProviderBlock, BlockType } from '../../database/entities/provider-block.entity';
+import { ExternalBusyBlock } from '../../database/entities/external-busy-block.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { UsersService } from '../users/users.service';
 
@@ -36,6 +37,7 @@ export class ProvidersService {
     @InjectRepository(AgentProviderAssignment) private assignmentRepo: Repository<AgentProviderAssignment>,
     @InjectRepository(ProviderAvailability) private availabilityRepo: Repository<ProviderAvailability>,
     @InjectRepository(ProviderBlock) private blockRepo: Repository<ProviderBlock>,
+    @InjectRepository(ExternalBusyBlock) private externalBlockRepo: Repository<ExternalBusyBlock>,
     private usersService: UsersService,
   ) {}
 
@@ -315,16 +317,25 @@ export class ProvidersService {
     const end = new Date(target);
     end.setHours(23, 59, 59, 999);
 
-    const appointments = await this.appointmentRepo.find({
-      where: {
-        providerId,
-        startAt: Between(start, end),
-      },
-      relations: { patient: true, appointmentType: true },
-      order: { startAt: 'ASC' },
-    });
+    const [appointments, externalBlocks] = await Promise.all([
+      this.appointmentRepo.find({
+        where: {
+          providerId,
+          startAt: Between(start, end),
+        },
+        relations: { patient: true, appointmentType: true },
+        order: { startAt: 'ASC' },
+      }),
+      // Synced Rula/Headway busy blocks (Sep 29 2026) — shown alongside real
+      // Nestyvo appointments so a provider/admin sees their actual full day,
+      // not just the Nestyvo-booked half of it. No `patient` field: the
+      // source feed itself carries no patient PHI, `summary` is already the
+      // generic label the source platform gives it (e.g. "Rula - existing
+      // client appointment"). See ExternalCalendarSyncService.
+      this.externalBlockRepo.find({ where: { providerId, startAt: Between(start, end) } }),
+    ]);
 
-    return appointments.map((a) => ({
+    const nestyvoRows = appointments.map((a) => ({
       id: a.id,
       startAt: a.startAt,
       endAt: a.endAt,
@@ -332,7 +343,21 @@ export class ProvidersService {
       type: a.appointmentType?.name,
       status: a.status,
       locationType: a.locationType,
+      source: 'nestyvo' as const,
     }));
+    const externalRows = externalBlocks.map((b) => ({
+      id: b.id,
+      startAt: b.startAt,
+      endAt: b.endAt,
+      patient: null,
+      type: b.summary,
+      status: null,
+      locationType: null,
+      source: 'external' as const,
+      externalSource: b.source,
+    }));
+
+    return [...nestyvoRows, ...externalRows].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
   }
 
   async findByUserId(userId: string): Promise<Provider | null> {

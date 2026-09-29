@@ -8,6 +8,7 @@ import { Patient } from '../../database/entities/patient.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { ProviderBlock } from '../../database/entities/provider-block.entity';
 import { ProviderAvailability } from '../../database/entities/provider-availability.entity';
+import { ExternalBusyBlock } from '../../database/entities/external-busy-block.entity';
 import { User } from '../../database/entities/user.entity';
 import { ProvidersService } from './providers.service';
 import { FillCandidatesService } from './fill-candidates.service';
@@ -19,7 +20,7 @@ import { UsersModule } from '../users/users.module';
   imports: [
     TypeOrmModule.forFeature([
       Provider, Appointment, AgentProviderAssignment,
-      WaitlistEntry, Patient, AuditLog, ProviderBlock, ProviderAvailability, User,
+      WaitlistEntry, Patient, AuditLog, ProviderBlock, ProviderAvailability, ExternalBusyBlock, User,
     ]),
     SmsModule,
     UsersModule,

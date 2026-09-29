@@ -13,6 +13,7 @@ import { ProviderBlock } from '../../database/entities/provider-block.entity';
 import { Patient } from '../../database/entities/patient.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
+import { ExternalBusyBlock } from '../../database/entities/external-busy-block.entity';
 import { FillCandidatesService } from '../providers/fill-candidates.service';
 
 @Injectable()
@@ -29,6 +30,7 @@ export class DashboardService {
     @InjectRepository(Patient) private patientRepo: Repository<Patient>,
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
     @InjectRepository(Ticket) private ticketRepo: Repository<Ticket>,
+    @InjectRepository(ExternalBusyBlock) private externalBlockRepo: Repository<ExternalBusyBlock>,
     private fillCandidatesService: FillCandidatesService,
   ) {}
 
@@ -45,7 +47,7 @@ export class DashboardService {
       return { totalOpenSlots: 0, openCallbacks: 0, openCancellations: 0, waitlistOpportunities: 0, providers: [] };
     }
 
-    const [providers, bookedRange, allBlocks, openCancellations, waitlistOpportunities, openCallbacks] =
+    const [providers, bookedRange, allBlocks, allExternalBlocks, openCancellations, waitlistOpportunities, openCallbacks] =
       await Promise.all([
         this.providerRepo.findBy({ id: In(providerIds) }),
 
@@ -60,6 +62,17 @@ export class DashboardService {
 
         // All blocks in the 30-day window
         this.blockRepo.find({
+          where: {
+            providerId: In(providerIds),
+            startAt: Between(startOfToday, thirtyDaysOut),
+          },
+        }),
+
+        // Synced Rula/Headway busy blocks (Sep 29 2026) — treated exactly
+        // like a ProviderBlock for open-slot purposes so Nestyvo never
+        // offers/creates a booking that overlaps a provider's external
+        // appointment. See ExternalCalendarSyncService.
+        this.externalBlockRepo.find({
           where: {
             providerId: In(providerIds),
             startAt: Between(startOfToday, thirtyDaysOut),
@@ -88,7 +101,10 @@ export class DashboardService {
     const providerData = providers.map((provider) => {
       const availability = allAvailability.filter((a) => a.providerId === provider.id);
       const booked = bookedRange.filter((a) => a.providerId === provider.id);
-      const blocks = allBlocks.filter((b) => b.providerId === provider.id);
+      const blocks = [
+        ...allBlocks.filter((b) => b.providerId === provider.id),
+        ...allExternalBlocks.filter((b) => b.providerId === provider.id),
+      ];
 
       const slotsByDate = computeSlotsByDate(
         provider.id,
@@ -135,12 +151,20 @@ export class DashboardService {
     // Schedule is fetched out to 30 days so the day-strip UI can show
     // appointments further out than this week — utilization/available-slots
     // below stay scoped to the current 7-day window they were designed for.
-    const [schedule, waitlistCount, weekCancellations, openRequestCount] = await Promise.all([
+    const [schedule, externalSchedule, waitlistCount, weekCancellations, openRequestCount] = await Promise.all([
       this.appointmentRepo.find({
         where: { providerId: provider.id, startAt: Between(startOfToday, thirtyDaysOut), status: AppointmentStatus.SCHEDULED },
         relations: { patient: true, appointmentType: true },
         order: { startAt: 'ASC' },
       }),
+      // Synced Rula/Headway busy blocks (Sep 29 2026), same 30-day window as
+      // Nestyvo's own schedule so the provider's day-strip/calendar shows
+      // their real full day. Utilization/available-slots math below stays
+      // Nestyvo-only for now — scoping this to "what's visible" rather than
+      // also correcting the utilization percentage was a deliberate cut to
+      // keep this change contained; double-booking prevention itself is
+      // already handled separately via computeSlotsByDate.
+      this.externalBlockRepo.find({ where: { providerId: provider.id, startAt: Between(startOfToday, thirtyDaysOut) } }),
       this.waitlistRepo.count({ where: { providerId: provider.id, status: WaitlistEntryStatus.ACTIVE } }),
       this.appointmentRepo.count({
         where: { providerId: provider.id, status: AppointmentStatus.CANCELLED, cancelledAt: Between(startOfWeek, new Date()) },
@@ -171,12 +195,21 @@ export class DashboardService {
       utilizationRate: Math.min(utilizationRate, 100),
       cancellationCount: weekCancellations,
       openRequestCount,
-      schedule: schedule.map((a) => ({
-        id: a.id, startAt: a.startAt, endAt: a.endAt,
-        patientId: a.patientId,
-        patient: `${a.patient.firstName} ${a.patient.lastName}`,
-        type: a.appointmentType?.name, status: a.status, locationType: a.locationType,
-      })),
+      schedule: [
+        ...schedule.map((a) => ({
+          id: a.id, startAt: a.startAt, endAt: a.endAt,
+          patientId: a.patientId,
+          patient: `${a.patient.firstName} ${a.patient.lastName}`,
+          type: a.appointmentType?.name, status: a.status, locationType: a.locationType,
+          source: 'nestyvo' as const,
+        })),
+        ...externalSchedule.map((b) => ({
+          id: b.id, startAt: b.startAt, endAt: b.endAt,
+          patientId: null, patient: null,
+          type: b.summary, status: null, locationType: null,
+          source: 'external' as const, externalSource: b.source,
+        })),
+      ].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()),
     };
   }
 
@@ -191,7 +224,7 @@ export class DashboardService {
     const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
     const daysOut = new Date(startOfToday); daysOut.setDate(daysOut.getDate() + days);
 
-    const [availability, booked, blocks] = await Promise.all([
+    const [availability, booked, ownBlocks, externalBlocks] = await Promise.all([
       this.availabilityRepo.find({ where: { providerId: provider.id, isActive: true } }),
       this.appointmentRepo.find({
         where: {
@@ -201,7 +234,9 @@ export class DashboardService {
         },
       }),
       this.blockRepo.find({ where: { providerId: provider.id, startAt: Between(startOfToday, daysOut) } }),
+      this.externalBlockRepo.find({ where: { providerId: provider.id, startAt: Between(startOfToday, daysOut) } }),
     ]);
+    const blocks = [...ownBlocks, ...externalBlocks];
 
     const slotsByDate = computeSlotsByDate(provider.id, startOfToday, daysOut, now, availability, booked, blocks);
     const totalSlots = slotsByDate.reduce((sum, d) => sum + d.slots.length, 0);
@@ -535,7 +570,10 @@ function computeSlotsByDate(
   now: Date,
   availability: ProviderAvailability[],
   booked: Appointment[],
-  blocks: ProviderBlock[],
+  // Widened beyond ProviderBlock[] since callers now also merge in synced
+  // ExternalBusyBlock rows (Rula/Headway) — only startAt/endAt are read
+  // below, so both entity shapes satisfy this structurally.
+  blocks: { startAt: Date; endAt: Date }[],
   slotMin = 50,
 ): { date: string; dateLabel: string; slots: { startAt: string; endAt: string; durationMin: number }[] }[] {
   const results: ReturnType<typeof computeSlotsByDate> = [];

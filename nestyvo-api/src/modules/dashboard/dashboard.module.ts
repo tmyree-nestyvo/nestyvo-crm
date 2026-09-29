@@ -12,6 +12,7 @@ import { Patient } from '../../database/entities/patient.entity';
 import { User } from '../../database/entities/user.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { Ticket } from '../../database/entities/ticket.entity';
+import { ExternalBusyBlock } from '../../database/entities/external-busy-block.entity';
 import { ProvidersModule } from '../providers/providers.module';
 import { DashboardService } from './dashboard.service';
 import { DashboardController } from './dashboard.controller';
@@ -31,6 +32,7 @@ import { DashboardController } from './dashboard.controller';
       User,
       AuditLog,
       Ticket,
+      ExternalBusyBlock,
     ]),
     ProvidersModule,
   ],

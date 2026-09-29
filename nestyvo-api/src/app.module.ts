@@ -19,6 +19,7 @@ import { ClientTagsModule } from './modules/client-tags/client-tags.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { PracticesModule } from './modules/practices/practices.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
+import { ExternalCalendarsModule } from './modules/external-calendars/external-calendars.module';
 import { JwtAuthGuard } from './auth/auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 
@@ -41,6 +42,8 @@ import { AppointmentReminder } from './database/entities/appointment-reminder.en
 import { PatientLink } from './database/entities/patient-link.entity';
 import { ClientTag } from './database/entities/client-tag.entity';
 import { Ticket } from './database/entities/ticket.entity';
+import { ExternalCalendarFeed } from './database/entities/external-calendar-feed.entity';
+import { ExternalBusyBlock } from './database/entities/external-busy-block.entity';
 
 const ALL_ENTITIES = [
   Practice,
@@ -61,6 +64,8 @@ const ALL_ENTITIES = [
   PatientLink,
   ClientTag,
   Ticket,
+  ExternalCalendarFeed,
+  ExternalBusyBlock,
 ];
 
 @Module({
@@ -113,6 +118,7 @@ const ALL_ENTITIES = [
     TicketsModule,
     PracticesModule,
     CalendarModule,
+    ExternalCalendarsModule,
   ],
   controllers: [AppController],
   providers: [
