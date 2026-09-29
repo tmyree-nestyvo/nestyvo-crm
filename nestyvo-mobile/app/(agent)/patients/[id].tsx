@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -90,7 +90,12 @@ export default function PatientDetailScreen() {
         {/* Contact Info */}
         <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
           <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Contact</Text>
-          <InfoRow icon="call-outline" label="Phone" value={patient?.phone ?? '—'} />
+          <InfoRow
+            icon="call-outline"
+            label="Phone"
+            value={patient?.phone ?? '—'}
+            onPress={patient?.phone ? () => Linking.openURL(`tel:${patient.phone.replace(/\D/g, '')}`) : undefined}
+          />
           <InfoRow icon="mail-outline" label="Email" value={patient?.email ?? '—'} />
           <InfoRow icon="chatbubble-outline" label="Preferred" value={patient?.preferredContact ?? '—'} />
         </View>
@@ -612,14 +617,27 @@ function LinkedAccounts({ patientId }: { patientId: string }) {
   );
 }
 
-function InfoRow({ icon, label, value }: { icon: any; label: string; value: string }) {
+function InfoRow({
+  icon, label, value, onPress,
+}: { icon: any; label: string; value: string; onPress?: () => void }) {
+  // Charlene (Sep 28-29 2026): wants a contact already open in the CRM to be
+  // one tap to call, instead of the current copy-into-a-separate-Dialpad-tab
+  // workaround. This doesn't need Dialpad's API at all — a real `tel:` link
+  // is exactly what Dialpad's own browser extension (once installed) takes
+  // over and routes through Dialpad instead of the OS/browser default; the
+  // same `tel:` pattern is already used for call actions on
+  // callbacks/fill-slot/waitlist, this just extends it to the patient
+  // profile's own Contact card, the most central "a contact in the CRM"
+  // screen there is.
+  const Wrapper = onPress ? TouchableOpacity : View;
   return (
-    <View className="flex-row items-center gap-3 mb-3 last:mb-0">
+    <Wrapper className="flex-row items-center gap-3 mb-3 last:mb-0" {...(onPress ? { onPress } : {})}>
       <View className="w-7 h-7 bg-gray-50 rounded-lg items-center justify-center">
         <Ionicons name={icon} size={14} color="#6b7280" />
       </View>
       <Text className="text-gray-500 text-sm w-20">{label}</Text>
-      <Text className="text-gray-900 text-sm font-medium flex-1">{value}</Text>
-    </View>
+      <Text className={`text-sm font-medium flex-1 ${onPress ? 'text-primary-600' : 'text-gray-900'}`}>{value}</Text>
+      {onPress ? <Ionicons name="call" size={14} color="#2563eb" /> : null}
+    </Wrapper>
   );
 }
