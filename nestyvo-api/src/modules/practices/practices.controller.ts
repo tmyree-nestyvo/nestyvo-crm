@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { ADMIN_AND_AGENT, ADMIN_ONLY } from '../../auth/role-groups';
+import { UserRole } from '../../database/entities/user.entity';
 import { SubscriptionStatus } from '../../database/entities/practice.entity';
 import { PracticesService } from './practices.service';
 
@@ -25,7 +26,16 @@ export class PracticesController {
   constructor(private practicesService: PracticesService) {}
 
   @Get()
-  @Roles(...ADMIN_AND_AGENT)
+  // Sep 24 role-groups.ts flagged this as "likely an oversight" —
+  // PRACTICE_MANAGER was left out of the only consumer of ADMIN_AND_AGENT.
+  // Confirmed real Sep 29 2026 during an RBAC parity audit: a
+  // practice_manager can already reach Provider Settings (gated to
+  // PRACTICE_MANAGEMENT), whose very first call is this endpoint, so they
+  // hit a 403 and an empty Partner picker on a screen they're otherwise
+  // allowed into. list() only ever returns {id, name} (see
+  // PracticesService.list) — no business/subscription detail, that's
+  // listAdmin() below, still admin-only — so widening this is low-risk.
+  @Roles(...ADMIN_AND_AGENT, UserRole.PRACTICE_MANAGER)
   list() {
     return this.practicesService.list();
   }
