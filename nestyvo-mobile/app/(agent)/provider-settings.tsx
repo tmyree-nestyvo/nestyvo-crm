@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { practicesApi, providersApi } from '../../lib/api';
+import { practicesApi, providersApi, externalCalendarsApi, ExternalCalendarSource } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
 
 type Option = { id: string; label: string };
@@ -71,6 +71,151 @@ function fmtBlockDate(iso: string) {
   return new Date(iso).toLocaleString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: TZ,
   });
+}
+
+const SOURCE_LABEL: Record<ExternalCalendarSource, string> = { rula: 'Rula', headway: 'Headway', other: 'Other' };
+
+function timeAgo(iso: string | null) {
+  if (!iso) return 'Never synced';
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (mins < 1) return 'Synced just now';
+  if (mins < 60) return `Synced ${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `Synced ${hrs}h ago`;
+  return `Synced ${Math.floor(hrs / 24)}d ago`;
+}
+
+function ExternalCalendarsSection({ providerId }: { providerId: string }) {
+  const queryClient = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [source, setSource] = useState<ExternalCalendarSource>('rula');
+  const [feedUrl, setFeedUrl] = useState('');
+  const [label, setLabel] = useState('');
+
+  const { data: feeds = [], isLoading } = useQuery({
+    queryKey: ['external-calendars', providerId],
+    queryFn: () => externalCalendarsApi.list(providerId),
+  });
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['external-calendars', providerId] });
+
+  const addFeed = useMutation({
+    mutationFn: () => externalCalendarsApi.add(providerId, { source, feedUrl: feedUrl.trim(), label: label.trim() || undefined }),
+    onSuccess: (created: any) => {
+      invalidate();
+      setFeedUrl(''); setLabel(''); setAdding(false);
+      if (created?.lastSyncError) {
+        Alert.alert('Calendar added, but the first sync failed', created.lastSyncError + '\n\nYou can retry with the sync button.');
+      } else {
+        Alert.alert('Calendar added', 'Synced successfully — its busy times will now be kept out of Nestyvo\'s open slots.');
+      }
+    },
+    onError: (err: any) => Alert.alert('Could not add calendar', err?.response?.data?.message || 'Check the URL and try again.'),
+  });
+
+  const syncFeed = useMutation({
+    mutationFn: (feedId: string) => externalCalendarsApi.sync(providerId, feedId),
+    onSuccess: (result: any) => {
+      invalidate();
+      Alert.alert('Synced', `${result.imported} appointment${result.imported === 1 ? '' : 's'} found${result.removed ? `, ${result.removed} removed` : ''}.`);
+    },
+    onError: (err: any) => Alert.alert('Sync failed', err?.response?.data?.message || 'Please try again.'),
+  });
+
+  const removeFeed = useMutation({
+    mutationFn: (feedId: string) => externalCalendarsApi.remove(providerId, feedId),
+    onSuccess: invalidate,
+    onError: (err: any) => Alert.alert('Could not remove calendar', err?.response?.data?.message || 'Please try again.'),
+  });
+
+  return (
+    <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-5">
+      <View className="flex-row items-center justify-between mb-1">
+        <Text className="text-base font-semibold text-gray-900">External Calendars</Text>
+        <TouchableOpacity
+          onPress={() => setAdding((v) => !v)}
+          className="flex-row items-center gap-1 bg-primary-50 px-3 py-1.5 rounded-full"
+        >
+          <Ionicons name={adding ? 'close' : 'add'} size={14} color="#2563eb" />
+          <Text className="text-primary-700 text-xs font-semibold">{adding ? 'Cancel' : 'Add'}</Text>
+        </TouchableOpacity>
+      </View>
+      <Text className="text-gray-400 text-xs mb-3">
+        Read-only Rula/Headway (or other) calendar-export links — synced hourly so Nestyvo never offers a slot
+        that overlaps one of this provider's outside appointments.
+      </Text>
+
+      {adding && (
+        <View className="bg-gray-50 rounded-xl border border-gray-100 p-3 mb-3">
+          <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Source</Text>
+          <View className="flex-row gap-1.5 mb-3">
+            {(Object.keys(SOURCE_LABEL) as ExternalCalendarSource[]).map((s) => (
+              <TouchableOpacity
+                key={s}
+                onPress={() => setSource(s)}
+                className={`px-3 py-1.5 rounded-full border ${source === s ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`}
+              >
+                <Text className={`text-xs font-medium ${source === s ? 'text-white' : 'text-gray-600'}`}>{SOURCE_LABEL[s]}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Feed URL</Text>
+          <TextInput
+            value={feedUrl}
+            onChangeText={setFeedUrl}
+            placeholder="https://…/feed.ics"
+            placeholderTextColor="#9ca3af"
+            autoCapitalize="none"
+            autoCorrect={false}
+            className="bg-white border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-900 mb-3"
+          />
+          <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Label (optional)</Text>
+          <TextInput
+            value={label}
+            onChangeText={setLabel}
+            placeholder="e.g. Personal Rula calendar"
+            placeholderTextColor="#9ca3af"
+            className="bg-white border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-900 mb-3"
+          />
+          <TouchableOpacity
+            onPress={() => addFeed.mutate()}
+            disabled={!feedUrl.trim() || addFeed.isPending}
+            className={`rounded-xl py-2.5 items-center ${!feedUrl.trim() ? 'bg-gray-300' : 'bg-gray-900'}`}
+          >
+            {addFeed.isPending ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-semibold text-sm">Add & Sync</Text>}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {isLoading ? (
+        <ActivityIndicator color="#2563eb" className="mt-2" />
+      ) : feeds.length === 0 ? (
+        !adding && <Text className="text-gray-400 text-sm text-center py-3">No external calendars yet.</Text>
+      ) : (
+        feeds.map((f) => (
+          <View key={f.id} className="flex-row items-center gap-2 py-2.5 border-t border-gray-50">
+            <View className="flex-1">
+              <View className="flex-row items-center gap-1.5">
+                <View className="bg-gray-100 rounded-full px-2 py-0.5">
+                  <Text className="text-gray-600 text-xs font-semibold">{SOURCE_LABEL[f.source]}</Text>
+                </View>
+                {f.label ? <Text className="text-gray-700 text-xs font-medium">{f.label}</Text> : null}
+              </View>
+              <Text className={`text-xs mt-1 ${f.lastSyncError ? 'text-red-500' : 'text-gray-400'}`} numberOfLines={1}>
+                {f.lastSyncError ? `Sync error: ${f.lastSyncError}` : timeAgo(f.lastSyncedAt)}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => syncFeed.mutate(f.id)} disabled={syncFeed.isPending} className="p-1.5">
+              <Ionicons name="sync" size={16} color="#6b7280" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => removeFeed.mutate(f.id)} disabled={removeFeed.isPending} className="p-1.5">
+              <Ionicons name="trash-outline" size={16} color="#d1d5db" />
+            </TouchableOpacity>
+          </View>
+        ))
+      )}
+    </View>
+  );
 }
 
 export default function ProviderSettingsScreen() {
@@ -428,6 +573,8 @@ export default function ProviderSettingsScreen() {
                 </View>
               ) : null}
             </View>
+
+            <ExternalCalendarsSection providerId={provider.id} />
           </>
         ) : null}
       </ScrollView>

@@ -106,6 +106,30 @@ export const providersApi = {
     api.delete(`/providers/${id}/blocks/${blockId}`).then((r) => r.data),
 };
 
+// External calendars (Rula/Headway feed ingestion, Sep 29 2026) — see
+// ExternalCalendarSyncService on the backend for why this is safe to pull:
+// the feeds themselves carry no patient PHI, just generic busy/free blocks.
+export type ExternalCalendarSource = 'rula' | 'headway' | 'other';
+export interface ExternalCalendarFeed {
+  id: string;
+  providerId: string;
+  source: ExternalCalendarSource;
+  feedUrl: string;
+  label?: string | null;
+  lastSyncedAt: string | null;
+  lastSyncError: string | null;
+}
+export const externalCalendarsApi = {
+  list: (providerId: string) =>
+    api.get<ExternalCalendarFeed[]>(`/providers/${providerId}/external-calendars`).then((r) => r.data),
+  add: (providerId: string, input: { source: ExternalCalendarSource; feedUrl: string; label?: string }) =>
+    api.post<ExternalCalendarFeed>(`/providers/${providerId}/external-calendars`, input).then((r) => r.data),
+  sync: (providerId: string, feedId: string) =>
+    api.post(`/providers/${providerId}/external-calendars/${feedId}/sync`).then((r) => r.data),
+  remove: (providerId: string, feedId: string) =>
+    api.delete(`/providers/${providerId}/external-calendars/${feedId}`).then((r) => r.data),
+};
+
 // Practices
 export interface UpsertPracticeInput {
   name: string;
