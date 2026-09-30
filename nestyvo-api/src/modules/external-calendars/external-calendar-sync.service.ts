@@ -14,7 +14,12 @@ import { ExternalBusyBlock } from '../../database/entities/external-busy-block.e
 // directly-callable syncFeed() for the "sync now" button after someone
 // just added a feed — waiting up to an hour to see it work would be a bad
 // first impression, especially for a live onboarding demo.
-const SYNC_INTERVAL_MS = 60 * 60 * 1000; // matches the feeds' own advertised 1hr refresh/TTL
+// Rula/Headway both advertise a 1hr refresh/TTL on their feeds, but
+// Charlene (Sep 30 2026) asked for 15-30 min explicitly: an hour-stale view
+// of a partner's outside calendar is an hour in which an agent can
+// double-book them. Polling faster than the source updates costs one cheap
+// GET per feed and removes that window, so it's worth the extra requests.
+const SYNC_INTERVAL_MS = 15 * 60 * 1000;
 
 @Injectable()
 export class ExternalCalendarSyncService {
@@ -25,7 +30,9 @@ export class ExternalCalendarSyncService {
     @InjectRepository(ExternalBusyBlock) private blockRepo: Repository<ExternalBusyBlock>,
   ) {}
 
-  @Cron('7 * * * *') // :07 past the hour, offset from reminders-cron's 5-min cadence to avoid piling up together
+  // Every 15 min at :02 past, offset from reminders-cron's own */5 cadence
+  // so the two don't fire on the same tick.
+  @Cron('2,17,32,47 * * * *')
   async syncDueFeeds() {
     const due = await this.feedRepo.find({
       where: [{ lastSyncedAt: LessThan(new Date(Date.now() - SYNC_INTERVAL_MS)) }, { lastSyncedAt: null as any }],

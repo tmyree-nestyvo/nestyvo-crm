@@ -23,14 +23,21 @@ function fmt(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: TZ });
 }
 
-function ProviderSlotGroup({ provider }: { provider: any }) {
+function ProviderSlotGroup({ provider, showClinician }: { provider: any; showClinician: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const slotsByDate: { date: string; dateLabel: string; slots: any[] }[] = provider.slotsByDate ?? [];
   const totalSlots: number = provider.openSlotCount ?? 0;
 
-  const initials = provider.name
+  // Lead with the partner's business name, not the clinician's (Charlene,
+  // Sep 30 2026 — "we should see it as Peace of Mind, the name of the
+  // business, rather than her name"). The clinician is only named when the
+  // partner actually has more than one, where it's the disambiguator.
+  const partnerName: string = provider.practiceName ?? provider.name;
+  const clinicianLine = [provider.name, provider.credentials].filter(Boolean).join(', ');
+
+  const initials = partnerName
     .split(' ')
-    .filter((w: string) => !['Dr.', 'Dr'].includes(w))
+    .filter((w: string) => !['Dr.', 'Dr', '&', 'and', 'of', 'the'].includes(w))
     .map((w: string) => w[0])
     .join('')
     .slice(0, 2)
@@ -49,8 +56,10 @@ function ProviderSlotGroup({ provider }: { provider: any }) {
         </View>
 
         <View className="flex-1">
-          <Text className="text-gray-900 font-semibold text-sm">{provider.name}</Text>
-          {provider.credentials ? (
+          <Text className="text-gray-900 font-semibold text-sm">{partnerName}</Text>
+          {showClinician && clinicianLine ? (
+            <Text className="text-gray-400 text-xs mt-0.5">{clinicianLine}</Text>
+          ) : provider.credentials && !provider.practiceName ? (
             <Text className="text-gray-400 text-xs mt-0.5">{provider.credentials}</Text>
           ) : null}
         </View>
@@ -59,8 +68,16 @@ function ProviderSlotGroup({ provider }: { provider: any }) {
           <View className="bg-green-50 border border-green-200 rounded-full px-3 py-0.5 flex-row items-center gap-1 mr-1">
             <View className="w-1.5 h-1.5 rounded-full bg-green-500" />
             <Text className="text-green-700 text-xs font-semibold">
-              {totalSlots} open {totalSlots === 1 ? 'slot' : 'slots'}
+              {totalSlots} available
             </Text>
+          </View>
+        ) : provider.hasAvailability === false ? (
+          // Zero slots because nobody ever set this partner's booking hours
+          // reads identically to "genuinely booked solid" — and Charlene hit
+          // exactly that, seeing "Fully booked" for a brand-new partner whose
+          // hours had silently failed to save. Name the real reason instead.
+          <View className="bg-amber-50 border border-amber-200 rounded-full px-3 py-0.5 mr-1">
+            <Text className="text-amber-700 text-xs font-semibold">No hours set</Text>
           </View>
         ) : (
           <View className="bg-gray-50 border border-gray-200 rounded-full px-3 py-0.5 mr-1">
@@ -175,32 +192,21 @@ export default function AgentDashboard() {
           >
             <Ionicons name="flag-outline" size={22} color="#6b7280" />
           </TouchableOpacity>
+          {/* One partner-management entry point, not three (Charlene, Sep 30
+              2026). The separate gear ("Provider Settings") and the "Provider"
+              button both went here: the gear's hours/blocks/calendars are now
+              reached per-provider from inside Partners, and the "Provider"
+              button only ever led admins to a "No provider account linked"
+              dead end, since an admin isn't a provider. Partners is now the
+              single place a partner's business info lives. */}
           {hasRole(role, ADMIN_ONLY) && (
             <TouchableOpacity
               testID="nav-partners"
               onPress={() => router.push('/(agent)/partners')}
-              className="p-2"
-            >
-              <Ionicons name="briefcase-outline" size={22} color="#6b7280" />
-            </TouchableOpacity>
-          )}
-          {hasRole(role, PRACTICE_MANAGEMENT) && (
-            <TouchableOpacity
-              testID="nav-provider-settings"
-              onPress={() => router.push('/(agent)/provider-settings')}
-              className="p-2"
-            >
-              <Ionicons name="settings-outline" size={22} color="#6b7280" />
-            </TouchableOpacity>
-          )}
-          {hasRole(role, ADMIN_ONLY) && (
-            <TouchableOpacity
-              testID="nav-switch-provider"
-              onPress={() => router.push('/(provider)')}
               className="flex-row items-center gap-1 bg-gray-100 px-3 py-1.5 rounded-xl mr-1"
             >
-              <Ionicons name="person-outline" size={14} color="#374151" />
-              <Text className="text-gray-700 text-xs font-medium">Provider</Text>
+              <Ionicons name="briefcase-outline" size={14} color="#374151" />
+              <Text className="text-gray-700 text-xs font-medium">Partners</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={handleSignOut} className="p-2">
@@ -254,7 +260,7 @@ export default function AgentDashboard() {
         <View className="flex-row items-center justify-between mb-3">
           <View>
             <Text className="text-base font-semibold text-gray-900">Available Appointments</Text>
-            <Text className="text-xs text-gray-400 mt-0.5">Next 30 days · tap a provider to drill in</Text>
+            <Text className="text-xs text-gray-400 mt-0.5">Next 30 days · tap a partner to drill in</Text>
           </View>
           {providers.length > 0 && (
             <TouchableOpacity onPress={() => setAllExpanded((e) => !e)}>
@@ -271,7 +277,15 @@ export default function AgentDashboard() {
           </View>
         ) : providers.length > 0 ? (
           providers.map((provider: any) => (
-            <ProviderSlotGroup key={provider.id} provider={provider} />
+            <ProviderSlotGroup
+              key={provider.id}
+              provider={provider}
+              // Only name the individual clinician when the partner has more
+              // than one — otherwise the business name alone identifies them.
+              showClinician={
+                providers.filter((p: any) => p.practiceId && p.practiceId === provider.practiceId).length > 1
+              }
+            />
           ))
         ) : (
           <View className="bg-white rounded-2xl border border-gray-100 p-6 items-center">

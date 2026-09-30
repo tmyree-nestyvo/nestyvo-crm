@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Switch, Modal } from 'react-native';
 import { Alert } from '../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { practicesApi, providersApi, externalCalendarsApi, ExternalCalendarSource } from '../../lib/api';
@@ -165,7 +165,7 @@ function ExternalCalendarsSection({ providerId }: { providerId: string }) {
         </TouchableOpacity>
       </View>
       <Text className="text-gray-400 text-xs mb-3">
-        Read-only Rula/Headway (or other) calendar-export links — synced hourly so Nestyvo never offers a slot
+        Read-only Rula/Headway (or other) calendar-export links — synced every 15 minutes so Nestyvo never offers a slot
         that overlaps one of this provider's outside appointments.
       </Text>
 
@@ -243,6 +243,7 @@ function ExternalCalendarsSection({ providerId }: { providerId: string }) {
 }
 
 export default function ProviderSettingsScreen() {
+  const deepLink = useLocalSearchParams<{ practiceId?: string; providerId?: string }>();
   const queryClient = useQueryClient();
   const [practice, setPractice] = useState<Option | null>(null);
   const [provider, setProvider] = useState<Option | null>(null);
@@ -292,6 +293,21 @@ export default function ProviderSettingsScreen() {
     id: p.id,
     label: `${p.firstName} ${p.lastName}${p.credentials ? ` ${p.credentials}` : ''}`,
   }));
+
+  // Preselect when deep-linked from a specific provider in Partners, so the
+  // two pickers aren't re-navigated by hand every time (Charlene, Sep 30
+  // 2026 — this screen is now reached from the provider it belongs to).
+  useEffect(() => {
+    if (!deepLink.practiceId || practice) return;
+    const match = practiceOptions.find((o) => o.id === deepLink.practiceId);
+    if (match) setPractice(match);
+  }, [deepLink.practiceId, practiceOptions, practice]);
+
+  useEffect(() => {
+    if (!deepLink.providerId || provider) return;
+    const match = providerOptions.find((o) => o.id === deepLink.providerId);
+    if (match) setProvider(match);
+  }, [deepLink.providerId, providerOptions, provider]);
 
   type Window = { dayOfWeek: number; startTime: string; endTime: string };
 

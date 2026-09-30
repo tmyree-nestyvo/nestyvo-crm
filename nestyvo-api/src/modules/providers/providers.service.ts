@@ -74,6 +74,45 @@ export class ProvidersService {
     return this.providerRepo.save(provider);
   }
 
+  // Charlene (Sep 30 2026) onboarded Peace of Mind leaving the login email
+  // blank, then found there was no way back in to add it — a provider could
+  // be created but never edited, so a partner with no login was permanently
+  // stuck without one. This fills that gap, including creating the login
+  // after the fact (the common case: business details first, credentials
+  // once the partner has actually agreed to start).
+  async update(
+    providerId: string,
+    input: Partial<Omit<CreateProviderInput, 'practiceId'>>,
+    user: User,
+  ): Promise<Provider> {
+    const provider = await this.assertCanManage(providerId, user);
+
+    if (input.loginEmail) {
+      if (provider.userId) {
+        throw new BadRequestException('This provider already has a login.');
+      }
+      // Login first, provider second — same ordering as create(), so a
+      // duplicate-email failure leaves no half-updated provider behind.
+      const created = await this.usersService.create({
+        email: input.loginEmail,
+        firstName: input.firstName ?? provider.firstName,
+        lastName: input.lastName ?? provider.lastName,
+        role: UserRole.PROVIDER,
+        phone: input.phone ?? provider.phone,
+      });
+      provider.userId = created.id;
+    }
+
+    for (const field of [
+      'firstName', 'lastName', 'credentials', 'specialty',
+      'phone', 'email', 'officeLocation', 'isVirtual', 'isInPerson',
+    ] as const) {
+      if (input[field] !== undefined) (provider as any)[field] = input[field];
+    }
+
+    return this.providerRepo.save(provider);
+  }
+
   // Admins manage every partner; practice managers only their own practice.
   private async assertCanManage(providerId: string, user: User): Promise<Provider> {
     const provider = await this.providerRepo.findOne({ where: { id: providerId } });

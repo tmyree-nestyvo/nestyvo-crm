@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { IsString, IsOptional, IsEmail, IsEnum, IsDateString } from 'class-validator';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
@@ -65,5 +65,12 @@ export class PracticesController {
   @Roles(...ADMIN_ONLY)
   update(@Param('id') id: string, @Body() dto: Partial<UpsertPracticeDto>) {
     return this.practicesService.update(id, dto);
+  }
+
+  // Soft delete — see PracticesService.remove for why it isn't a hard one.
+  @Delete(':id')
+  @Roles(...ADMIN_ONLY)
+  remove(@Param('id') id: string) {
+    return this.practicesService.remove(id);
   }
 }

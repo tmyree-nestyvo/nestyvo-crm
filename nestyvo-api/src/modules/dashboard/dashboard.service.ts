@@ -49,7 +49,10 @@ export class DashboardService {
 
     const [providers, bookedRange, allBlocks, allExternalBlocks, openCancellations, waitlistOpportunities, openCallbacks] =
       await Promise.all([
-        this.providerRepo.findBy({ id: In(providerIds) }),
+        // practice relation added Sep 30 2026 — the dashboard leads with the
+        // partner's business name ("Peace of Mind"), not the clinician's, per
+        // Charlene: the business is the thing she onboarded and thinks in.
+        this.providerRepo.find({ where: { id: In(providerIds) }, relations: { practice: true } }),
 
         // All booked appointments in the 30-day window
         this.appointmentRepo.find({
@@ -123,6 +126,13 @@ export class DashboardService {
         name: `${provider.firstName} ${provider.lastName}`,
         credentials: provider.credentials,
         status: provider.status,
+        practiceId: provider.practiceId,
+        practiceName: provider.practice?.name ?? null,
+        // Lets the UI distinguish "genuinely fully booked" from "nobody ever
+        // set this partner's hours" — those look identical as a 0 slot count,
+        // and Charlene hit exactly that confusion with Peace of Mind showing
+        // "Fully booked" when the real problem was no availability saved.
+        hasAvailability: availability.length > 0,
         openSlotCount: totalSlots,
         slotsByDate,
       };

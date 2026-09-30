@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Query, Body, Req, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Query, Body, Req, UseGuards, ForbiddenException } from '@nestjs/common';
 import { IsString, IsOptional, IsEnum, IsDateString, IsInt, Min, Max, Matches, ValidateNested, ArrayMaxSize, IsArray, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
 import type { Request } from 'express';
@@ -45,6 +45,21 @@ class CreateProviderDto {
   @IsOptional() isVirtual?: boolean;
   @IsOptional() isInPerson?: boolean;
   // If set, also creates their PROVIDER-role login (see UsersService.create).
+  @IsOptional() @IsString() loginEmail?: string;
+}
+
+// Everything optional — the common edit is adding only the login email to a
+// provider onboarded without one (Charlene, Sep 30 2026).
+class UpdateProviderDto {
+  @IsOptional() @IsString() firstName?: string;
+  @IsOptional() @IsString() lastName?: string;
+  @IsOptional() @IsString() credentials?: string;
+  @IsOptional() @IsString() specialty?: string;
+  @IsOptional() @IsString() phone?: string;
+  @IsOptional() @IsString() email?: string;
+  @IsOptional() @IsString() officeLocation?: string;
+  @IsOptional() isVirtual?: boolean;
+  @IsOptional() isInPerson?: boolean;
   @IsOptional() @IsString() loginEmail?: string;
 }
 
@@ -315,6 +330,18 @@ export class ProvidersController {
     @CurrentUser() user: User,
   ) {
     return this.providersService.deleteBlock(id, blockId, user);
+  }
+
+  // Declared down here with the other ":id" routes, after every literal
+  // "self/*" route above — see the route-ordering note on self/blocks.
+  @Patch(':id')
+  @Roles(...PRACTICE_MANAGEMENT)
+  updateProvider(
+    @Param('id') id: string,
+    @Body() dto: UpdateProviderDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.providersService.update(id, dto, user);
   }
 
 }

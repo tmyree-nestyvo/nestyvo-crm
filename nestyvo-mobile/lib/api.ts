@@ -89,6 +89,22 @@ export const providersApi = {
     isInPerson?: boolean;
     loginEmail?: string;
   }) => api.post('/providers', input).then((r) => r.data),
+  /**
+   * Edit a provider after creation — most importantly to add a login email
+   * to one onboarded without it, which previously had no path at all.
+   */
+  update: (
+    id: string,
+    input: {
+      firstName?: string;
+      lastName?: string;
+      credentials?: string;
+      specialty?: string;
+      phone?: string;
+      email?: string;
+      loginEmail?: string;
+    },
+  ) => api.patch(`/providers/${id}`, input).then((r) => r.data),
   createRecurringBlock: (
     id: string,
     input: {
@@ -152,6 +168,8 @@ export const practicesApi = {
   create: (input: UpsertPracticeInput) => api.post('/practices', input).then((r) => r.data),
   update: (id: string, input: Partial<UpsertPracticeInput>) =>
     api.patch(`/practices/${id}`, input).then((r) => r.data),
+  /** Soft delete — hides the partner everywhere but keeps its history. */
+  remove: (id: string) => api.delete(`/practices/${id}`).then((r) => r.data),
 };
 
 // Users (admin-only login creation — partner providers, staff hires)

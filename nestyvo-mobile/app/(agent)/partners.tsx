@@ -202,6 +202,136 @@ function AddProviderForm({ practiceId, onDone }: { practiceId: string; onDone: (
   );
 }
 
+// Charlene (Sep 30 2026) onboarded a partner leaving the login email blank,
+// then found no way back in to add it — providers could be created but never
+// edited. Each row now expands into an edit form, and shows at a glance
+// whether a login exists at all (the thing that actually blocks a partner
+// from signing in).
+function ProviderRow({ provider, practiceId }: { provider: any; practiceId: string }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [firstName, setFirstName] = useState(provider.firstName ?? '');
+  const [lastName, setLastName] = useState(provider.lastName ?? '');
+  const [credentials, setCredentials] = useState(provider.credentials ?? '');
+  const [specialty, setSpecialty] = useState(provider.specialty ?? '');
+  const [phone, setPhone] = useState(provider.phone ?? '');
+  const [email, setEmail] = useState(provider.email ?? '');
+  const [loginEmail, setLoginEmail] = useState('');
+
+  const hasLogin = !!provider.userId;
+
+  const save = useMutation({
+    mutationFn: () =>
+      providersApi.update(provider.id, {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        credentials: credentials.trim() || undefined,
+        specialty: specialty.trim() || undefined,
+        phone: phone.trim() || undefined,
+        email: email.trim() || undefined,
+        loginEmail: !hasLogin && loginEmail.trim() ? loginEmail.trim() : undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['practice-providers', practiceId] });
+      Alert.alert(
+        'Saved',
+        !hasLogin && loginEmail.trim()
+          ? `${firstName} ${lastName} can now sign in with ${loginEmail.trim()}.`
+          : 'Provider details updated.',
+      );
+      setLoginEmail('');
+      setEditing(false);
+    },
+    onError: (err: any) => Alert.alert('Could not save provider', err?.response?.data?.message || 'Please try again.'),
+  });
+
+  return (
+    <View className="bg-white rounded-2xl border border-gray-100 px-4 py-3.5 mb-2">
+      <TouchableOpacity onPress={() => setEditing((v) => !v)} className="flex-row items-center gap-3">
+        <View className="w-9 h-9 bg-primary-100 rounded-full items-center justify-center">
+          <Text className="text-primary-700 font-bold text-xs">{provider.firstName?.[0]}{provider.lastName?.[0]}</Text>
+        </View>
+        <View className="flex-1">
+          <Text className="text-gray-900 font-semibold text-sm">
+            {provider.firstName} {provider.lastName}{provider.credentials ? `, ${provider.credentials}` : ''}
+          </Text>
+          <View className="flex-row items-center gap-1.5 mt-0.5">
+            <Ionicons
+              name={hasLogin ? 'key' : 'key-outline'}
+              size={11}
+              color={hasLogin ? '#16a34a' : '#d97706'}
+            />
+            <Text className={`text-xs ${hasLogin ? 'text-green-700' : 'text-amber-700'}`}>
+              {hasLogin ? 'Login active' : 'No login yet'}
+            </Text>
+            {provider.specialty ? <Text className="text-gray-400 text-xs">· {provider.specialty}</Text> : null}
+          </View>
+        </View>
+        <Ionicons name={editing ? 'chevron-up' : 'chevron-down'} size={16} color="#9ca3af" />
+      </TouchableOpacity>
+
+      {editing && (
+        <View className="mt-3 pt-3 border-t border-gray-50">
+          <View className="flex-row gap-2">
+            <View className="flex-1"><FormField label="First name" value={firstName} onChangeText={setFirstName} /></View>
+            <View className="flex-1"><FormField label="Last name" value={lastName} onChangeText={setLastName} /></View>
+          </View>
+          <FormField label="Credentials" value={credentials} onChangeText={setCredentials} placeholder="e.g. LMFT" />
+          <FormField label="Specialty" value={specialty} onChangeText={setSpecialty} />
+          <FormField label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+          <FormField label="Contact email" value={email} onChangeText={setEmail} keyboardType="email-address" />
+
+          {hasLogin ? (
+            <View className="bg-green-50 border border-green-100 rounded-xl px-3 py-2.5 mb-3">
+              <Text className="text-green-800 text-xs">
+                This provider already has a sign-in. Changing it isn't supported here yet — ask if you need it reset.
+              </Text>
+            </View>
+          ) : (
+            <>
+              <FormField
+                label="Login email"
+                value={loginEmail}
+                onChangeText={setLoginEmail}
+                placeholder="Creates their sign-in"
+                keyboardType="email-address"
+              />
+              <Text className="text-xs text-gray-400 mb-3 -mt-2">
+                Set this to let them sign in and manage their own schedule.
+              </Text>
+            </>
+          )}
+
+          <TouchableOpacity
+            onPress={() => save.mutate()}
+            disabled={save.isPending || !firstName.trim() || !lastName.trim()}
+            className={`rounded-xl py-3 items-center ${!firstName.trim() || !lastName.trim() ? 'bg-gray-300' : 'bg-primary-600'}`}
+          >
+            {save.isPending ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-semibold text-sm">Save Provider</Text>}
+          </TouchableOpacity>
+
+          {/* Where the old standalone gear icon's screen now lives — reached
+              from the provider it belongs to, already preselected, instead of
+              being a separate top-level destination with its own two pickers. */}
+          <TouchableOpacity
+            onPress={() =>
+              router.push({
+                pathname: '/(agent)/provider-settings',
+                params: { practiceId, providerId: provider.id },
+              })
+            }
+            className="flex-row items-center justify-center gap-1.5 mt-2 py-3 rounded-xl border border-gray-200"
+          >
+            <Ionicons name="time-outline" size={14} color="#374151" />
+            <Text className="text-gray-700 text-sm font-medium">Hours, blocks &amp; calendars</Text>
+            <Ionicons name="chevron-forward" size={14} color="#9ca3af" />
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
+
 function PracticeDetail({ practiceId, onBack }: { practiceId: string; onBack: () => void }) {
   const queryClient = useQueryClient();
   const { data: practice, isLoading } = useQuery({ queryKey: ['practice', practiceId], queryFn: () => practicesApi.get(practiceId) });
@@ -217,6 +347,29 @@ function PracticeDetail({ practiceId, onBack }: { practiceId: string; onBack: ()
     },
     onError: (err: any) => Alert.alert('Could not save', err?.response?.data?.message || 'Please try again.'),
   });
+
+  const remove = useMutation({
+    mutationFn: () => practicesApi.remove(practiceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['practices-admin'] });
+      queryClient.invalidateQueries({ queryKey: ['practices'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
+      Alert.alert('Partner removed', `${practice?.name ?? 'The partner'} no longer appears in Nestyvo.`);
+      onBack();
+    },
+    onError: (err: any) => Alert.alert('Could not remove partner', err?.response?.data?.message || 'Please try again.'),
+  });
+
+  function confirmRemove() {
+    Alert.alert(
+      `Remove ${practice?.name ?? 'this partner'}?`,
+      'They disappear from every list and picker. Their history is kept, so this can be undone if it was a mistake.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => remove.mutate() },
+      ],
+    );
+  }
 
   if (isLoading || !practice) {
     return (
@@ -267,18 +420,25 @@ function PracticeDetail({ practiceId, onBack }: { practiceId: string; onBack: ()
           <Text className="text-gray-400 text-sm mt-2">No providers yet</Text>
         </View>
       ) : (
-        providers.map((p: any) => (
-          <View key={p.id} className="bg-white rounded-2xl border border-gray-100 px-4 py-3.5 mb-2 flex-row items-center gap-3">
-            <View className="w-9 h-9 bg-primary-100 rounded-full items-center justify-center">
-              <Text className="text-primary-700 font-bold text-xs">{p.firstName?.[0]}{p.lastName?.[0]}</Text>
-            </View>
-            <View className="flex-1">
-              <Text className="text-gray-900 font-semibold text-sm">{p.firstName} {p.lastName}{p.credentials ? `, ${p.credentials}` : ''}</Text>
-              {p.specialty ? <Text className="text-gray-400 text-xs mt-0.5">{p.specialty}</Text> : null}
-            </View>
-          </View>
-        ))
+        providers.map((p: any) => <ProviderRow key={p.id} provider={p} practiceId={practiceId} />)
       )}
+
+      <View className="h-px bg-gray-100 my-6" />
+
+      <TouchableOpacity
+        onPress={confirmRemove}
+        disabled={remove.isPending}
+        className="flex-row items-center justify-center gap-2 border border-red-200 bg-red-50 rounded-2xl py-3"
+      >
+        {remove.isPending ? (
+          <ActivityIndicator color="#dc2626" />
+        ) : (
+          <>
+            <Ionicons name="trash-outline" size={15} color="#dc2626" />
+            <Text className="text-red-600 font-semibold text-sm">Remove this partner</Text>
+          </>
+        )}
+      </TouchableOpacity>
     </ScrollView>
   );
 }

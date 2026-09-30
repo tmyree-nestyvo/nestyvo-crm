@@ -29,9 +29,10 @@ export class PracticesService {
     });
   }
 
-  // Full fields, admin partner-management screen only.
+  // Full fields, admin partner-management screen only. Filters to active so
+  // a removed partner (see remove()) disappears from the Partners screen.
   listAdmin() {
-    return this.practiceRepo.find({ order: { name: 'ASC' } });
+    return this.practiceRepo.find({ where: { isActive: true }, order: { name: 'ASC' } });
   }
 
   async findOne(id: string): Promise<Practice> {
@@ -59,5 +60,19 @@ export class PracticesService {
     const practice = await this.findOne(id);
     Object.assign(practice, input);
     return this.practiceRepo.save(practice);
+  }
+
+  // Charlene (Sep 30 2026) wants partners she no longer works with out of
+  // her system. Deliberately a soft delete: a practice has providers,
+  // patients, appointments and tickets hanging off it, and cascading all of
+  // that away on one tap is unrecoverable. Flipping isActive removes it from
+  // every picker and from the Partners screen (both list() and listAdmin()
+  // filter on it) while leaving history intact — a mistaken delete is fixed
+  // by flipping the flag back, not by restoring a backup.
+  async remove(id: string) {
+    const practice = await this.findOne(id);
+    practice.isActive = false;
+    await this.practiceRepo.save(practice);
+    return { success: true, id };
   }
 }
