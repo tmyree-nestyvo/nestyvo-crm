@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, Linking, Alert, Modal,
+  ActivityIndicator, Linking, Modal,
 } from 'react-native';
+import { Alert } from '../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';

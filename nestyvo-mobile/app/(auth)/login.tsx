@@ -7,8 +7,8 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
+import { Alert } from '../../lib/alert';
 import { router } from 'expo-router';
 import { signIn } from '../../lib/auth';
 import { useAuthStore } from '../../lib/store';

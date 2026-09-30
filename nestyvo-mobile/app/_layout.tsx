@@ -5,6 +5,7 @@ import { Stack } from 'expo-router';
 import Head from 'expo-router/head';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
+import { AlertHost } from '../components/AlertHost';
 
 // Required by NativeWind v4 / react-native-css-interop on web
 if (typeof StyleSheet.setFlag === 'function') {
@@ -45,6 +46,10 @@ export default function RootLayout() {
           <Stack.Screen name="(provider)" />
           <Stack.Screen name="cancel/[reminderId]" />
         </Stack>
+        {/* Mounted after the navigator so alerts paint above every screen.
+            react-native-web's own Alert.alert is an empty no-op — see
+            lib/alert.ts. */}
+        <AlertHost />
       </QueryClientProvider>
     </Head.Provider>
   );

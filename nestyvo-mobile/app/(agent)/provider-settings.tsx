@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Switch, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Switch, Modal } from 'react-native';
+import { Alert } from '../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -64,6 +65,29 @@ function defaultDays(): DayWindow[] {
     startTime: '09:00',
     endTime: '17:00',
   }));
+}
+
+// The API validates times as strict HH:mm. Typing "9:00" — the single most
+// natural thing to do in a free-text time box — was rejected with a 400,
+// and because Alert.alert is a no-op on web (see lib/alert.ts) that error
+// was invisible: the hours just silently never saved. Charlene hit exactly
+// this on Sep 29 (Peace of Mind had zero availability rows afterward).
+// Accept what people actually type and normalize it instead of rejecting.
+function normalizeTime(raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return null;
+  const m = v.match(/^(\d{1,2})\s*:?\s*(\d{2})?$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = m[2] === undefined ? 0 : Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+/** Compare as minutes, not strings — "9:00" > "17:00" lexicographically. */
+function toMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
 }
 
 const TZ = 'America/Los_Angeles';
@@ -269,15 +293,10 @@ export default function ProviderSettingsScreen() {
     label: `${p.firstName} ${p.lastName}${p.credentials ? ` ${p.credentials}` : ''}`,
   }));
 
+  type Window = { dayOfWeek: number; startTime: string; endTime: string };
+
   const saveAvailability = useMutation({
-    mutationFn: () =>
-      providersApi.replaceAvailability(
-        provider!.id,
-        days
-          .map((d, i) => ({ ...d, dayOfWeek: i }))
-          .filter((d) => d.enabled)
-          .map((d) => ({ dayOfWeek: d.dayOfWeek, startTime: d.startTime, endTime: d.endTime })),
-      ),
+    mutationFn: (windows: Window[]) => providersApi.replaceAvailability(provider!.id, windows),
     onSuccess: () => {
       Alert.alert('Saved', 'Weekly hours updated.');
       queryClient.invalidateQueries({ queryKey: ['provider-availability', provider?.id] });
@@ -288,18 +307,64 @@ export default function ProviderSettingsScreen() {
     },
   });
 
+  // Normalize + validate before sending, and name the offending day rather
+  // than surfacing the API's generic "must be HH:mm".
+  function handleSaveHours() {
+    const enabled = days.map((d, i) => ({ ...d, dayOfWeek: i })).filter((d) => d.enabled);
+    if (!enabled.length) {
+      Alert.alert('No days selected', 'Turn on at least one day before saving.');
+      return;
+    }
+    const windows: Window[] = [];
+    for (const d of enabled) {
+      const startTime = normalizeTime(d.startTime);
+      const endTime = normalizeTime(d.endTime);
+      if (!startTime || !endTime) {
+        Alert.alert(`Check ${DAY_LABELS[d.dayOfWeek]}'s hours`, 'Use a 24-hour time like 9:00 or 17:30.');
+        return;
+      }
+      if (toMinutes(startTime) >= toMinutes(endTime)) {
+        Alert.alert(
+          `Check ${DAY_LABELS[d.dayOfWeek]}'s hours`,
+          `Start (${startTime}) has to be before end (${endTime}).`,
+        );
+        return;
+      }
+      windows.push({ dayOfWeek: d.dayOfWeek, startTime, endTime });
+    }
+    // Show the normalized values back, so what's on screen matches what saved.
+    setDays((prev) =>
+      prev.map((p, i) => {
+        const w = windows.find((x) => x.dayOfWeek === i);
+        return w ? { ...p, startTime: w.startTime, endTime: w.endTime } : p;
+      }),
+    );
+    saveAvailability.mutate(windows);
+  }
+
   const addRecurringBlock = useMutation({
-    mutationFn: () =>
-      providersApi.createRecurringBlock(provider!.id, {
+    mutationFn: () => {
+      // Same HH:mm strictness as weekly hours above — normalize rather than
+      // let the API reject it.
+      const startTime = normalizeTime(blockStart);
+      const endTime = normalizeTime(blockEnd);
+      if (!startTime || !endTime) {
+        throw new Error('Use a 24-hour time like 9:00 or 17:30.');
+      }
+      if (toMinutes(startTime) >= toMinutes(endTime)) {
+        throw new Error(`Start (${startTime}) has to be before end (${endTime}).`);
+      }
+      return providersApi.createRecurringBlock(provider!.id, {
         frequency: blockFrequency,
         daysOfWeek: blockFrequency === 'weekly' ? blockDays : undefined,
         dayOfMonth: blockFrequency === 'monthly' ? Number(blockDayOfMonth) || 1 : undefined,
-        startTime: blockStart,
-        endTime: blockEnd,
+        startTime,
+        endTime,
         endDate: blockEndDate || undefined,
         weeks: blockFrequency === 'weekly' && !blockEndDate ? Number(blockWeeks) || 12 : undefined,
         reason: blockReason || undefined,
-      }),
+      });
+    },
     onSuccess: () => {
       setBlockReason('');
       queryClient.invalidateQueries({ queryKey: ['provider-blocks', provider?.id] });
@@ -307,7 +372,10 @@ export default function ProviderSettingsScreen() {
       Alert.alert('Added', 'Recurring block created.');
     },
     onError: (err: any) => {
-      Alert.alert("Couldn't add block", err?.response?.data?.message || 'Please check the times and try again.');
+      Alert.alert(
+        "Couldn't add block",
+        err?.response?.data?.message || err?.message || 'Please check the times and try again.',
+      );
     },
   });
 
@@ -400,6 +468,14 @@ export default function ProviderSettingsScreen() {
                         <TextInput
                           value={d.startTime}
                           onChangeText={(v) => setDays((prev) => prev.map((p, j) => (j === i ? { ...p, startTime: v } : p)))}
+                          // Tidy "9" / "9:00" / "900" into 09:00 as soon as
+                          // they tab away, so the accepted format is obvious
+                          // before they ever press Save.
+                          onBlur={() =>
+                            setDays((prev) =>
+                              prev.map((p, j) => (j === i ? { ...p, startTime: normalizeTime(p.startTime) ?? p.startTime } : p)),
+                            )
+                          }
                           placeholder="09:00"
                           className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-gray-900 w-20 text-center"
                         />
@@ -407,6 +483,11 @@ export default function ProviderSettingsScreen() {
                         <TextInput
                           value={d.endTime}
                           onChangeText={(v) => setDays((prev) => prev.map((p, j) => (j === i ? { ...p, endTime: v } : p)))}
+                          onBlur={() =>
+                            setDays((prev) =>
+                              prev.map((p, j) => (j === i ? { ...p, endTime: normalizeTime(p.endTime) ?? p.endTime } : p)),
+                            )
+                          }
                           placeholder="17:00"
                           className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-gray-900 w-20 text-center"
                         />
@@ -419,7 +500,7 @@ export default function ProviderSettingsScreen() {
               )}
 
               <TouchableOpacity
-                onPress={() => saveAvailability.mutate()}
+                onPress={handleSaveHours}
                 disabled={saveAvailability.isPending}
                 className="bg-primary-600 rounded-xl py-3 items-center mt-4"
               >
