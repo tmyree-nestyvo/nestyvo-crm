@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, Headers, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,23 +13,27 @@ import { ADMIN_ONLY } from './role-groups';
 // production as of Sep 24 2026 — see [[project_decisions]]), gated behind
 // DEV_AUTH_BYPASS=true. Fixed same day two real holes found while this
 // controller was live in *production* (Railway has DEV_AUTH_BYPASS=true
-// set, no Cognito vars configured at all — this bypass is the only thing
-// production auth runs on right now, not a dev-only path in practice):
+// set, no Cognito vars configured at all):
 //   1. mockLogin used to accept an arbitrary `role` in the request body and
-//      auto-created a User row for ANY email with that role — meaning
-//      anyone who knew the (public) API URL could POST {"email": "x",
-//      "role": "administrator"} and get a fully-privileged token with zero
-//      real credentials, against a HIPAA-regulated system holding real
-//      patient data. Auto-create is removed entirely — login now only
-//      works for a User row that already exists (created via the seed
-//      script or, going forward, the admin partner-onboarding flow), and
-//      the role a token carries always comes from that stored row, never
-//      from the request.
+//      auto-created a User row for ANY email. Auto-create removed — login
+//      only works for a row that already exists, role always comes from
+//      that stored row, never from the request.
 //   2. The JWT signing secret was a literal string checked into source
-//      control ('nestyvo-dev-secret') — anyone with read access to the
-//      repo could forge arbitrary tokens (any role, any identity) without
-//      even calling this endpoint. Moved to JWT_SECRET, required at boot
-//      (see auth.module.ts) — no silent fallback to the old literal.
+//      control. Moved to JWT_SECRET, required at boot (see auth.module.ts).
+//
+// Third hole, closed Sep 30 2026 now that PasswordAuthController exists as
+// the real, shipped login mechanism: this endpoint still only required
+// knowing a valid user's email — zero credentials — which is exactly the
+// "logins don't automatically log in for anybody" gap Charlene flagged.
+// DEV_AUTH_BYPASS itself has to stay true (it also selects which JWT
+// *verification* strategy the whole server runs on — see auth.module.ts —
+// and real Cognito still isn't provisioned, so flipping it off would break
+// every login, not just this one), so the fix is narrower: both routes here
+// now also require an `x-dev-secret` header matching DEV_LOGIN_SECRET, a
+// separate env var known only to Troy/me, set directly on Railway, never
+// committed. No var set → always 401, fails closed. This is now purely a
+// verification/emergency-access tool, not a path the shipped app's UI
+// exposes at all (see login.tsx).
 @Controller('dev')
 export class DevAuthController {
   constructor(
@@ -37,20 +41,26 @@ export class DevAuthController {
     @InjectRepository(User) private userRepo: Repository<User>,
   ) {}
 
-  // Was @Public() — an unauthenticated user-directory enumeration endpoint,
-  // fixed alongside the mockLogin holes above (same incident: dev-only
-  // conveniences left wide open because "it's just for dev" while actually
-  // live in production).
+  private assertDevSecret(provided: string | undefined) {
+    const expected = process.env.DEV_LOGIN_SECRET;
+    if (!expected || !provided || provided !== expected) {
+      throw new UnauthorizedException('Invalid or missing x-dev-secret header.');
+    }
+  }
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...ADMIN_ONLY)
   @Get('users')
-  async listUsers() {
+  async listUsers(@Headers('x-dev-secret') devSecret?: string) {
+    this.assertDevSecret(devSecret);
     return this.userRepo.find({ select: { id: true, email: true, role: true, firstName: true, lastName: true } });
   }
 
   @Public()
   @Post('login')
-  async mockLogin(@Body() body: { email: string }) {
+  async mockLogin(@Body() body: { email: string }, @Headers('x-dev-secret') devSecret?: string) {
+    this.assertDevSecret(devSecret);
+
     const user = await this.userRepo.findOne({ where: { email: body.email } });
     if (!user || !user.isActive) {
       throw new UnauthorizedException('No account found for that email.');

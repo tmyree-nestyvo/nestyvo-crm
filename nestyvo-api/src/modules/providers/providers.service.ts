@@ -27,6 +27,8 @@ export interface CreateProviderInput {
   isInPerson?: boolean;
   /** If set, also creates a PROVIDER-role login for this person (see UsersService.create). */
   loginEmail?: string;
+  /** Optional — admin can set it directly; otherwise a temp password is generated. */
+  loginPassword?: string;
 }
 
 @Injectable()
@@ -45,17 +47,20 @@ export class ProvidersService {
   // clinical profile and, optionally, their login in one call. Login is
   // created FIRST (when requested) so a duplicate-email failure never leaves
   // an orphan Provider row with no way to log in — see UsersService.create.
-  async create(input: CreateProviderInput): Promise<Provider> {
+  async create(input: CreateProviderInput): Promise<{ provider: Provider; tempPassword: string | null }> {
     let userId: string | undefined;
+    let tempPassword: string | null = null;
     if (input.loginEmail) {
-      const user = await this.usersService.create({
+      const { user, tempPassword: generated } = await this.usersService.create({
         email: input.loginEmail,
         firstName: input.firstName,
         lastName: input.lastName,
         role: UserRole.PROVIDER,
         phone: input.phone,
+        initialPassword: input.loginPassword,
       });
       userId = user.id;
+      tempPassword = generated;
     }
 
     const provider = this.providerRepo.create({
@@ -71,7 +76,8 @@ export class ProvidersService {
       isVirtual: input.isVirtual ?? false,
       isInPerson: input.isInPerson ?? true,
     });
-    return this.providerRepo.save(provider);
+    const saved = await this.providerRepo.save(provider);
+    return { provider: saved, tempPassword };
   }
 
   // Charlene (Sep 30 2026) onboarded Peace of Mind leaving the login email
@@ -84,8 +90,9 @@ export class ProvidersService {
     providerId: string,
     input: Partial<Omit<CreateProviderInput, 'practiceId'>>,
     user: User,
-  ): Promise<Provider> {
+  ): Promise<{ provider: Provider; tempPassword: string | null }> {
     const provider = await this.assertCanManage(providerId, user);
+    let tempPassword: string | null = null;
 
     if (input.loginEmail) {
       if (provider.userId) {
@@ -93,14 +100,16 @@ export class ProvidersService {
       }
       // Login first, provider second — same ordering as create(), so a
       // duplicate-email failure leaves no half-updated provider behind.
-      const created = await this.usersService.create({
+      const { user: created, tempPassword: generated } = await this.usersService.create({
         email: input.loginEmail,
         firstName: input.firstName ?? provider.firstName,
         lastName: input.lastName ?? provider.lastName,
         role: UserRole.PROVIDER,
         phone: input.phone ?? provider.phone,
+        initialPassword: input.loginPassword,
       });
       provider.userId = created.id;
+      tempPassword = generated;
     }
 
     for (const field of [
@@ -110,7 +119,18 @@ export class ProvidersService {
       if (input[field] !== undefined) (provider as any)[field] = input[field];
     }
 
-    return this.providerRepo.save(provider);
+    const saved = await this.providerRepo.save(provider);
+    return { provider: saved, tempPassword };
+  }
+
+  // See UsersController's own reset-password for the admin/agent-account
+  // equivalent — this is the provider-scoped path, reachable by a
+  // practice_manager for their own practice, not just an admin.
+  async resetLoginPassword(providerId: string, user: User): Promise<{ tempPassword: string }> {
+    const provider = await this.assertCanManage(providerId, user);
+    if (!provider.userId) throw new BadRequestException('This provider has no login to reset.');
+    const { tempPassword } = await this.usersService.resetPassword(provider.userId);
+    return { tempPassword };
   }
 
   // Admins manage every partner; practice managers only their own practice.

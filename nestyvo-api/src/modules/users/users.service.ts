@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserRole } from '../../database/entities/user.entity';
+import { hashPassword, generateTempPassword } from '../../auth/password.util';
 
 @Injectable()
 export class UsersService {
@@ -46,9 +47,18 @@ export class UsersService {
     role: UserRole;
     practiceId?: string | null;
     phone?: string;
-  }): Promise<User> {
+    /** Admin can set one directly; otherwise a temp password is generated. */
+    initialPassword?: string;
+  }): Promise<{ user: User; tempPassword: string | null }> {
     const existing = await this.userRepo.findOne({ where: { email: input.email } });
     if (existing) throw new ConflictException('A user with this email already exists.');
+
+    // A generated password is always a "temp" one (mustChangePassword=true,
+    // handed back once so the admin can relay it — see password.util.ts);
+    // an admin-supplied one is trusted as already-communicated and doesn't
+    // force a change, matching how the admin would set it up in person.
+    const generated = !input.initialPassword;
+    const plainPassword = input.initialPassword ?? generateTempPassword();
 
     const user = this.userRepo.create({
       cognitoId: `dev-${input.email}`,
@@ -59,7 +69,28 @@ export class UsersService {
       practiceId: input.practiceId ?? undefined,
       phone: input.phone,
       isActive: true,
+      passwordHash: await hashPassword(plainPassword),
+      mustChangePassword: generated,
     });
-    return this.userRepo.save(user);
+    const saved = await this.userRepo.save(user);
+    return { user: saved, tempPassword: generated ? plainPassword : null };
+  }
+
+  /**
+   * Admin-only password reset — for a login that's stuck (forgotten temp
+   * password, needs re-issuing) or, right now, for migrating the handful of
+   * accounts that existed before real password auth did (see the Sep 30
+   * 2026 migration note in charlene_requirements memory). Always generates
+   * a fresh temp password and forces a change on next sign-in — an admin
+   * resetting someone else's password should never silently know their
+   * real one afterward.
+   */
+  async resetPassword(userId: string): Promise<{ user: User; tempPassword: string }> {
+    const user = await this.findById(userId);
+    const tempPassword = generateTempPassword();
+    user.passwordHash = await hashPassword(tempPassword);
+    user.mustChangePassword = true;
+    const saved = await this.userRepo.save(user);
+    return { user: saved, tempPassword };
   }
 }

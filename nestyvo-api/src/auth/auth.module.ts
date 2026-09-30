@@ -6,6 +6,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CognitoStrategy } from './cognito.strategy';
 import { DevStrategy } from './dev.strategy';
 import { DevAuthController } from './dev-auth.controller';
+import { PasswordAuthController } from './password-auth.controller';
 import { User } from '../database/entities/user.entity';
 
 const DEV_BYPASS = process.env.DEV_AUTH_BYPASS === 'true';
@@ -34,7 +35,12 @@ const DEV_BYPASS = process.env.DEV_AUTH_BYPASS === 'true';
       inject: [ConfigService],
     },
   ],
-  controllers: DEV_BYPASS ? [DevAuthController] : [],
+  // PasswordAuthController (real email+password login) is the actual
+  // production auth mechanism now and stays registered regardless of
+  // DEV_AUTH_BYPASS. DevAuthController's /dev/login stays DEV_BYPASS-gated,
+  // server-side only, verification/emergency-access use — see its own
+  // comment for why it isn't removed outright.
+  controllers: DEV_BYPASS ? [DevAuthController, PasswordAuthController] : [PasswordAuthController],
   exports: [PassportModule, JwtModule],
 })
 export class AuthModule {}

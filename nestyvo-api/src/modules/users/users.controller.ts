@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Req, UseGuards } from '@nestjs/common';
-import { IsString, IsEmail, IsEnum, IsOptional } from 'class-validator';
+import { Controller, Get, Post, Body, Param, Req, UseGuards } from '@nestjs/common';
+import { IsString, IsEmail, IsEnum, IsOptional, MinLength } from 'class-validator';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -14,6 +14,7 @@ class CreateUserDto {
   @IsEnum(UserRole) role: UserRole;
   @IsOptional() @IsString() practiceId?: string;
   @IsOptional() @IsString() phone?: string;
+  @IsOptional() @IsString() @MinLength(8) initialPassword?: string;
 }
 
 @Controller('users')
@@ -32,6 +33,7 @@ export class UsersController {
       role: user.role,
       practiceId: user.practiceId,
       practiceName: (user as any).practice?.name,
+      mustChangePassword: user.mustChangePassword,
     };
   }
 
@@ -41,7 +43,19 @@ export class UsersController {
   @Post()
   @UseGuards(RolesGuard)
   @Roles(...ADMIN_ONLY)
-  create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
+  async create(@Body() dto: CreateUserDto) {
+    const { user, tempPassword } = await this.usersService.create(dto);
+    return { user, tempPassword };
+  }
+
+  // Reset a stuck/forgotten login (or migrate a pre-password-auth account —
+  // see Sep 30 2026 migration note) — always issues a fresh temp password
+  // and forces a change on next sign-in.
+  @Post(':id/reset-password')
+  @UseGuards(RolesGuard)
+  @Roles(...ADMIN_ONLY)
+  async resetPassword(@Param('id') id: string) {
+    const { user, tempPassword } = await this.usersService.resetPassword(id);
+    return { user: { id: user.id, email: user.email }, tempPassword };
   }
 }

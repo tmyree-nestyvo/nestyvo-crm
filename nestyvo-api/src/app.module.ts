@@ -22,6 +22,7 @@ import { CalendarModule } from './modules/calendar/calendar.module';
 import { ExternalCalendarsModule } from './modules/external-calendars/external-calendars.module';
 import { JwtAuthGuard } from './auth/auth.guard';
 import { RolesGuard } from './auth/roles.guard';
+import { PasswordChangeGuard } from './auth/password-change.guard';
 
 // Entities
 import { Practice } from './database/entities/practice.entity';
@@ -124,6 +125,7 @@ const ALL_ENTITIES = [
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: PasswordChangeGuard },
   ],
 })
 export class AppModule {}

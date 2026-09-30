@@ -41,6 +41,22 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
+  // Real password auth (Sep 30 2026 — Charlene: production must not
+  // auto-log anyone in). Nullable because most existing rows predate this
+  // and have no password yet — /auth/login treats a null hash as "account
+  // not activated" rather than a crash. Never selected by default (see
+  // AuthService) so a stray `find()` elsewhere in the codebase can't
+  // accidentally leak it into an API response.
+  @Column({ type: 'varchar', nullable: true, select: false })
+  passwordHash: string | null;
+
+  // Set whenever an admin creates a login or resets one — the account
+  // works for exactly one sign-in with the temp password, then the
+  // password-change screen is the only route Nestyvo lets it reach until
+  // this clears. See PasswordChangeGuard.
+  @Column({ default: false })
+  mustChangePassword: boolean;
+
   @Column({ type: 'timestamptz', nullable: true })
   lastLoginAt: Date;
 

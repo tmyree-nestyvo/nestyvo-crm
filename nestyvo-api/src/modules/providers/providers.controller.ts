@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Put, Patch, Delete, Param, Query, Body, Req, UseGuards, ForbiddenException } from '@nestjs/common';
-import { IsString, IsOptional, IsEnum, IsDateString, IsInt, Min, Max, Matches, ValidateNested, ArrayMaxSize, IsArray, ArrayMinSize } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsDateString, IsInt, Min, Max, Matches, ValidateNested, ArrayMaxSize, IsArray, ArrayMinSize, MinLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../../auth/auth.guard';
@@ -46,6 +46,9 @@ class CreateProviderDto {
   @IsOptional() isInPerson?: boolean;
   // If set, also creates their PROVIDER-role login (see UsersService.create).
   @IsOptional() @IsString() loginEmail?: string;
+  // Optional — admin can set it directly; otherwise a temp password is
+  // generated and returned once in the response (see UsersService.create).
+  @IsOptional() @IsString() @MinLength(8) loginPassword?: string;
 }
 
 // Everything optional — the common edit is adding only the login email to a
@@ -61,6 +64,7 @@ class UpdateProviderDto {
   @IsOptional() isVirtual?: boolean;
   @IsOptional() isInPerson?: boolean;
   @IsOptional() @IsString() loginEmail?: string;
+  @IsOptional() @IsString() @MinLength(8) loginPassword?: string;
 }
 
 class CreateBlockDto {
@@ -129,10 +133,15 @@ export class ProvidersController {
 
   // Partner onboarding (Charlene, Sep 24 2026) — admin-only, creates a
   // provider's business/clinical profile and optionally their login.
+  // Response is flattened (provider fields + tempPassword) rather than
+  // nested, so existing frontend code reading e.g. `created.id` still
+  // works unchanged; tempPassword is simply absent (undefined) when no
+  // login was requested or an explicit password was supplied.
   @Post()
   @Roles(...ADMIN_ONLY)
-  createProvider(@Body() dto: CreateProviderDto) {
-    return this.providersService.create(dto);
+  async createProvider(@Body() dto: CreateProviderDto) {
+    const { provider, tempPassword } = await this.providersService.create(dto);
+    return { ...provider, tempPassword };
   }
 
   // Literal "self/*" routes MUST be declared before any ":id/*" routes below
@@ -336,12 +345,21 @@ export class ProvidersController {
   // "self/*" route above — see the route-ordering note on self/blocks.
   @Patch(':id')
   @Roles(...PRACTICE_MANAGEMENT)
-  updateProvider(
+  async updateProvider(
     @Param('id') id: string,
     @Body() dto: UpdateProviderDto,
     @CurrentUser() user: User,
   ) {
-    return this.providersService.update(id, dto, user);
+    const { provider, tempPassword } = await this.providersService.update(id, dto, user);
+    return { ...provider, tempPassword };
   }
 
+  // Reset a provider's login — always issues a fresh temp password and
+  // forces a change on next sign-in (Charlene, Sep 30 2026 — the practical
+  // "they forgot it / never got it" recovery path).
+  @Post(':id/reset-password')
+  @Roles(...PRACTICE_MANAGEMENT)
+  resetProviderPassword(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.providersService.resetLoginPassword(id, user);
+  }
 }
