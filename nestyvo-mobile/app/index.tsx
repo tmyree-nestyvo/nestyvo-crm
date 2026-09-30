@@ -1,20 +1,22 @@
-import { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuthStore } from '../lib/store';
-import { getStoredToken } from '../lib/auth';
 import { hasRole, OFFICE_STAFF, PROVIDER_ONLY } from '../lib/role-groups';
 
 export default function RootIndex() {
-  const { token, role, setAuth } = useAuthStore();
+  const { token, role, hydrated } = useAuthStore();
 
-  useEffect(() => {
-    // Try to restore token from secure storage on cold start
-    getStoredToken().then((stored) => {
-      // Token exists but we don't have user info yet — redirect to login to re-auth
-      // In production you'd decode the JWT here to restore role/userId
-    });
-  }, []);
+  // Session restore (see app/_layout.tsx's AuthHydrator) runs async — wait
+  // for it before treating "no token yet" as "logged out." Without this, a
+  // page refresh with a perfectly valid persisted session bounced straight
+  // to the login screen for the instant before hydration finished.
+  if (!hydrated) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white">
+        <ActivityIndicator color="#2563eb" />
+      </View>
+    );
+  }
 
   if (!token) return <Redirect href="/(auth)/login" />;
 

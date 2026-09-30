@@ -155,14 +155,23 @@ function AddProviderForm({ practiceId, onDone }: { practiceId: string; onDone: (
         email: email.trim() || undefined,
         loginEmail: loginEmail.trim() || undefined,
       }),
-    onSuccess: () => {
+    onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ['practice-providers', practiceId] });
-      Alert.alert(
-        'Provider added',
-        loginEmail.trim()
-          ? `${firstName} ${lastName} can now sign in with ${loginEmail.trim()}.`
-          : `${firstName} ${lastName} was added. No login was created — you can add one later.`,
-      );
+      if (result?.tempPassword) {
+        // Shown once — see ProviderRow's identical note on why this is the
+        // real hand-off mechanism until there's real email delivery.
+        Alert.alert(
+          'Provider added',
+          `${firstName} ${lastName} can sign in with:\n\nEmail: ${loginEmail.trim()}\nTemporary password: ${result.tempPassword}\n\nThey'll be asked to set their own password on first sign-in.`,
+        );
+      } else {
+        Alert.alert(
+          'Provider added',
+          loginEmail.trim()
+            ? `${firstName} ${lastName} can now sign in with ${loginEmail.trim()}.`
+            : `${firstName} ${lastName} was added. No login was created — you can add one later.`,
+        );
+      }
       onDone();
     },
     onError: (err: any) => Alert.alert('Could not add provider', err?.response?.data?.message || 'Please try again.'),
@@ -231,18 +240,35 @@ function ProviderRow({ provider, practiceId }: { provider: any; practiceId: stri
         email: email.trim() || undefined,
         loginEmail: !hasLogin && loginEmail.trim() ? loginEmail.trim() : undefined,
       }),
-    onSuccess: () => {
+    onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ['practice-providers', practiceId] });
-      Alert.alert(
-        'Saved',
-        !hasLogin && loginEmail.trim()
-          ? `${firstName} ${lastName} can now sign in with ${loginEmail.trim()}.`
-          : 'Provider details updated.',
-      );
+      if (result?.tempPassword) {
+        // There's no real email delivery yet — this is the actual hand-off
+        // mechanism: shown once, here, for the admin to relay directly
+        // (same "she relays it herself" pattern as everything else in
+        // partner onboarding). It's never retrievable again after this.
+        Alert.alert(
+          'Login created',
+          `${firstName} ${lastName} can sign in with:\n\nEmail: ${loginEmail.trim()}\nTemporary password: ${result.tempPassword}\n\nThey'll be asked to set their own password on first sign-in.`,
+        );
+      } else {
+        Alert.alert('Saved', 'Provider details updated.');
+      }
       setLoginEmail('');
       setEditing(false);
     },
     onError: (err: any) => Alert.alert('Could not save provider', err?.response?.data?.message || 'Please try again.'),
+  });
+
+  const resetPassword = useMutation({
+    mutationFn: () => providersApi.resetPassword(provider.id),
+    onSuccess: (result) => {
+      Alert.alert(
+        'Password reset',
+        `${provider.firstName} ${provider.lastName}'s new temporary password:\n\n${result.tempPassword}\n\nThey'll be asked to set their own on next sign-in. Their old password no longer works.`,
+      );
+    },
+    onError: (err: any) => Alert.alert('Could not reset password', err?.response?.data?.message || 'Please try again.'),
   });
 
   return (
@@ -282,10 +308,30 @@ function ProviderRow({ provider, practiceId }: { provider: any; practiceId: stri
           <FormField label="Contact email" value={email} onChangeText={setEmail} keyboardType="email-address" />
 
           {hasLogin ? (
-            <View className="bg-green-50 border border-green-100 rounded-xl px-3 py-2.5 mb-3">
-              <Text className="text-green-800 text-xs">
-                This provider already has a sign-in. Changing it isn't supported here yet — ask if you need it reset.
+            <View className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 mb-3 flex-row items-center justify-between gap-2">
+              <Text className="text-gray-600 text-xs flex-1">
+                Has an active sign-in. Resetting issues a new temporary password and invalidates the old one immediately.
               </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  Alert.alert(
+                    `Reset ${provider.firstName}'s password?`,
+                    'Their current password stops working right away.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Reset', style: 'destructive', onPress: () => resetPassword.mutate() },
+                    ],
+                  )
+                }
+                disabled={resetPassword.isPending}
+                className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5"
+              >
+                {resetPassword.isPending ? (
+                  <ActivityIndicator size="small" color="#374151" />
+                ) : (
+                  <Text className="text-gray-700 text-xs font-semibold">Reset</Text>
+                )}
+              </TouchableOpacity>
             </View>
           ) : (
             <>

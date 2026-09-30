@@ -10,47 +10,55 @@ import {
 } from 'react-native';
 import { Alert } from '../../lib/alert';
 import { router } from 'expo-router';
-import { signIn } from '../../lib/auth';
+import { persistSession } from '../../lib/auth';
 import { useAuthStore } from '../../lib/store';
-import { api, API_BASE_URL } from '../../lib/api';
+import { api } from '../../lib/api';
 
-const IS_DEV = API_BASE_URL.includes('localhost') || process.env.EXPO_PUBLIC_DEV_AUTH === 'true';
-
+// Real email+password login (Charlene, Sep 30 2026 — production must not
+// auto-log anyone in). Replaces the previous dev-mode screen entirely: no
+// auto-populated email, no password-free "Sign In (Dev)" button, no quick-
+// switch between accounts. See PasswordAuthController on the backend.
 export default function LoginScreen() {
-  const [email, setEmail] = useState(IS_DEV ? 'agent@nestyvo.com' : '');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const handleLogin = async () => {
-    if (!email.trim()) return;
+    if (!email.trim() || !password.trim()) return;
     setLoading(true);
     try {
-      let token: string;
+      const { data } = await api.post('/auth/login', { email: email.trim(), password });
 
-      if (IS_DEV) {
-        // Dev bypass: POST /dev/login returns a local JWT, no Cognito needed
-        const { data } = await api.post('/dev/login', { email: email.trim() });
-        token = data.token;
-      } else {
-        if (!password.trim()) { setLoading(false); return; }
-        const session = await signIn(email.trim(), password);
-        token = session.getIdToken().getJwtToken();
+      if (data.mustChangePassword) {
+        // Not signed in yet as far as the rest of the app is concerned —
+        // PasswordChangeGuard on the backend would 403 anything else
+        // anyway. Hand the one-time token to the change-password screen
+        // via router params rather than persisting it, since this session
+        // shouldn't survive a refresh until a real password is actually set.
+        router.replace({
+          pathname: '/(auth)/change-password',
+          params: { token: data.token, firstLogin: '1' },
+        });
+        return;
       }
 
       const { data: user } = await api.get('/users/me', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${data.token}` },
       });
 
-      setAuth(token, user.role, user.id, `${user.firstName} ${user.lastName}`, user.practiceId);
+      setAuth(data.token, user.role, user.id, `${user.firstName} ${user.lastName}`, user.practiceId);
+      await persistSession({
+        token: data.token,
+        role: user.role,
+        userId: user.id,
+        name: `${user.firstName} ${user.lastName}`,
+        practiceId: user.practiceId ?? null,
+      });
 
-      if (user.role === 'provider') {
-        router.replace('/(provider)');
-      } else {
-        router.replace('/(agent)');
-      }
+      router.replace(user.role === 'provider' ? '/(provider)' : '/(agent)');
     } catch (err: any) {
-      Alert.alert('Login Failed', err.message ?? 'Please check your credentials and try again.');
+      Alert.alert('Login Failed', err?.response?.data?.message || 'Please check your credentials and try again.');
     } finally {
       setLoading(false);
     }
@@ -62,21 +70,14 @@ export default function LoginScreen() {
       className="flex-1 bg-white"
     >
       <View className="flex-1 px-8 justify-center">
-        {/* Logo / Wordmark */}
         <View className="mb-12">
           <View className="w-14 h-14 bg-primary-600 rounded-2xl items-center justify-center mb-4">
             <Text className="text-white text-2xl font-bold">N</Text>
           </View>
           <Text className="text-3xl font-bold text-gray-900">Nestyvo</Text>
           <Text className="text-gray-500 mt-1">Scheduling Operations Platform</Text>
-          {IS_DEV && (
-            <View className="mt-2 px-3 py-1 bg-amber-50 border border-amber-200 rounded-lg self-start">
-              <Text className="text-amber-700 text-xs font-medium">Dev Mode — no password needed</Text>
-            </View>
-          )}
         </View>
 
-        {/* Form */}
         <View className="gap-4">
           <View>
             <Text className="text-sm font-medium text-gray-700 mb-1.5">Email</Text>
@@ -86,64 +87,37 @@ export default function LoginScreen() {
               placeholder="you@practice.com"
               placeholderTextColor="#9ca3af"
               autoCapitalize="none"
+              autoCorrect={false}
               keyboardType="email-address"
               className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900"
             />
           </View>
 
-          {!IS_DEV && (
-            <View>
-              <Text className="text-sm font-medium text-gray-700 mb-1.5">Password</Text>
-              <TextInput
-                value={password}
-                onChangeText={setPassword}
-                placeholder="••••••••"
-                placeholderTextColor="#9ca3af"
-                secureTextEntry
-                className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900"
-              />
-            </View>
-          )}
+          <View>
+            <Text className="text-sm font-medium text-gray-700 mb-1.5">Password</Text>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="••••••••"
+              placeholderTextColor="#9ca3af"
+              secureTextEntry
+              onSubmitEditing={handleLogin}
+              className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900"
+            />
+          </View>
 
           <TouchableOpacity
             onPress={handleLogin}
-            disabled={loading}
-            className="bg-primary-600 rounded-xl py-4 items-center mt-2"
+            disabled={loading || !email.trim() || !password.trim()}
+            className={`rounded-xl py-4 items-center mt-2 ${
+              !email.trim() || !password.trim() ? 'bg-gray-300' : 'bg-primary-600'
+            }`}
           >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text className="text-white font-semibold text-base">
-                {IS_DEV ? 'Sign In (Dev)' : 'Sign In'}
-              </Text>
-            )}
+            {loading ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-semibold text-base">Sign In</Text>}
           </TouchableOpacity>
-
-          {IS_DEV && (
-            <View className="gap-2">
-              <Text className="text-xs text-gray-400 text-center">Quick switch:</Text>
-              <View className="flex-row gap-2">
-                {['agent@nestyvo.com', 'admin@nestyvo.com'].map((e) => (
-                  <TouchableOpacity
-                    key={e}
-                    onPress={() => setEmail(e)}
-                    className={`flex-1 py-2 rounded-lg border items-center ${
-                      email === e ? 'border-primary-600 bg-primary-50' : 'border-gray-200'
-                    }`}
-                  >
-                    <Text className={`text-xs font-medium ${email === e ? 'text-primary-700' : 'text-gray-500'}`}>
-                      {e.split('@')[0]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
         </View>
 
-        <Text className="text-center text-xs text-gray-400 mt-8">
-          {IS_DEV ? 'Development build' : 'HIPAA-compliant • Secured by AWS Cognito'}
-        </Text>
+        <Text className="text-center text-xs text-gray-400 mt-8">HIPAA-compliant • Secured by Nestyvo Auth</Text>
       </View>
     </KeyboardAvoidingView>
   );

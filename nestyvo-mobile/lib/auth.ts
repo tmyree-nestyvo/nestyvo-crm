@@ -70,8 +70,46 @@ export async function signIn(email: string, password: string): Promise<CognitoUs
 export async function signOut(): Promise<void> {
   await storage.remove(TOKEN_KEY);
   await storage.remove(REFRESH_KEY);
+  await storage.remove(SESSION_KEY);
 }
 
 export async function getStoredToken(): Promise<string | null> {
   return storage.get(TOKEN_KEY);
+}
+
+// --- Real password auth (Sep 30 2026) ---
+// Independent of the Cognito path above, which stays unconfigured/unused
+// (see cognito.strategy.ts) — this talks to PasswordAuthController, the
+// mechanism the shipped app's login screen actually uses. Session
+// persistence lives here too: `app/index.tsx`'s hydration effect used to
+// be a no-op TODO ("In production you'd decode the JWT here..."), so a
+// refresh or a direct link silently dropped every session. That's fixed by
+// actually storing and restoring the full session, not just a bare token.
+
+const SESSION_KEY = 'nestyvo_session_v1';
+
+export type StoredSession = {
+  token: string;
+  role: 'administrator' | 'scheduling_agent' | 'provider' | 'practice_manager';
+  userId: string;
+  name: string;
+  practiceId: string | null;
+};
+
+export async function persistSession(session: StoredSession): Promise<void> {
+  await storage.set(SESSION_KEY, JSON.stringify(session));
+}
+
+export async function loadPersistedSession(): Promise<StoredSession | null> {
+  const raw = await storage.get(SESSION_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as StoredSession;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearPersistedSession(): Promise<void> {
+  await storage.remove(SESSION_KEY);
 }

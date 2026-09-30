@@ -1,6 +1,8 @@
 import axios from 'axios';
+import { router } from 'expo-router';
 import { API_BASE_URL } from './constants';
 import { useAuthStore } from './store';
+import { clearPersistedSession } from './auth';
 
 export { API_BASE_URL };
 
@@ -11,6 +13,30 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+// Two defense-in-depth cases, both real gaps a live session can hit that
+// login.tsx's own redirect logic never sees (it only runs once, at login):
+//  - PASSWORD_CHANGE_REQUIRED: PasswordChangeGuard 403s every route once an
+//    admin resets a password mid-session (see providers/users reset-password
+//    endpoints) — the normal first-login redirect in login.tsx has already
+//    happened by then, so it never fires again on its own.
+//  - 401: the 8h token simply expired, or was revoked. Bounce to login
+//    instead of leaving every screen quietly failing its own requests.
+api.interceptors.response.use(
+  (res) => res,
+  async (err) => {
+    const status = err?.response?.status;
+    const message = err?.response?.data?.message;
+    if (status === 403 && message === 'PASSWORD_CHANGE_REQUIRED') {
+      router.replace({ pathname: '/(auth)/change-password', params: { firstLogin: '1' } });
+    } else if (status === 401 && useAuthStore.getState().token) {
+      useAuthStore.getState().clearAuth();
+      await clearPersistedSession();
+      router.replace('/(auth)/login');
+    }
+    return Promise.reject(err);
+  },
+);
 
 // Agent copilot
 export type AgentMessage = { role: 'user' | 'assistant'; content: string };
@@ -88,6 +114,8 @@ export const providersApi = {
     isVirtual?: boolean;
     isInPerson?: boolean;
     loginEmail?: string;
+    /** Admin can set it directly; otherwise a temp password is generated and returned once. */
+    loginPassword?: string;
   }) => api.post('/providers', input).then((r) => r.data),
   /**
    * Edit a provider after creation — most importantly to add a login email
@@ -103,8 +131,12 @@ export const providersApi = {
       phone?: string;
       email?: string;
       loginEmail?: string;
+      loginPassword?: string;
     },
   ) => api.patch(`/providers/${id}`, input).then((r) => r.data),
+  /** Always issues a fresh temp password and forces a change on next sign-in. */
+  resetPassword: (id: string) =>
+    api.post<{ tempPassword: string }>(`/providers/${id}/reset-password`).then((r) => r.data),
   createRecurringBlock: (
     id: string,
     input: {

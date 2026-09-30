@@ -209,6 +209,13 @@ export default function AgentDashboard() {
               <Text className="text-gray-700 text-xs font-medium">Partners</Text>
             </TouchableOpacity>
           )}
+          <TouchableOpacity
+            testID="nav-change-password"
+            onPress={() => router.push('/(auth)/change-password')}
+            className="p-2"
+          >
+            <Ionicons name="key-outline" size={22} color="#6b7280" />
+          </TouchableOpacity>
           <TouchableOpacity onPress={handleSignOut} className="p-2">
             <Ionicons name="log-out-outline" size={22} color="#6b7280" />
           </TouchableOpacity>
