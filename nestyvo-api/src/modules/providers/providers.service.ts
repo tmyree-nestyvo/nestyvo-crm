@@ -137,7 +137,15 @@ export class ProvidersService {
   private async assertCanManage(providerId: string, user: User): Promise<Provider> {
     const provider = await this.providerRepo.findOne({ where: { id: providerId } });
     if (!provider) throw new NotFoundException('Provider not found');
-    if (user.role !== UserRole.ADMINISTRATOR && provider.practiceId !== user.practiceId) {
+    // SCHEDULING_AGENT is cross-practice everywhere else in this app (patient
+    // search, dashboard, fill-candidates — see Aug 23 2026 fix in
+    // charlene_requirements) — added here Sep 30 2026 when availability/
+    // blocks widened to OFFICE_STAFF, since leaving this unchanged would
+    // have practice-locked every agent to their own seed practiceId only.
+    // PRACTICE_MANAGER is deliberately excluded — the one office role that
+    // really is scoped to a single practice.
+    const unrestricted = user.role === UserRole.ADMINISTRATOR || user.role === UserRole.SCHEDULING_AGENT;
+    if (!unrestricted && provider.practiceId !== user.practiceId) {
       throw new ForbiddenException('Not your practice');
     }
     return provider;

@@ -3,8 +3,9 @@ import { IsString, IsOptional, IsEmail, IsEnum, IsDateString } from 'class-valid
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { ADMIN_AND_AGENT, ADMIN_ONLY } from '../../auth/role-groups';
-import { UserRole } from '../../database/entities/user.entity';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { ADMIN_AND_AGENT, ADMIN_ONLY, OFFICE_STAFF } from '../../auth/role-groups';
+import { User, UserRole } from '../../database/entities/user.entity';
 import { SubscriptionStatus } from '../../database/entities/practice.entity';
 import { PracticesService } from './practices.service';
 
@@ -55,10 +56,30 @@ export class PracticesController {
     return this.practicesService.create(dto);
   }
 
+  // Widened from ADMIN_ONLY Sep 30 2026 for agent parity (Charlene: "an
+  // agent should not be able to onboard a partner. They can, however,
+  // adjust their business hours and block times") — an agent needs to open
+  // a partner's detail screen to reach its providers, but the response is
+  // trimmed to identifying info only, not the notes/subscription fields
+  // that read as back-office/financial rather than "hours and block times."
+  // PRACTICE_MANAGER also gains full detail here in the same pass — the
+  // exact asymmetry already flagged and fixed once for the sibling GET
+  // /practices (list) route on Sep 29 2026, same root cause.
   @Get(':id')
-  @Roles(...ADMIN_ONLY)
-  findOne(@Param('id') id: string) {
-    return this.practicesService.findOne(id);
+  @Roles(...OFFICE_STAFF)
+  async findOne(@Param('id') id: string, @CurrentUser() user: User) {
+    const practice = await this.practicesService.findOne(id);
+    if (user.role === UserRole.ADMINISTRATOR || user.role === UserRole.PRACTICE_MANAGER) {
+      return practice;
+    }
+    return {
+      id: practice.id,
+      name: practice.name,
+      contactName: practice.contactName,
+      phone: practice.phone,
+      email: practice.email,
+      address: practice.address,
+    };
   }
 
   @Patch(':id')

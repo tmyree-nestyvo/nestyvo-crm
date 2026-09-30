@@ -286,14 +286,24 @@ export class ProvidersController {
     return { success: true };
   }
 
+  // Charlene (Sep 30 2026 — agent parity): "an agent should not be able to
+  // onboard a partner. They can, however, adjust their business hours and
+  // block times." These four widen from PRACTICE_MANAGEMENT to OFFICE_STAFF
+  // (adds SCHEDULING_AGENT); provider create/edit/login/reset below stay
+  // PRACTICE_MANAGEMENT-only — that's the "onboarding" half agents don't
+  // get. assertCanManage() also had to change (see providers.service.ts) —
+  // agents are meant to be cross-practice everywhere else in this app
+  // (search, dashboard, fill-candidates), and leaving it unchanged would
+  // have 403'd an agent on every single practice, the exact "nav lets you
+  // in, first call fails" bug already found and fixed twice this session.
   @Get(':id/availability')
-  @Roles(...PRACTICE_MANAGEMENT)
+  @Roles(...OFFICE_STAFF)
   getAvailability(@Param('id') id: string, @CurrentUser() user: User) {
     return this.providersService.getAvailability(id, user);
   }
 
   @Put(':id/availability')
-  @Roles(...PRACTICE_MANAGEMENT)
+  @Roles(...OFFICE_STAFF)
   replaceAvailability(
     @Param('id') id: string,
     @Body() dto: ReplaceAvailabilityDto,
@@ -303,13 +313,13 @@ export class ProvidersController {
   }
 
   @Get(':id/blocks')
-  @Roles(...PRACTICE_MANAGEMENT)
+  @Roles(...OFFICE_STAFF)
   getBlocksForAdmin(@Param('id') id: string, @CurrentUser() user: User) {
     return this.providersService.getBlocksForAdmin(id, user);
   }
 
   @Post(':id/recurring-block')
-  @Roles(...PRACTICE_MANAGEMENT)
+  @Roles(...OFFICE_STAFF)
   createRecurringBlock(
     @Param('id') id: string,
     @Body() dto: RecurringBlockDto,
@@ -332,7 +342,7 @@ export class ProvidersController {
   }
 
   @Delete(':id/blocks/:blockId')
-  @Roles(...PRACTICE_MANAGEMENT)
+  @Roles(...OFFICE_STAFF)
   deleteBlock(
     @Param('id') id: string,
     @Param('blockId') blockId: string,

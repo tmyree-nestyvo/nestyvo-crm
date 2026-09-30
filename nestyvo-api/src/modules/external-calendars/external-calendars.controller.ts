@@ -5,16 +5,26 @@ import { Repository } from 'typeorm';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { PRACTICE_MANAGEMENT } from '../../auth/role-groups';
+import { OFFICE_STAFF } from '../../auth/role-groups';
 import { ExternalCalendarFeed, ExternalCalendarSource } from '../../database/entities/external-calendar-feed.entity';
 import { ExternalCalendarSyncService } from './external-calendar-sync.service';
 
-// Admin/practice_manager only for v1 — Charlene (the admin doing partner
-// onboarding) is the one who actually has these Rula/Headway links in hand
-// today. A provider self-service path (mirroring the self/recurring-block
-// pattern in providers.controller.ts) is a natural follow-up once a
-// provider wants to paste in their own link without going through admin,
-// not built now to keep this change scoped to what's actually needed.
+// Widened from PRACTICE_MANAGEMENT to OFFICE_STAFF Sep 30 2026 (Charlene,
+// agent parity — "adjust hours and block times" was read to include this,
+// the other half of "keep a partner's calendar accurate"). A provider
+// self-service path (mirroring the self/recurring-block pattern in
+// providers.controller.ts) is a natural follow-up once a provider wants to
+// paste in their own link without going through the office, not built now.
+//
+// Pre-existing gap, not introduced or worsened by this change: unlike
+// providers.controller.ts's other routes, these never call an
+// assertCanManage-style practice-ownership check at all — any OFFICE_STAFF
+// caller can already read/add/sync/delete any provider's feeds regardless
+// of practice. Fine for SCHEDULING_AGENT (meant to be cross-practice
+// everywhere) but means PRACTICE_MANAGER was never actually confined to
+// their own practice here either. Low severity (busy-block metadata only,
+// no PHI) — flagged rather than silently fixed while touching this file
+// for an unrelated reason.
 class AddFeedDto {
   @IsEnum(ExternalCalendarSource) source: ExternalCalendarSource;
   @IsUrl({ require_tld: false }) feedUrl: string;
@@ -23,7 +33,7 @@ class AddFeedDto {
 
 @Controller('providers/:providerId/external-calendars')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(...PRACTICE_MANAGEMENT)
+@Roles(...OFFICE_STAFF)
 export class ExternalCalendarsController {
   constructor(
     @InjectRepository(ExternalCalendarFeed) private feedRepo: Repository<ExternalCalendarFeed>,

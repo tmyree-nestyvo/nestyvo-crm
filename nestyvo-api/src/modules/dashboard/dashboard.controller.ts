@@ -3,7 +3,7 @@ import { IsString, IsOptional, IsEnum } from 'class-validator';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { OFFICE_STAFF, PROVIDER_ONLY } from '../../auth/role-groups';
+import { OFFICE_STAFF, PROVIDER_ONLY, PRACTICE_MANAGEMENT } from '../../auth/role-groups';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { User } from '../../database/entities/user.entity';
 import { CallbackSource } from '../../database/entities/callback-request.entity';
@@ -74,8 +74,12 @@ export class DashboardController {
     return this.dashboardService.getAgentWaitlist(user);
   }
 
+  // Narrowed from OFFICE_STAFF to PRACTICE_MANAGEMENT Sep 30 2026 (Charlene,
+  // agent parity — "an agent should also not see analytics from their
+  // logins"). The only route in this controller that excludes
+  // SCHEDULING_AGENT; every other agent-dashboard route is unchanged.
   @Get('agent/stats')
-  @Roles(...OFFICE_STAFF)
+  @Roles(...PRACTICE_MANAGEMENT)
   getAgentStats(@CurrentUser() user: User, @Query('period') period = 'month') {
     return this.dashboardService.getAgentStats(user, period);
   }
