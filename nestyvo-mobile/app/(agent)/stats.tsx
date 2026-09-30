@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
+import { useAuthStore } from '../../lib/store';
+import { hasRole, PRACTICE_MANAGEMENT } from '../../lib/role-groups';
 
 type Period = 'month' | '30d' | '7d';
 
@@ -15,11 +17,12 @@ const PERIODS: { key: Period; label: string }[] = [
   { key: '7d',    label: 'Last 7d' },
 ];
 
-function useStats(period: Period) {
+function useStats(period: Period, enabled: boolean) {
   return useQuery({
     queryKey: ['agent-stats', period],
     queryFn: () => api.get(`/dashboard/agent/stats?period=${period}`).then((r) => r.data),
     staleTime: 60_000,
+    enabled,
   });
 }
 
@@ -41,10 +44,36 @@ function MetricBox({ label, value, sub, color }: { label: string; value: string 
 
 export default function StatsScreen() {
   const [period, setPeriod] = useState<Period>('month');
-  const { data, isLoading, refetch, isRefetching } = useStats(period);
+  const role = useAuthStore((s) => s.role);
+  const canView = hasRole(role, PRACTICE_MANAGEMENT);
+  const { data, isLoading, refetch, isRefetching } = useStats(period, canView);
 
   const summary = data?.summary ?? {};
   const providers: any[] = data?.providers ?? [];
+
+  // Client-side guard, not just the hidden nav icon (Charlene, Sep 30 2026 —
+  // "an agent should also not see analytics"). The backend already 403s an
+  // agent here regardless; this keeps a direct deep-link from showing a raw
+  // error instead of a clear explanation.
+  if (!canView) {
+    return (
+      <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
+        <View className="px-5 pt-4 pb-3 flex-row items-center gap-3">
+          <TouchableOpacity onPress={() => router.back()} className="p-1 -ml-1">
+            <Ionicons name="arrow-back" size={22} color="#374151" />
+          </TouchableOpacity>
+          <Text className="text-xl font-bold text-gray-900 flex-1">Stats &amp; Reporting</Text>
+          <HomeButton href="/(agent)" />
+        </View>
+        <View className="flex-1 items-center justify-center px-8">
+          <Ionicons name="lock-closed-outline" size={32} color="#d1d5db" />
+          <Text className="text-gray-400 text-sm text-center mt-3">
+            Analytics isn't available on an agent login.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>

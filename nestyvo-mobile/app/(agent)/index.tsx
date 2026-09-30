@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../lib/store';
-import { hasRole, ADMIN_ONLY, PRACTICE_MANAGEMENT } from '../../lib/role-groups';
+import { hasRole, PRACTICE_MANAGEMENT, OFFICE_STAFF } from '../../lib/role-groups';
 import { api } from '../../lib/api';
 import { StatCard } from '../../components/dashboard/StatCard';
 import { signOut } from '../../lib/auth';
@@ -179,12 +179,18 @@ export default function AgentDashboard() {
           </Text>
         </View>
         <View className="flex-row items-center gap-1">
-          <TouchableOpacity
-            onPress={() => router.push('/(agent)/stats')}
-            className="p-2"
-          >
-            <Ionicons name="bar-chart-outline" size={22} color="#6b7280" />
-          </TouchableOpacity>
+          {/* Analytics hidden from agents (Charlene, Sep 30 2026 — "an agent
+              should also not see analytics from their logins"). Backend
+              /dashboard/agent/stats already 403s an agent regardless — this
+              just keeps the icon from being a dead end that leads there. */}
+          {hasRole(role, PRACTICE_MANAGEMENT) && (
+            <TouchableOpacity
+              onPress={() => router.push('/(agent)/stats')}
+              className="p-2"
+            >
+              <Ionicons name="bar-chart-outline" size={22} color="#6b7280" />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             testID="nav-requests"
             onPress={() => router.push('/(agent)/tickets')}
@@ -198,8 +204,14 @@ export default function AgentDashboard() {
               reached per-provider from inside Partners, and the "Provider"
               button only ever led admins to a "No provider account linked"
               dead end, since an admin isn't a provider. Partners is now the
-              single place a partner's business info lives. */}
-          {hasRole(role, ADMIN_ONLY) && (
+              single place a partner's business info lives.
+              Widened ADMIN_ONLY -> OFFICE_STAFF same day (agent parity):
+              agents can't onboard a partner or edit its business info, but
+              they belong in this screen for the one thing it also does —
+              reach a provider's hours/blocks/calendars — so the screen
+              itself is now role-aware rather than agents needing a
+              different entry point for the same underlying data. */}
+          {hasRole(role, OFFICE_STAFF) && (
             <TouchableOpacity
               testID="nav-partners"
               onPress={() => router.push('/(agent)/partners')}

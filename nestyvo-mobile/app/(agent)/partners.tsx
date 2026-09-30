@@ -7,12 +7,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { practicesApi, providersApi, usersApi, UpsertPracticeInput } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
+import { useAuthStore } from '../../lib/store';
+import { hasRole, ADMIN_ONLY, PRACTICE_MANAGEMENT } from '../../lib/role-groups';
 
-// Admin-only partner onboarding (Charlene, Sep 24 2026): "a place in the
-// admin login view to onboard a new partner — add all of their business
-// info and create them a partner login." This screen covers the full loop:
+// Originally admin-only partner onboarding (Charlene, Sep 24 2026): "a place
+// in the admin login view to onboard a new partner — add all of their
+// business info and create them a partner login." Covers the full loop:
 // create the business (Practice), edit it later (incl. the subscription
 // placeholder), and add one or more providers + logins under it.
+//
+// Made role-aware Sep 30 2026 for agent parity ("an agent should not be
+// able to onboard a partner. They can, however, adjust their business hours
+// and block times... other functions should all mirror the admin logins").
+// Rather than a separate simplified screen for agents, this one screen
+// mirrors admin's the way she asked — the same navigation, scoped down by
+// what each role can see/do inside it:
+//   ADMIN_ONLY        — create/edit/delete a partner's business info,
+//                        create a provider (+ login), reset a login.
+//   PRACTICE_MANAGEMENT (admin + practice_manager) — same as above.
+//   OFFICE_STAFF (+ SCHEDULING_AGENT) — can open the screen and see the
+//                        partner/provider list, but the business-info form
+//                        renders read-only, there's no create/delete, and
+//                        each provider row only offers "Hours, blocks &
+//                        calendars" — no edit form, no login/reset controls.
 
 type SubStatus = 'trial' | 'active' | 'past_due' | 'canceled';
 
@@ -23,8 +40,24 @@ const STATUS_CONFIG: Record<SubStatus, { label: string; color: string; bg: strin
   canceled: { label: 'Canceled', color: '#dc2626', bg: '#fef2f2' },
 };
 
-function usePractices() {
-  return useQuery({ queryKey: ['practices-admin'], queryFn: () => practicesApi.listAdmin() });
+// GET /practices/admin (full business/subscription detail) is ADMIN_ONLY on
+// the backend — the list screen itself would 403 an agent immediately on
+// open if it always called that. Sep 30 2026 parity: agent instead gets
+// GET /practices (name only, already OFFICE_STAFF-accessible since Sep 29's
+// RBAC fix) and a correspondingly simpler row (see PartnersScreen below).
+// Both hooks are always called (Rules of Hooks) — exactly one is enabled.
+function usePractices(canManagePartners: boolean) {
+  const admin = useQuery({
+    queryKey: ['practices-admin'],
+    queryFn: () => practicesApi.listAdmin(),
+    enabled: canManagePartners,
+  });
+  const basic = useQuery({
+    queryKey: ['practices'],
+    queryFn: () => practicesApi.list(),
+    enabled: !canManagePartners,
+  });
+  return canManagePartners ? admin : basic;
 }
 
 function usePracticeProviders(practiceId: string | null) {
@@ -216,7 +249,7 @@ function AddProviderForm({ practiceId, onDone }: { practiceId: string; onDone: (
 // edited. Each row now expands into an edit form, and shows at a glance
 // whether a login exists at all (the thing that actually blocks a partner
 // from signing in).
-function ProviderRow({ provider, practiceId }: { provider: any; practiceId: string }) {
+function ProviderRow({ provider, practiceId, canManage }: { provider: any; practiceId: string; canManage: boolean }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [firstName, setFirstName] = useState(provider.firstName ?? '');
@@ -298,67 +331,73 @@ function ProviderRow({ provider, practiceId }: { provider: any; practiceId: stri
 
       {editing && (
         <View className="mt-3 pt-3 border-t border-gray-50">
-          <View className="flex-row gap-2">
-            <View className="flex-1"><FormField label="First name" value={firstName} onChangeText={setFirstName} /></View>
-            <View className="flex-1"><FormField label="Last name" value={lastName} onChangeText={setLastName} /></View>
-          </View>
-          <FormField label="Credentials" value={credentials} onChangeText={setCredentials} placeholder="e.g. LMFT" />
-          <FormField label="Specialty" value={specialty} onChangeText={setSpecialty} />
-          <FormField label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-          <FormField label="Contact email" value={email} onChangeText={setEmail} keyboardType="email-address" />
-
-          {hasLogin ? (
-            <View className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 mb-3 flex-row items-center justify-between gap-2">
-              <Text className="text-gray-600 text-xs flex-1">
-                Has an active sign-in. Resetting issues a new temporary password and invalidates the old one immediately.
-              </Text>
-              <TouchableOpacity
-                onPress={() =>
-                  Alert.alert(
-                    `Reset ${provider.firstName}'s password?`,
-                    'Their current password stops working right away.',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Reset', style: 'destructive', onPress: () => resetPassword.mutate() },
-                    ],
-                  )
-                }
-                disabled={resetPassword.isPending}
-                className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5"
-              >
-                {resetPassword.isPending ? (
-                  <ActivityIndicator size="small" color="#374151" />
-                ) : (
-                  <Text className="text-gray-700 text-xs font-semibold">Reset</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          ) : (
+          {canManage && (
             <>
-              <FormField
-                label="Login email"
-                value={loginEmail}
-                onChangeText={setLoginEmail}
-                placeholder="Creates their sign-in"
-                keyboardType="email-address"
-              />
-              <Text className="text-xs text-gray-400 mb-3 -mt-2">
-                Set this to let them sign in and manage their own schedule.
-              </Text>
+              <View className="flex-row gap-2">
+                <View className="flex-1"><FormField label="First name" value={firstName} onChangeText={setFirstName} /></View>
+                <View className="flex-1"><FormField label="Last name" value={lastName} onChangeText={setLastName} /></View>
+              </View>
+              <FormField label="Credentials" value={credentials} onChangeText={setCredentials} placeholder="e.g. LMFT" />
+              <FormField label="Specialty" value={specialty} onChangeText={setSpecialty} />
+              <FormField label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+              <FormField label="Contact email" value={email} onChangeText={setEmail} keyboardType="email-address" />
+
+              {hasLogin ? (
+                <View className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 mb-3 flex-row items-center justify-between gap-2">
+                  <Text className="text-gray-600 text-xs flex-1">
+                    Has an active sign-in. Resetting issues a new temporary password and invalidates the old one immediately.
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() =>
+                      Alert.alert(
+                        `Reset ${provider.firstName}'s password?`,
+                        'Their current password stops working right away.',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Reset', style: 'destructive', onPress: () => resetPassword.mutate() },
+                        ],
+                      )
+                    }
+                    disabled={resetPassword.isPending}
+                    className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5"
+                  >
+                    {resetPassword.isPending ? (
+                      <ActivityIndicator size="small" color="#374151" />
+                    ) : (
+                      <Text className="text-gray-700 text-xs font-semibold">Reset</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  <FormField
+                    label="Login email"
+                    value={loginEmail}
+                    onChangeText={setLoginEmail}
+                    placeholder="Creates their sign-in"
+                    keyboardType="email-address"
+                  />
+                  <Text className="text-xs text-gray-400 mb-3 -mt-2">
+                    Set this to let them sign in and manage their own schedule.
+                  </Text>
+                </>
+              )}
+
+              <TouchableOpacity
+                onPress={() => save.mutate()}
+                disabled={save.isPending || !firstName.trim() || !lastName.trim()}
+                className={`rounded-xl py-3 items-center ${!firstName.trim() || !lastName.trim() ? 'bg-gray-300' : 'bg-primary-600'}`}
+              >
+                {save.isPending ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-semibold text-sm">Save Provider</Text>}
+              </TouchableOpacity>
             </>
           )}
 
-          <TouchableOpacity
-            onPress={() => save.mutate()}
-            disabled={save.isPending || !firstName.trim() || !lastName.trim()}
-            className={`rounded-xl py-3 items-center ${!firstName.trim() || !lastName.trim() ? 'bg-gray-300' : 'bg-primary-600'}`}
-          >
-            {save.isPending ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-semibold text-sm">Save Provider</Text>}
-          </TouchableOpacity>
-
           {/* Where the old standalone gear icon's screen now lives — reached
               from the provider it belongs to, already preselected, instead of
-              being a separate top-level destination with its own two pickers. */}
+              being a separate top-level destination with its own two pickers.
+              The one thing agents get here (Sep 30 2026 parity): everything
+              else in this expanded section is canManage-only. */}
           <TouchableOpacity
             onPress={() =>
               router.push({
@@ -366,7 +405,7 @@ function ProviderRow({ provider, practiceId }: { provider: any; practiceId: stri
                 params: { practiceId, providerId: provider.id },
               })
             }
-            className="flex-row items-center justify-center gap-1.5 mt-2 py-3 rounded-xl border border-gray-200"
+            className={`flex-row items-center justify-center gap-1.5 py-3 rounded-xl border border-gray-200 ${canManage ? 'mt-2' : ''}`}
           >
             <Ionicons name="time-outline" size={14} color="#374151" />
             <Text className="text-gray-700 text-sm font-medium">Hours, blocks &amp; calendars</Text>
@@ -380,6 +419,15 @@ function ProviderRow({ provider, practiceId }: { provider: any; practiceId: stri
 
 function PracticeDetail({ practiceId, onBack }: { practiceId: string; onBack: () => void }) {
   const queryClient = useQueryClient();
+  const role = useAuthStore((s) => s.role);
+  // ADMIN_ONLY on the backend for both edit and delete (PATCH/DELETE
+  // /practices/:id) — practice_manager can VIEW full detail (see the Sep 30
+  // 2026 note on GET /practices/:id) but can't edit it either, same as
+  // before today. Only admin sees this as an editable form at all.
+  const canEditBusinessInfo = hasRole(role, ADMIN_ONLY);
+  // Provider create/login/reset — the "onboarding" half agents don't get.
+  const canManageProviders = hasRole(role, PRACTICE_MANAGEMENT);
+
   const { data: practice, isLoading } = useQuery({ queryKey: ['practice', practiceId], queryFn: () => practicesApi.get(practiceId) });
   const { data: providers = [], isLoading: loadingProviders } = usePracticeProviders(practiceId);
   const [addingProvider, setAddingProvider] = useState(false);
@@ -434,27 +482,42 @@ function PracticeDetail({ practiceId, onBack }: { practiceId: string; onBack: ()
 
       <Text className="text-xl font-bold text-gray-900 mb-4">{practice.name}</Text>
 
-      <PracticeForm
-        initial={practice}
-        onSubmit={(v) => update.mutate(v)}
-        submitting={update.isPending}
-        submitLabel="Save Changes"
-      />
+      {canEditBusinessInfo ? (
+        <PracticeForm
+          initial={practice}
+          onSubmit={(v) => update.mutate(v)}
+          submitting={update.isPending}
+          submitLabel="Save Changes"
+        />
+      ) : (
+        // Read-only mirror for an agent (Sep 30 2026 parity) — the backend
+        // already only sends back identifying fields for this role (see
+        // GET /practices/:id), not notes/subscription, so there's nothing
+        // to hide here beyond just not rendering an editable form.
+        <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-2 gap-2.5">
+          {practice.contactName ? <InfoLine label="Contact" value={practice.contactName} /> : null}
+          {practice.phone ? <InfoLine label="Phone" value={practice.phone} /> : null}
+          {practice.email ? <InfoLine label="Email" value={practice.email} /> : null}
+          {practice.address ? <InfoLine label="Address" value={practice.address} /> : null}
+        </View>
+      )}
 
       <View className="h-px bg-gray-100 my-6" />
 
       <View className="flex-row items-center justify-between mb-3">
         <Text className="text-base font-semibold text-gray-900">Providers ({providers.length})</Text>
-        <TouchableOpacity
-          onPress={() => setAddingProvider((v) => !v)}
-          className="flex-row items-center gap-1 bg-primary-50 px-3 py-1.5 rounded-full"
-        >
-          <Ionicons name={addingProvider ? 'close' : 'add'} size={14} color="#2563eb" />
-          <Text className="text-primary-700 text-xs font-semibold">{addingProvider ? 'Cancel' : 'Add Provider'}</Text>
-        </TouchableOpacity>
+        {canManageProviders && (
+          <TouchableOpacity
+            onPress={() => setAddingProvider((v) => !v)}
+            className="flex-row items-center gap-1 bg-primary-50 px-3 py-1.5 rounded-full"
+          >
+            <Ionicons name={addingProvider ? 'close' : 'add'} size={14} color="#2563eb" />
+            <Text className="text-primary-700 text-xs font-semibold">{addingProvider ? 'Cancel' : 'Add Provider'}</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {addingProvider && (
+      {addingProvider && canManageProviders && (
         <AddProviderForm practiceId={practiceId} onDone={() => setAddingProvider(false)} />
       )}
 
@@ -466,31 +529,50 @@ function PracticeDetail({ practiceId, onBack }: { practiceId: string; onBack: ()
           <Text className="text-gray-400 text-sm mt-2">No providers yet</Text>
         </View>
       ) : (
-        providers.map((p: any) => <ProviderRow key={p.id} provider={p} practiceId={practiceId} />)
+        providers.map((p: any) => (
+          <ProviderRow key={p.id} provider={p} practiceId={practiceId} canManage={canManageProviders} />
+        ))
       )}
 
-      <View className="h-px bg-gray-100 my-6" />
-
-      <TouchableOpacity
-        onPress={confirmRemove}
-        disabled={remove.isPending}
-        className="flex-row items-center justify-center gap-2 border border-red-200 bg-red-50 rounded-2xl py-3"
-      >
-        {remove.isPending ? (
-          <ActivityIndicator color="#dc2626" />
-        ) : (
-          <>
-            <Ionicons name="trash-outline" size={15} color="#dc2626" />
-            <Text className="text-red-600 font-semibold text-sm">Remove this partner</Text>
-          </>
-        )}
-      </TouchableOpacity>
+      {canEditBusinessInfo && (
+        <>
+          <View className="h-px bg-gray-100 my-6" />
+          <TouchableOpacity
+            onPress={confirmRemove}
+            disabled={remove.isPending}
+            className="flex-row items-center justify-center gap-2 border border-red-200 bg-red-50 rounded-2xl py-3"
+          >
+            {remove.isPending ? (
+              <ActivityIndicator color="#dc2626" />
+            ) : (
+              <>
+                <Ionicons name="trash-outline" size={15} color="#dc2626" />
+                <Text className="text-red-600 font-semibold text-sm">Remove this partner</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </>
+      )}
     </ScrollView>
   );
 }
 
+function InfoLine({ label, value }: { label: string; value: string }) {
+  return (
+    <View>
+      <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{label}</Text>
+      <Text className="text-gray-900 text-sm mt-0.5">{value}</Text>
+    </View>
+  );
+}
+
 export default function PartnersScreen() {
-  const { data: practices = [], isLoading } = usePractices();
+  const role = useAuthStore((s) => s.role);
+  // Only admin can create/delete a partner ("onboard") — see the
+  // ADMIN_ONLY gates on POST/DELETE /practices, unchanged from before
+  // today's agent-parity pass.
+  const canManagePartners = hasRole(role, ADMIN_ONLY);
+  const { data: practices = [], isLoading } = usePractices(canManagePartners);
   const [mode, setMode] = useState<'list' | 'create' | 'detail'>('list');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -519,7 +601,7 @@ export default function PartnersScreen() {
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
         <Text className="text-xl font-bold text-gray-900 flex-1">Partners</Text>
-        {mode === 'list' && (
+        {mode === 'list' && canManagePartners && (
           <TouchableOpacity
             onPress={() => setMode('create')}
             className="flex-row items-center gap-1.5 bg-primary-600 px-3.5 py-2 rounded-full"
@@ -555,7 +637,12 @@ export default function PartnersScreen() {
             </View>
           ) : (
             practices.map((p: any) => {
-              const cfg = STATUS_CONFIG[(p.subscriptionStatus as SubStatus) ?? 'trial'];
+              // The agent-facing GET /practices response doesn't include
+              // subscriptionStatus at all (see PracticesService.list) —
+              // defaulting a missing value to 'trial' would show a
+              // confidently wrong badge, not an honestly-unknown one. Only
+              // render it when the field is actually present.
+              const cfg = p.subscriptionStatus ? STATUS_CONFIG[p.subscriptionStatus as SubStatus] : null;
               return (
                 <TouchableOpacity
                   key={p.id}
@@ -564,9 +651,11 @@ export default function PartnersScreen() {
                 >
                   <View className="flex-row items-center justify-between mb-1">
                     <Text className="text-gray-900 font-semibold text-base flex-1" numberOfLines={1}>{p.name}</Text>
-                    <View className="rounded-full px-2.5 py-0.5" style={{ backgroundColor: cfg.bg }}>
-                      <Text className="text-xs font-semibold" style={{ color: cfg.color }}>{cfg.label}</Text>
-                    </View>
+                    {cfg ? (
+                      <View className="rounded-full px-2.5 py-0.5" style={{ backgroundColor: cfg.bg }}>
+                        <Text className="text-xs font-semibold" style={{ color: cfg.color }}>{cfg.label}</Text>
+                      </View>
+                    ) : null}
                   </View>
                   {p.contactName ? <Text className="text-gray-500 text-xs">{p.contactName}</Text> : null}
                   <View className="flex-row items-center gap-3 mt-1.5">
