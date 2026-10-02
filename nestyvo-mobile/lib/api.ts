@@ -132,6 +132,7 @@ export const providersApi = {
       email?: string;
       loginEmail?: string;
       loginPassword?: string;
+      defaultSlotDurationMin?: number;
     },
   ) => api.patch(`/providers/${id}`, input).then((r) => r.data),
   /** Always issues a fresh temp password and forces a change on next sign-in. */

@@ -259,6 +259,13 @@ function ProviderRow({ provider, practiceId, canManage }: { provider: any; pract
   const [phone, setPhone] = useState(provider.phone ?? '');
   const [email, setEmail] = useState(provider.email ?? '');
   const [loginEmail, setLoginEmail] = useState('');
+  // Charlene, Oct 2 2026 — "recognize 60 min block increments instead of
+  // 50 mins." Per-provider, not global: changing the system default would
+  // have altered Westside's already-working, already-demoed 50-min slot
+  // grid with nobody asking for that. provider.defaultSlotDurationMin
+  // always comes back from the API now (entity default is 50), so this
+  // never shows blank.
+  const [slotDuration, setSlotDuration] = useState(String(provider.defaultSlotDurationMin ?? 50));
 
   const hasLogin = !!provider.userId;
 
@@ -272,6 +279,7 @@ function ProviderRow({ provider, practiceId, canManage }: { provider: any; pract
         phone: phone.trim() || undefined,
         email: email.trim() || undefined,
         loginEmail: !hasLogin && loginEmail.trim() ? loginEmail.trim() : undefined,
+        defaultSlotDurationMin: Number(slotDuration) || 50,
       }),
     onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ['practice-providers', practiceId] });
@@ -339,6 +347,16 @@ function ProviderRow({ provider, practiceId, canManage }: { provider: any; pract
               </View>
               <FormField label="Credentials" value={credentials} onChangeText={setCredentials} placeholder="e.g. LMFT" />
               <FormField label="Specialty" value={specialty} onChangeText={setSpecialty} />
+              <FormField
+                label="Session length (minutes)"
+                value={slotDuration}
+                onChangeText={setSlotDuration}
+                placeholder="50"
+                keyboardType="phone-pad"
+              />
+              <Text className="text-xs text-gray-400 mb-3 -mt-2">
+                How long each open slot is on the calendar — e.g. 50 for a therapy session, 60 for a full hour.
+              </Text>
               <FormField label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
               <FormField label="Contact email" value={email} onChangeText={setEmail} keyboardType="email-address" />
 

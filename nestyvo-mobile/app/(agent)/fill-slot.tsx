@@ -378,6 +378,21 @@ export default function FillSlotScreen() {
         <Text className="text-gray-400 text-xs mt-1">
           {candidates?.length ?? 0} clients to call · ranked by priority
         </Text>
+        <TouchableOpacity
+          onPress={() => router.push({
+            pathname: '/(agent)/patients/new',
+            params: {
+              presetProviderId: providerId,
+              presetProviderName: providerName,
+              bookSlotStartAt: slotStartAt,
+              bookSlotEndAt: slotEndAt,
+            },
+          })}
+          className="mt-3 flex-row items-center justify-center gap-1.5 bg-primary-50 border border-primary-100 py-2.5 rounded-xl"
+        >
+          <Ionicons name="person-add-outline" size={15} color="#2563eb" />
+          <Text className="text-primary-700 text-sm font-medium">New Client for This Slot</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView className="flex-1" contentContainerClassName="px-5 pt-4 pb-10">

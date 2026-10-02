@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, Modal, ActivityIndicator } from 'react-native';
 import { Alert } from '../../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { patientsApi, providersApi, practicesApi, clientTagsApi } from '../../../lib/api';
@@ -83,6 +83,17 @@ export default function NewClientScreen() {
   const { role, practiceId: myPracticeId } = useAuthStore();
   const isCrossPractice = hasRole(role, ADMIN_AND_AGENT);
 
+  // Arriving from Fill Slot (an open appointment with no client to put in
+  // it) — these preselect the provider so the slot can be booked straight
+  // through instead of dropping back to the generic calendar after create.
+  const { presetProviderId, presetProviderName, bookSlotStartAt, bookSlotEndAt } = useLocalSearchParams<{
+    presetProviderId?: string;
+    presetProviderName?: string;
+    bookSlotStartAt?: string;
+    bookSlotEndAt?: string;
+  }>();
+  const [presetApplied, setPresetApplied] = useState(false);
+
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
@@ -112,6 +123,35 @@ export default function NewClientScreen() {
     queryFn: () => clientTagsApi.list(effectivePracticeId),
     enabled: !!effectivePracticeId,
   });
+
+  // Cross-practice roles need the preset provider's practiceId before the
+  // provider picker's own list (scoped by practice) will even include it —
+  // the unfiltered list (no practiceId) returns every active provider.
+  const { data: allProviders = [] } = useQuery({
+    queryKey: ['providers', 'all'],
+    queryFn: () => providersApi.list(),
+    enabled: isCrossPractice && !!presetProviderId,
+  });
+
+  useEffect(() => {
+    if (presetApplied || !presetProviderId) return;
+    if (isCrossPractice) {
+      const match = allProviders.find((p: any) => p.id === presetProviderId);
+      if (!match) return;
+      const practiceMatch = practices.find((p: any) => p.id === match.practiceId);
+      setPractice({ id: match.practiceId, label: practiceMatch?.name ?? '' });
+      setProvider({
+        id: match.id,
+        label: presetProviderName || `${match.firstName} ${match.lastName}`,
+        sublabel: match.credentials,
+      });
+      setPresetApplied(true);
+    } else {
+      // Already scoped to my own practice — no lookup needed.
+      setProvider({ id: presetProviderId, label: presetProviderName || '' });
+      setPresetApplied(true);
+    }
+  }, [presetApplied, presetProviderId, presetProviderName, isCrossPractice, allProviders, practices]);
 
   const [created, setCreated] = useState<{ id: string; name: string } | null>(null);
 
@@ -151,18 +191,32 @@ export default function NewClientScreen() {
         </Text>
         <TouchableOpacity
           onPress={() =>
-            router.push({
-              pathname: '/(agent)/calendar',
-              params: {
-                initialProviderId: provider!.id,
-                bookingPatientId: created.id,
-                bookingPatientName: created.name,
-              },
-            })
+            bookSlotStartAt && bookSlotEndAt
+              ? router.replace({
+                  pathname: '/(agent)/book-slot',
+                  params: {
+                    providerId: provider!.id,
+                    providerName: provider!.label,
+                    slotStartAt: bookSlotStartAt,
+                    slotEndAt: bookSlotEndAt,
+                    patientId: created.id,
+                    patientName: created.name,
+                  },
+                })
+              : router.push({
+                  pathname: '/(agent)/calendar',
+                  params: {
+                    initialProviderId: provider!.id,
+                    bookingPatientId: created.id,
+                    bookingPatientName: created.name,
+                  },
+                })
           }
           className="mt-6 bg-primary-600 rounded-xl px-6 py-3 w-full items-center"
         >
-          <Text className="text-white font-semibold text-sm">Schedule First Appointment</Text>
+          <Text className="text-white font-semibold text-sm">
+            {bookSlotStartAt ? 'Book This Slot' : 'Schedule First Appointment'}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => router.replace(`/(agent)/patients/${created.id}`)}
