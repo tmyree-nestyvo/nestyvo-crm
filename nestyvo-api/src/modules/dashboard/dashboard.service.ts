@@ -359,12 +359,28 @@ export class DashboardService {
   // she'd always tested via the old dev-login quick-switch as pseudo-admin,
   // which bypassed this entirely; real password auth finally put her
   // through her account's actual (previously-unexercised) scoping path.
-  // practice_manager stays assignment-scoped — the one office role that's
-  // genuinely meant to be confined to their own practice.
+  // practice_manager was left on the final assignment-based fallback below,
+  // which is architecturally wrong for that role: AgentProviderAssignment
+  // models Charlene's offshore agents being individually assigned to
+  // specific providers (possibly across practices), not a practice's own
+  // manager, who inherently "owns" every provider in their one practice
+  // regardless of any assignment row ever existing. Confirmed live Oct 2
+  // 2026 during a deep QA pass with the first-ever real practice_manager
+  // test account this project has had: stats/cancellations/waitlist all
+  // silently showed zero providers for a PM whose practice has 2 real
+  // ones, because no one had ever created assignment rows for a PM (there
+  // was never a reason to). Fixed to scope by practiceId directly, matching
+  // how listForUser (providers.service.ts) already correctly does it.
   private async getScopedProviderIds(user: User): Promise<string[]> {
     if (user.role === UserRole.ADMINISTRATOR || user.role === UserRole.SCHEDULING_AGENT) {
       const allProviders = await this.providerRepo.find({ where: { status: ProviderStatus.ACTIVE } });
       return allProviders.map((p) => p.id);
+    }
+    if (user.role === UserRole.PRACTICE_MANAGER) {
+      const practiceProviders = await this.providerRepo.find({
+        where: { practiceId: user.practiceId, status: ProviderStatus.ACTIVE },
+      });
+      return practiceProviders.map((p) => p.id);
     }
     const assignments = await this.assignmentRepo.find({
       where: { agentUserId: user.id, isActive: true },

@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ExternalCalendarFeed } from '../../database/entities/external-calendar-feed.entity';
 import { ExternalBusyBlock } from '../../database/entities/external-busy-block.entity';
 import { User } from '../../database/entities/user.entity';
+import { Provider } from '../../database/entities/provider.entity';
 import { ExternalCalendarsController } from './external-calendars.controller';
 import { ExternalCalendarSyncService } from './external-calendar-sync.service';
 
@@ -13,7 +14,8 @@ import { ExternalCalendarSyncService } from './external-calendar-sync.service';
   // Every other module using RolesGuard (e.g. providers.module.ts) includes
   // User in its forFeature list for the same reason — missed it on the
   // first pass here and it crashed app boot ("UserRepository" not found).
-  imports: [TypeOrmModule.forFeature([ExternalCalendarFeed, ExternalBusyBlock, User])],
+  // Provider added Oct 2 2026 for the new assertCanAccess practice check.
+  imports: [TypeOrmModule.forFeature([ExternalCalendarFeed, ExternalBusyBlock, User, Provider])],
   controllers: [ExternalCalendarsController],
   providers: [ExternalCalendarSyncService],
   exports: [ExternalCalendarSyncService],

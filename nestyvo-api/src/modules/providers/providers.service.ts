@@ -384,7 +384,36 @@ export class ProvidersService {
     return self ? [self] : [];
   }
 
-  async getSchedule(providerId: string, date?: string): Promise<any[]> {
+  // Real, if narrow, PHI exposure confirmed live Oct 2 2026 during a deep
+  // QA pass: this route (@Roles(...ALL_STAFF)) had no ownership check
+  // whatsoever — any authenticated staff member, including a provider
+  // themselves, could view ANY other provider's real booked appointments
+  // (with real patient names) regardless of practice, while the sibling
+  // getAvailability/getBlocks already correctly enforce assertCanManage's
+  // practice confinement. assertCanManage itself isn't reused here as-is —
+  // it compares provider.practiceId to the CALLER's own practiceId, which
+  // is null for every PROVIDER-role user (their practice lives on the
+  // Provider record, not the User row — see tickets.service.ts's identical
+  // comment), so it would incorrectly block every provider from viewing
+  // even their own schedule. Providers get a stricter, separate check here:
+  // only their own schedule, not "same practice."
+  async getSchedule(providerId: string, date?: string, user?: User): Promise<any[]> {
+    if (user) {
+      if (user.role === UserRole.PRACTICE_MANAGER) {
+        const target = await this.providerRepo.findOne({ where: { id: providerId } });
+        if (!target || target.practiceId !== user.practiceId) {
+          throw new ForbiddenException('Not your practice');
+        }
+      } else if (user.role === UserRole.PROVIDER) {
+        const self = await this.providerRepo.findOne({ where: { userId: user.id } });
+        if (!self || self.id !== providerId) {
+          throw new ForbiddenException('Not your schedule');
+        }
+      }
+      // ADMINISTRATOR and SCHEDULING_AGENT stay unrestricted, matching
+      // assertCanManage's convention everywhere else in this file.
+    }
+
     const target = date ? new Date(date + 'T00:00:00') : new Date();
     const start = new Date(target);
     start.setHours(0, 0, 0, 0);

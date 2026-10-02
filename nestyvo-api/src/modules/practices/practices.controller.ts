@@ -69,9 +69,20 @@ export class PracticesController {
   @Roles(...OFFICE_STAFF)
   async findOne(@Param('id') id: string, @CurrentUser() user: User) {
     const practice = await this.practicesService.findOne(id);
-    if (user.role === UserRole.ADMINISTRATOR || user.role === UserRole.PRACTICE_MANAGER) {
-      return practice;
-    }
+
+    // Real cross-tenant exposure, confirmed live Oct 2 2026 during a deep QA
+    // pass with the first-ever real practice_manager test account: this
+    // originally gave PRACTICE_MANAGER full business/subscription detail for
+    // ANY practice id, not just their own — the trimmed-vs-full split above
+    // only ever considered SCHEDULING_AGENT (cross-practice by design) vs.
+    // everyone else, never that PRACTICE_MANAGER is supposed to be confined
+    // to one practice everywhere else in this app. A PM now gets full detail
+    // only for their own practiceId, and the same agent-style trimmed view
+    // for any other — not a 403, since they can still legitimately look up
+    // another partner's identifying info the same way an agent can.
+    if (user.role === UserRole.ADMINISTRATOR) return practice;
+    if (user.role === UserRole.PRACTICE_MANAGER && practice.id === user.practiceId) return practice;
+
     return {
       id: practice.id,
       name: practice.name,

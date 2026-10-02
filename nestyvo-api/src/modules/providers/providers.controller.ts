@@ -218,8 +218,8 @@ export class ProvidersController {
 
   @Get(':id/schedule')
   @Roles(...ALL_STAFF)
-  getSchedule(@Param('id') id: string, @Query('date') date?: string) {
-    return this.providersService.getSchedule(id, date);
+  getSchedule(@Param('id') id: string, @Query('date') date?: string, @CurrentUser() user?: User) {
+    return this.providersService.getSchedule(id, date, user!);
   }
 
   @Get(':id/fill-candidates')
