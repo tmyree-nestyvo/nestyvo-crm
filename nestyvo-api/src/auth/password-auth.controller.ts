@@ -10,7 +10,7 @@ import { User } from '../database/entities/user.entity';
 import { Public } from './decorators/public.decorator';
 import { AllowDuringPasswordChange } from './decorators/allow-password-change.decorator';
 import { JwtAuthGuard } from './auth.guard';
-import { hashPassword, verifyPassword } from './password.util';
+import { hashPassword, verifyPassword, generateResetToken, hashResetToken } from './password.util';
 
 // Real password login (Charlene, Sep 30 2026 — "we'd want to ensure it was
 // secure and the logins don't automatically log in for anybody"). Replaces
@@ -29,6 +29,17 @@ class ChangePasswordDto {
   @IsOptional() @IsString() currentPassword?: string;
   @IsString() @MinLength(8) newPassword: string;
 }
+
+class ForgotPasswordDto {
+  @IsEmail() email: string;
+}
+
+class ResetPasswordDto {
+  @IsString() token: string;
+  @IsString() @MinLength(8) newPassword: string;
+}
+
+const RESET_TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 @Controller('auth')
 export class PasswordAuthController {
@@ -110,6 +121,60 @@ export class PasswordAuthController {
     // from the DB on every request, not from a JWT claim — see
     // PasswordChangeGuard), but re-issuing is cheap and conventional, and
     // saves the client a second round trip to keep using the same session.
+    const token = this.jwtService.sign({ sub: user.cognitoId, email: user.email });
+    return { token, success: true };
+  }
+
+  // No email-sending provider exists in this codebase (checked: no
+  // SendGrid/Resend/SES/SMTP) — returns the raw reset link directly in the
+  // response instead of emailing it, same deliberate, flagged stand-in
+  // already used in sal_tax_app's identical endpoint. A human (Troy) is the
+  // one relaying it until real delivery exists. Built Oct 1 2026 after
+  // Charlene got locked out with no self-service way back in and suggested
+  // exactly this.
+  @Public()
+  @Post('forgot-password')
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    const user = await this.userRepo.findOne({ where: { email: dto.email, isActive: true } });
+    const genericMessage = 'If that email has an account, a reset link has been generated.';
+    if (!user) {
+      // Don't reveal whether the email exists — same generic response either way.
+      return { message: genericMessage };
+    }
+
+    const token = generateResetToken();
+    user.passwordResetTokenHash = hashResetToken(token);
+    user.passwordResetExpiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+    await this.userRepo.save(user);
+
+    return {
+      message: genericMessage,
+      // TEMPORARY — see method comment. Remove once real email delivery
+      // exists; returning the token here only makes sense while a human is
+      // the one calling this directly, not a real end user's own browser.
+      devResetToken: token,
+      expiresAt: user.passwordResetExpiresAt,
+    };
+  }
+
+  @Public()
+  @Post('reset-password')
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    const tokenHash = hashResetToken(dto.token);
+    const user = await this.userRepo.findOne({
+      where: { passwordResetTokenHash: tokenHash },
+      select: { id: true, cognitoId: true, email: true, passwordResetTokenHash: true, passwordResetExpiresAt: true },
+    });
+    if (!user || !user.passwordResetExpiresAt || user.passwordResetExpiresAt < new Date()) {
+      throw new BadRequestException('This reset link is invalid or has expired.');
+    }
+
+    user.passwordHash = await hashPassword(dto.newPassword);
+    user.mustChangePassword = false;
+    user.passwordResetTokenHash = null;
+    user.passwordResetExpiresAt = null;
+    await this.userRepo.save(user);
+
     const token = this.jwtService.sign({ sub: user.cognitoId, email: user.email });
     return { token, success: true };
   }

@@ -57,6 +57,16 @@ export class User {
   @Column({ default: false })
   mustChangePassword: boolean;
 
+  // Forgot-password (Oct 1 2026 — Charlene got locked out and suggested
+  // exactly this). select: false for the same reason as passwordHash — a
+  // stray find() shouldn't leak an active reset token. Cleared on
+  // successful reset (single-use) or left to just expire otherwise.
+  @Column({ type: 'varchar', nullable: true, select: false })
+  passwordResetTokenHash: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  passwordResetExpiresAt: Date | null;
+
   @Column({ type: 'timestamptz', nullable: true })
   lastLoginAt: Date;
 

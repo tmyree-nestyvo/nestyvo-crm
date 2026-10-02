@@ -1,5 +1,5 @@
 import * as bcrypt from 'bcryptjs';
-import { randomInt } from 'crypto';
+import { randomInt, randomBytes, createHash } from 'crypto';
 
 // bcryptjs (pure JS), not native bcrypt — this Docker build already had one
 // native-module surprise this project (msgpackr-extract's install script,
@@ -31,4 +31,17 @@ export function generateTempPassword(length = 10): string {
     out += TEMP_PASSWORD_ALPHABET[randomInt(TEMP_PASSWORD_ALPHABET.length)];
   }
   return out;
+}
+
+// Password-reset tokens are already high-entropy random — a fast SHA-256
+// hash (not bcrypt) is the right tool here, same pattern most frameworks use
+// for reset/remember tokens vs. human passwords. Never store the raw token.
+// Ported from sal_tax_app's identical password.util.ts (Oct 1 2026 —
+// Charlene: "maybe this is a good opportunity to add a forgot pw button").
+export function generateResetToken(): string {
+  return randomBytes(32).toString('hex');
+}
+
+export function hashResetToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
 }
