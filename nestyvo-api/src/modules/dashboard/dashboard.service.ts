@@ -117,6 +117,7 @@ export class DashboardService {
         availability,
         booked,
         blocks,
+        provider.defaultSlotDurationMin,
       );
 
       const totalSlots = slotsByDate.reduce((sum, d) => sum + d.slots.length, 0);
@@ -248,7 +249,9 @@ export class DashboardService {
     ]);
     const blocks = [...ownBlocks, ...externalBlocks];
 
-    const slotsByDate = computeSlotsByDate(provider.id, startOfToday, daysOut, now, availability, booked, blocks);
+    const slotsByDate = computeSlotsByDate(
+      provider.id, startOfToday, daysOut, now, availability, booked, blocks, provider.defaultSlotDurationMin,
+    );
     const totalSlots = slotsByDate.reduce((sum, d) => sum + d.slots.length, 0);
 
     return { totalSlots, slotsByDate };

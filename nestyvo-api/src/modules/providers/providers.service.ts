@@ -29,6 +29,8 @@ export interface CreateProviderInput {
   loginEmail?: string;
   /** Optional — admin can set it directly; otherwise a temp password is generated. */
   loginPassword?: string;
+  /** Session length in minutes for open-slot generation. Defaults to 50 on the entity. */
+  defaultSlotDurationMin?: number;
 }
 
 @Injectable()
@@ -75,6 +77,9 @@ export class ProvidersService {
       officeLocation: input.officeLocation,
       isVirtual: input.isVirtual ?? false,
       isInPerson: input.isInPerson ?? true,
+      // Entity default (50) applies when omitted — unchanged behavior for
+      // every existing onboarding flow that doesn't pass this yet.
+      ...(input.defaultSlotDurationMin !== undefined ? { defaultSlotDurationMin: input.defaultSlotDurationMin } : {}),
     });
     const saved = await this.providerRepo.save(provider);
     return { provider: saved, tempPassword };
@@ -115,6 +120,7 @@ export class ProvidersService {
     for (const field of [
       'firstName', 'lastName', 'credentials', 'specialty',
       'phone', 'email', 'officeLocation', 'isVirtual', 'isInPerson',
+      'defaultSlotDurationMin',
     ] as const) {
       if (input[field] !== undefined) (provider as any)[field] = input[field];
     }

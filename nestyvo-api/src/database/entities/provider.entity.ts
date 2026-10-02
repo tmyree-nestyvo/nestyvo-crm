@@ -57,6 +57,22 @@ export class Provider {
   @Column({ type: 'enum', enum: ProviderStatus, default: ProviderStatus.ACTIVE })
   status: ProviderStatus;
 
+  // Charlene, Oct 2 2026 — "we need to recognize 60 min block increments
+  // instead of 50 mins": open-slot generation (computeSlotsByDate,
+  // dashboard.service.ts) had a single global 50-min default with no
+  // per-provider override at all, even though ProviderAppointmentType
+  // already models real per-provider session lengths (Westside's own
+  // providers already have a mix of 50/60/90-min types, never actually
+  // read by slot generation). Rather than make slot generation consume
+  // that richer, ambiguous (multiple types per provider) table — a bigger
+  // change than "ship tomorrow" allows, and real risk to Westside's
+  // already-working, already-demoed 50-min grid — this is a single
+  // explicit column, defaulting to 50 so every existing provider's
+  // behavior is byte-for-byte unchanged, set to 60 only for the one
+  // provider (Peace of Mind's Gencia) that actually needs it right now.
+  @Column({ type: 'int', default: 50 })
+  defaultSlotDurationMin: number;
+
   @Column({ nullable: true })
   newPatientCapacity: number;
 

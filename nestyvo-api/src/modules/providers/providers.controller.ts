@@ -49,6 +49,7 @@ class CreateProviderDto {
   // Optional — admin can set it directly; otherwise a temp password is
   // generated and returned once in the response (see UsersService.create).
   @IsOptional() @IsString() @MinLength(8) loginPassword?: string;
+  @IsOptional() @IsInt() @Min(15) defaultSlotDurationMin?: number;
 }
 
 // Everything optional — the common edit is adding only the login email to a
@@ -65,6 +66,10 @@ class UpdateProviderDto {
   @IsOptional() isInPerson?: boolean;
   @IsOptional() @IsString() loginEmail?: string;
   @IsOptional() @IsString() @MinLength(8) loginPassword?: string;
+  // Charlene, Oct 2 2026 — per-provider session length for open-slot
+  // generation. Min 15 as a sanity floor, nothing enforced at the high end
+  // (a 2-4hr block is a real, named use case elsewhere in this project).
+  @IsOptional() @IsInt() @Min(15) defaultSlotDurationMin?: number;
 }
 
 class CreateBlockDto {
