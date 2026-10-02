@@ -9,7 +9,16 @@ export class ClientTagsService {
   constructor(@InjectRepository(ClientTag) private tagRepo: Repository<ClientTag>) {}
 
   list(user: User, targetPracticeId?: string) {
-    const practiceId = targetPracticeId && user.role === UserRole.ADMINISTRATOR ? targetPracticeId : user.practiceId;
+    // GET /client-tags is OFFICE_STAFF (includes SCHEDULING_AGENT) — only
+    // ADMINISTRATOR could actually use targetPracticeId though, so an agent
+    // viewing/assigning tags for a patient outside their home practice
+    // (e.g. a Peace of Mind patient while seeded under Westside) silently
+    // got Westside's tag set instead of the one that actually applied.
+    // create/update/remove stay PRACTICE_MANAGEMENT-only at the controller
+    // level (Aug 21 2026 decision: tag *definitions* stay admin-controlled)
+    // — this only widens read access, matching how assignment already works.
+    const isCrossPractice = user.role === UserRole.ADMINISTRATOR || user.role === UserRole.SCHEDULING_AGENT;
+    const practiceId = targetPracticeId && isCrossPractice ? targetPracticeId : user.practiceId;
     return this.tagRepo.find({
       where: { practiceId, isActive: true },
       order: { blockMinutes: 'ASC' },

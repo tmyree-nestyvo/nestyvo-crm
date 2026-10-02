@@ -348,10 +348,21 @@ export class DashboardService {
     return { id: saved.id };
   }
 
-  // Admin works across every partner practice; other roles stay scoped to
-  // their own assigned providers. Mirrors getAgentDashboard's scoping.
+  // Admin and scheduling_agent both work across every partner practice —
+  // SCHEDULING_AGENT has been cross-practice/unrestricted everywhere else in
+  // this app since Aug 23 2026 (search, patient creation, etc. — see
+  // charlene_requirements memory), but this method was missed in that pass.
+  // Confirmed live Oct 2 2026: Charlene's scheduling_agent account only had
+  // AgentProviderAssignment rows for Westside's 2 original providers, so
+  // Peace of Mind and Ortiz & Associates — onboarded since — were silently
+  // invisible on her dashboard and calendar. Invisible until now because
+  // she'd always tested via the old dev-login quick-switch as pseudo-admin,
+  // which bypassed this entirely; real password auth finally put her
+  // through her account's actual (previously-unexercised) scoping path.
+  // practice_manager stays assignment-scoped — the one office role that's
+  // genuinely meant to be confined to their own practice.
   private async getScopedProviderIds(user: User): Promise<string[]> {
-    if (user.role === UserRole.ADMINISTRATOR) {
+    if (user.role === UserRole.ADMINISTRATOR || user.role === UserRole.SCHEDULING_AGENT) {
       const allProviders = await this.providerRepo.find({ where: { status: ProviderStatus.ACTIVE } });
       return allProviders.map((p) => p.id);
     }
@@ -475,10 +486,15 @@ export class DashboardService {
   }
 
   async getAgentStats(user: User, period: string): Promise<any> {
-    const assignments = await this.assignmentRepo.find({
-      where: { agentUserId: user.id, isActive: true },
-    });
-    const providerIds = assignments.map((a) => a.providerId);
+    // Was its own standalone assignment lookup with NO administrator bypass
+    // at all — unlike every other scoped method in this file. Confirmed
+    // live Oct 2 2026: admin@nestyvo.com has zero AgentProviderAssignment
+    // rows of its own (admins aren't individually assigned to providers),
+    // so this screen would have silently shown all-zero stats for Troy's
+    // own account too, not just agents. Routed through the same
+    // getScopedProviderIds every other method here already uses — fixes
+    // both this and the agent cross-practice gap in one move.
+    const providerIds = await this.getScopedProviderIds(user);
     if (!providerIds.length) return { periodLabel: period, providers: [], summary: { scheduled: 0, cancellations: 0, filled: 0, contactsMade: 0, revenueRecovered: 0 } };
 
     const now = new Date();

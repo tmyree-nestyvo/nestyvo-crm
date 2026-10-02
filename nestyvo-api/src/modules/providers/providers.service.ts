@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Between } from 'typeorm';
 import { randomBytes } from 'crypto';
-import { Provider } from '../../database/entities/provider.entity';
+import { Provider, ProviderStatus } from '../../database/entities/provider.entity';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
 import { AgentProviderAssignment } from '../../database/entities/agent-provider-assignment.entity';
 import { ProviderAvailability } from '../../database/entities/provider-availability.entity';
@@ -353,8 +353,23 @@ export class ProvidersService {
       });
     }
 
-    if (user.role === UserRole.ADMINISTRATOR) {
-      return this.providerRepo.find({ where: { isActive: true } as any, order: { lastName: 'ASC' } });
+    // Unfiltered "list everyone" case (no targetPracticeId) — until Oct 2
+    // 2026 this fell through to an assignment-scoped branch for
+    // SCHEDULING_AGENT below, predating the Aug 23 2026 decision that
+    // agents are cross-practice/unrestricted everywhere, same as admin.
+    // Confirmed live: Charlene's account only had AgentProviderAssignment
+    // rows for Westside's 2 original providers, so every partner onboarded
+    // since (Peace of Mind, Ortiz & Associates) was invisible to her here —
+    // same root cause just fixed in dashboard.service.ts's
+    // getScopedProviderIds.
+    if (user.role === UserRole.ADMINISTRATOR || user.role === UserRole.SCHEDULING_AGENT) {
+      // Pre-existing bug, already documented (project_build_state memory):
+      // Provider has no `isActive` column at all, only `status`
+      // (ACTIVE/INACTIVE/VACATION) — this 500'd for admin too, silently,
+      // whenever GET /providers was called with no practiceId filter.
+      // Surfaced for real the moment SCHEDULING_AGENT started reaching this
+      // same branch (Oct 2 2026) — fixed properly now rather than inherited.
+      return this.providerRepo.find({ where: { status: ProviderStatus.ACTIVE }, order: { lastName: 'ASC' } });
     }
 
     if (user.role === UserRole.PRACTICE_MANAGER) {
@@ -362,14 +377,6 @@ export class ProvidersService {
         where: { practiceId: user.practiceId } as any,
         order: { lastName: 'ASC' },
       });
-    }
-
-    if (user.role === UserRole.SCHEDULING_AGENT) {
-      const assignments = await this.assignmentRepo.find({
-        where: { agentUserId: user.id, isActive: true },
-      });
-      if (!assignments.length) return [];
-      return this.providerRepo.findBy({ id: In(assignments.map((a) => a.providerId)) });
     }
 
     // Provider sees themselves

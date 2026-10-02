@@ -115,6 +115,16 @@ export class PatientsService {
         where: { assignedProviderId: provider.id },
         order: { lastName: 'ASC', firstName: 'ASC' },
       });
+    } else if (user.role === UserRole.ADMINISTRATOR) {
+      // ROSTER_ACCESS = [ADMINISTRATOR, PRACTICE_MANAGER, PROVIDER] — no
+      // SCHEDULING_AGENT (agents browse via search(), which already handles
+      // cross-practice correctly — see that method's comment). But admin's
+      // own practiceId is just whichever practice they were seeded under
+      // (Westside here), same root cause as every other scoping gap found
+      // Oct 2 2026 — admin was being silently confined to one practice's
+      // roster instead of seeing every practice, same "admin sees
+      // everything" principle already established elsewhere (Aug 23 fix).
+      patients = await this.patientRepo.find({ order: { lastName: 'ASC', firstName: 'ASC' } });
     } else {
       patients = await this.patientRepo.find({
         where: { practiceId: user.practiceId },
