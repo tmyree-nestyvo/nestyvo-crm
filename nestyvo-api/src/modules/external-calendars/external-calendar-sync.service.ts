@@ -3,8 +3,30 @@ import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, LessThan, Repository } from 'typeorm';
 import * as ical from 'node-ical';
-import { ExternalCalendarFeed } from '../../database/entities/external-calendar-feed.entity';
+import { ExternalCalendarFeed, ExternalCalendarSource } from '../../database/entities/external-calendar-feed.entity';
 import { ExternalBusyBlock } from '../../database/entities/external-busy-block.entity';
+
+// Workstream C (Oct 3 2026) — extracted straight from inspecting both of
+// Gencia's real, live feeds directly (not guessed): Rula puts a unique
+// per-session join link in DESCRIPTION ("Join the session: <url>"),
+// Headway puts its provider's own static room link in DESCRIPTION ("Join
+// virtually at <url>"). Platform-aware since the two feeds don't share a
+// format at all otherwise (Rula also has an X-ALT-DESC HTML duplicate,
+// Headway doesn't). Falls back to null rather than throwing — an
+// unexpected feed shape should never break the sync, same instinct as the
+// rest of this file (skip malformed events rather than guess).
+const TELEHEALTH_LINK_PATTERNS: Partial<Record<ExternalCalendarSource, RegExp>> = {
+  [ExternalCalendarSource.RULA]: /https:\/\/join\.rula\.com\/\S+/,
+  [ExternalCalendarSource.HEADWAY]: /https:\/\/sessions\.psychologytoday\.com\/\S+/,
+};
+
+function extractTelehealthLink(source: ExternalCalendarSource, description: string | null): string | null {
+  if (!description) return null;
+  const pattern = TELEHEALTH_LINK_PATTERNS[source];
+  if (!pattern) return null;
+  const match = description.match(pattern);
+  return match ? match[0] : null;
+}
 
 // Pulls a provider's Rula/Headway (or other) calendar-export .ics feed and
 // stores each event as a generic busy block — see ExternalCalendarFeed and
@@ -88,6 +110,10 @@ export class ExternalCalendarSyncService {
       row.startAt = new Date(event.start as any);
       row.endAt = new Date(event.end as any);
       row.summary = event.summary ? String(event.summary) : 'Busy';
+      const description = event.description ? String(event.description) : null;
+      row.description = description;
+      row.telehealthLink = extractTelehealthLink(feed.source, description);
+      row.location = event.location ? String(event.location) : null;
       row.lastSeenAt = now;
       await this.blockRepo.save(row);
       imported++;

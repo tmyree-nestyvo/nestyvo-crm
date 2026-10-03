@@ -219,6 +219,9 @@ export class DashboardService {
           patientId: null, patient: null,
           type: b.summary, status: null, locationType: null,
           source: 'external' as const, externalSource: b.source,
+          // Workstream C (Oct 3 2026) — see providers.service.ts getSchedule's
+          // identical addition for the raw-feed evidence behind these two.
+          telehealthLink: b.telehealthLink, externalLocation: b.location,
         })),
       ].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()),
     };

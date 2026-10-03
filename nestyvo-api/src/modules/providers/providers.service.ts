@@ -525,6 +525,13 @@ export class ProvidersService {
       locationType: null,
       source: 'external' as const,
       externalSource: b.source,
+      // Workstream C (Oct 3 2026) — real per-event data from the feed
+      // itself (see ExternalCalendarSyncService), not previously surfaced
+      // anywhere past the sync. No client name field here deliberately —
+      // neither Rula's nor Headway's feed carries one (see the entity's
+      // comment); this is everything the raw data actually supports.
+      telehealthLink: b.telehealthLink,
+      externalLocation: b.location,
     }));
 
     return [...nestyvoRows, ...externalRows].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());

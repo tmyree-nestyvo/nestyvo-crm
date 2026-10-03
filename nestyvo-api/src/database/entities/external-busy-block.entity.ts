@@ -44,6 +44,24 @@ export class ExternalBusyBlock {
   @Column()
   summary: string;
 
+  // Workstream C (Oct 3 2026) — raw-feed inspection of both of Gencia's
+  // real live feeds (see ExternalCalendarSyncService) found a real,
+  // per-event telehealth link in Rula's DESCRIPTION field (unique per
+  // session) and Headway's own static room link in theirs, plus a real
+  // LOCATION on Headway events ("Telehealth"). Neither feed's SUMMARY,
+  // DESCRIPTION, or any other field carries a client/patient name anywhere
+  // — confirmed across all 160 real events on the account, both platforms
+  // — so that part of the original ask isn't buildable from this data and
+  // is flagged back separately, not silently worked around here.
+  @Column({ type: 'text', nullable: true })
+  description: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  telehealthLink: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  location: string | null;
+
   @Column({ type: 'timestamptz' })
   lastSeenAt: Date;
 
