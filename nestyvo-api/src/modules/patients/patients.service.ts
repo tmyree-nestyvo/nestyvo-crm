@@ -97,7 +97,14 @@ export class PatientsService {
       recentAppointments: recentAppointments.map((a) => ({
         id: a.id,
         startAt: a.startAt,
-        provider: `${a.provider.firstName} ${a.provider.lastName}`,
+        // Phase 0 audit (Oct 2 2026) caught this live: AppointmentCard (the
+        // shared component this list is actually rendered with) reads
+        // `.patient` for its bold headline — this used to come back as
+        // `provider` instead, so every row on a client's Recent
+        // Appointments list rendered with a blank headline. `patient` here
+        // is the provider's name, which is the correct "who" to headline
+        // from a client-profile vantage point.
+        patient: `${a.provider.firstName} ${a.provider.lastName}`,
         type: a.appointmentType?.name,
         status: a.status,
         locationType: a.locationType,

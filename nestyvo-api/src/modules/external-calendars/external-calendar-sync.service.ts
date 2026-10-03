@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, Repository } from 'typeorm';
+import { IsNull, LessThan, Repository } from 'typeorm';
 import * as ical from 'node-ical';
 import { ExternalCalendarFeed } from '../../database/entities/external-calendar-feed.entity';
 import { ExternalBusyBlock } from '../../database/entities/external-busy-block.entity';
@@ -34,8 +34,13 @@ export class ExternalCalendarSyncService {
   // so the two don't fire on the same tick.
   @Cron('2,17,32,47 * * * *')
   async syncDueFeeds() {
+    // Phase 0 audit (Oct 2 2026) caught this live in production logs: a
+    // literal `null` in a TypeORM where-condition throws instead of
+    // matching, so this crashed on every single run and no feed was ever
+    // auto-refreshing — only the manual "sync now" button actually worked.
+    // IsNull() is the correct way to match a SQL NULL here.
     const due = await this.feedRepo.find({
-      where: [{ lastSyncedAt: LessThan(new Date(Date.now() - SYNC_INTERVAL_MS)) }, { lastSyncedAt: null as any }],
+      where: [{ lastSyncedAt: LessThan(new Date(Date.now() - SYNC_INTERVAL_MS)) }, { lastSyncedAt: IsNull() }],
       take: 100,
     });
     for (const feed of due) {
