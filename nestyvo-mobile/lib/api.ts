@@ -100,6 +100,13 @@ export const providersApi = {
     api.get(`/providers/${id}/schedule`, { params: { date } }).then((r) => r.data),
   getAppointmentDetail: (providerId: string, appointmentId: string) =>
     api.get(`/providers/${providerId}/appointments/${appointmentId}`).then((r) => r.data),
+  cancelAppointment: (providerId: string, appointmentId: string, reason?: string) =>
+    api.patch(`/providers/${providerId}/appointments/${appointmentId}/cancel`, { reason }).then((r) => r.data),
+  rescheduleAppointment: (
+    providerId: string,
+    appointmentId: string,
+    input: { newStartAt: string; newEndAt?: string; reason?: string },
+  ) => api.patch(`/providers/${providerId}/appointments/${appointmentId}/reschedule`, input).then((r) => r.data),
   getAvailability: (id: string) => api.get(`/providers/${id}/availability`).then((r) => r.data),
   replaceAvailability: (id: string, windows: { dayOfWeek: number; startTime: string; endTime: string }[]) =>
     api.put(`/providers/${id}/availability`, { windows }).then((r) => r.data),
@@ -155,6 +162,30 @@ export const providersApi = {
   ) => api.post(`/providers/${id}/recurring-block`, input).then((r) => r.data),
   deleteBlock: (id: string, blockId: string) =>
     api.delete(`/providers/${id}/blocks/${blockId}`).then((r) => r.data),
+};
+
+// Provider-specific appointment/service types (Workstream B, Oct 3 2026) —
+// each provider has their OWN list; never shown globally across providers.
+export interface ProviderAppointmentType {
+  id: string;
+  providerId: string;
+  name: string;
+  durationMin: number;
+  category: string;
+  isActive: boolean;
+}
+export const appointmentTypesApi = {
+  list: (providerId: string) =>
+    api.get<ProviderAppointmentType[]>(`/providers/${providerId}/appointment-types`).then((r) => r.data),
+  create: (providerId: string, input: { name: string; durationMin: number; category?: string }) =>
+    api.post<ProviderAppointmentType>(`/providers/${providerId}/appointment-types`, input).then((r) => r.data),
+  update: (
+    providerId: string,
+    typeId: string,
+    input: { name?: string; durationMin?: number; category?: string; isActive?: boolean },
+  ) => api.patch<ProviderAppointmentType>(`/providers/${providerId}/appointment-types/${typeId}`, input).then((r) => r.data),
+  deactivate: (providerId: string, typeId: string) =>
+    api.delete(`/providers/${providerId}/appointment-types/${typeId}`).then((r) => r.data),
 };
 
 // External calendars (Rula/Headway feed ingestion, Sep 29 2026) — see

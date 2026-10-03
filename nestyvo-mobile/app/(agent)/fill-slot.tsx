@@ -7,7 +7,7 @@ import { Alert } from '../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { api, patientsApi } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
 
@@ -78,20 +78,20 @@ function CandidateCard({
   candidate,
   rank,
   providerId,
+  providerName,
   slotStartAt,
   slotEndAt,
 }: {
   candidate: Candidate;
   rank: number;
   providerId: string;
+  providerName: string;
   slotStartAt: string;
   slotEndAt: string;
 }) {
   const [expanded, setExpanded] = useState(rank === 1); // first candidate open by default
   const [outcomeModal, setOutcomeModal] = useState(false);
-  const [booked, setBooked] = useState(false);
   const [callLogged, setCallLogged] = useState<string | null>(null);
-  const queryClient = useQueryClient();
 
   const cfg = SOURCE_CONFIG[candidate.source];
   const tagCfg = TAG_FIT_CONFIG[candidate.tagFit];
@@ -107,16 +107,21 @@ function CandidateCard({
       setCallLogged(outcome);
       setOutcomeModal(false);
       if (outcome === 'scheduled') {
-        // Book the appointment
-        api.post(`/providers/${providerId}/appointments`, {
-          patientId: candidate.patientId,
-          startAt: slotStartAt,
-          endAt: slotEndAt,
-          locationType: 'in_person',
-        }).then(() => {
-          setBooked(true);
-          queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
-          Alert.alert('Appointment Booked', `${candidate.name} is now scheduled for ${fmt(slotStartAt)}.`);
+        // Workstream B (Oct 3 2026) — this used to book directly here with
+        // no appointment-type/duration choice at all. Routes through the
+        // same book-slot.tsx every other booking path now uses, so this
+        // gets the type picker + duration override for free instead of
+        // needing its own.
+        router.push({
+          pathname: '/(agent)/book-slot',
+          params: {
+            providerId,
+            providerName,
+            slotStartAt,
+            slotEndAt,
+            patientId: candidate.patientId,
+            patientName: candidate.name,
+          },
         });
       }
     },
@@ -128,18 +133,6 @@ function CandidateCard({
       setOutcomeModal(true);
     }
   };
-
-  if (booked) {
-    return (
-      <View className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-3 flex-row items-center gap-3">
-        <Ionicons name="checkmark-circle" size={24} color="#16a34a" />
-        <View>
-          <Text className="text-green-800 font-semibold text-sm">{candidate.name} — Booked</Text>
-          <Text className="text-green-600 text-xs mt-0.5">{fmt(slotStartAt)} slot filled</Text>
-        </View>
-      </View>
-    );
-  }
 
   return (
     <>
@@ -554,6 +547,7 @@ export default function FillSlotScreen() {
               candidate={c}
               rank={i + 1}
               providerId={providerId}
+              providerName={providerName}
               slotStartAt={slotStartAt}
               slotEndAt={slotEndAt}
             />

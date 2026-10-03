@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, TextInput, Modal, ScrollView } from 'react-native';
 import { Alert } from '../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api, appointmentTypesApi, ProviderAppointmentType } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
 
 const TZ = 'America/Los_Angeles';
@@ -15,6 +15,55 @@ function fmt(iso: string) {
     hour: 'numeric', minute: '2-digit',
     timeZone: TZ,
   });
+}
+
+// Workstream B (Oct 3 2026) — this screen used to be a fixed slot with a
+// single Confirm button. Charlene: each provider has their OWN appointment/
+// service types (never a global list); selecting one auto-populates a
+// default duration, but the agent can still adjust the actual appointment
+// length before saving — the saved startAt/endAt stays the real source of
+// truth for availability, same as it already was.
+
+function TypePicker({
+  visible,
+  onClose,
+  types,
+  onSelect,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  types: ProviderAppointmentType[];
+  onSelect: (t: ProviderAppointmentType) => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View className="flex-1 justify-end bg-black/40">
+        <View className="bg-white rounded-t-3xl px-5 pt-5 pb-10 max-h-[70%]">
+          <Text className="text-base font-bold text-gray-900 mb-4">Appointment Type</Text>
+          <ScrollView>
+            {types.map((t) => (
+              <TouchableOpacity
+                key={t.id}
+                onPress={() => { onSelect(t); onClose(); }}
+                className="flex-row items-center justify-between px-4 py-3.5 rounded-xl border border-gray-100 bg-gray-50 mb-2"
+              >
+                <Text className="text-gray-800 font-medium text-sm">{t.name}</Text>
+                <Text className="text-gray-400 text-xs">{t.durationMin} min</Text>
+              </TouchableOpacity>
+            ))}
+            {types.length === 0 && (
+              <Text className="text-gray-400 text-sm text-center py-4">
+                No appointment types set up for this provider yet.
+              </Text>
+            )}
+          </ScrollView>
+          <TouchableOpacity onPress={onClose} className="mt-1 items-center py-2">
+            <Text className="text-gray-400 text-sm">Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 export default function BookSlotScreen() {
@@ -27,21 +76,51 @@ export default function BookSlotScreen() {
     patientName: string;
     callbackId?: string;
   }>();
+  const queryClient = useQueryClient();
   const [booked, setBooked] = useState(false);
+  const [typeModal, setTypeModal] = useState(false);
+  const [selectedType, setSelectedType] = useState<ProviderAppointmentType | null>(null);
+
+  const originalDurationMin = slotStartAt && slotEndAt
+    ? Math.round((new Date(slotEndAt).getTime() - new Date(slotStartAt).getTime()) / 60000)
+    : 50;
+  const [durationMin, setDurationMin] = useState(String(originalDurationMin));
+
+  const { data: types = [] } = useQuery({
+    queryKey: ['appointment-types', providerId],
+    queryFn: () => appointmentTypesApi.list(providerId),
+    enabled: !!providerId,
+  });
+  const activeTypes = types.filter((t) => t.isActive);
+
+  const selectType = (t: ProviderAppointmentType) => {
+    setSelectedType(t);
+    setDurationMin(String(t.durationMin)); // auto-populate; agent can still edit below
+  };
+
+  const effectiveDurationMin = Math.max(5, Number(durationMin) || originalDurationMin);
+  const effectiveEndAt = slotStartAt
+    ? new Date(new Date(slotStartAt).getTime() + effectiveDurationMin * 60000).toISOString()
+    : slotEndAt;
 
   const bookAppointment = useMutation({
     mutationFn: async () => {
       await api.post(`/providers/${providerId}/appointments`, {
         patientId,
         startAt: slotStartAt,
-        endAt: slotEndAt,
+        endAt: effectiveEndAt,
         locationType: 'in_person',
+        appointmentTypeId: selectedType?.id,
       });
       if (callbackId) {
         await api.patch(`/dashboard/agent/callbacks/${callbackId}/dismiss`).catch(() => {});
       }
     },
-    onSuccess: () => setBooked(true),
+    onSuccess: () => {
+      setBooked(true);
+      queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['provider-schedule'] });
+    },
     onError: (err: any) => {
       Alert.alert('Couldn\'t book appointment', err?.response?.data?.message || 'Please try again.');
     },
@@ -79,11 +158,36 @@ export default function BookSlotScreen() {
             </View>
             <Text className="text-gray-900 font-bold text-base mb-1">{patientName}</Text>
             <Text className="text-gray-500 text-sm mb-4">with {providerName}</Text>
-            <View className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 mb-5">
+            <View className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 mb-4">
               <Text className="text-gray-700 text-sm font-medium">
                 {slotStartAt ? fmt(slotStartAt) : ''}
               </Text>
             </View>
+
+            <Text className="text-gray-500 text-xs font-medium mb-2">Appointment Type</Text>
+            <TouchableOpacity
+              onPress={() => setTypeModal(true)}
+              className="flex-row items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 mb-4"
+            >
+              <Text className={selectedType ? 'text-gray-900 text-sm' : 'text-gray-400 text-sm'}>
+                {selectedType ? selectedType.name : 'None selected'}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color="#9ca3af" />
+            </TouchableOpacity>
+
+            <Text className="text-gray-500 text-xs font-medium mb-2">Duration (minutes)</Text>
+            <TextInput
+              value={durationMin}
+              onChangeText={setDurationMin}
+              keyboardType="number-pad"
+              placeholder="50"
+              className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-900 mb-1"
+            />
+            <Text className="text-gray-400 text-xs mb-5">
+              Ends {new Date(effectiveEndAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: TZ })}
+              {selectedType ? ` · default for ${selectedType.name} is ${selectedType.durationMin} min` : ''}
+            </Text>
+
             <TouchableOpacity
               onPress={() => bookAppointment.mutate()}
               disabled={bookAppointment.isPending}
@@ -98,6 +202,8 @@ export default function BookSlotScreen() {
           </View>
         )}
       </View>
+
+      <TypePicker visible={typeModal} onClose={() => setTypeModal(false)} types={activeTypes} onSelect={selectType} />
     </SafeAreaView>
   );
 }

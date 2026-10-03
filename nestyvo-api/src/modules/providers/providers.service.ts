@@ -8,6 +8,7 @@ import { AgentProviderAssignment } from '../../database/entities/agent-provider-
 import { ProviderAvailability } from '../../database/entities/provider-availability.entity';
 import { ProviderBlock, BlockType } from '../../database/entities/provider-block.entity';
 import { ExternalBusyBlock } from '../../database/entities/external-busy-block.entity';
+import { ProviderAppointmentType } from '../../database/entities/provider-appointment-type.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { UsersService } from '../users/users.service';
 
@@ -42,6 +43,7 @@ export class ProvidersService {
     @InjectRepository(ProviderAvailability) private availabilityRepo: Repository<ProviderAvailability>,
     @InjectRepository(ProviderBlock) private blockRepo: Repository<ProviderBlock>,
     @InjectRepository(ExternalBusyBlock) private externalBlockRepo: Repository<ExternalBusyBlock>,
+    @InjectRepository(ProviderAppointmentType) private appointmentTypeRepo: Repository<ProviderAppointmentType>,
     private usersService: UsersService,
   ) {}
 
@@ -187,6 +189,59 @@ export class ProvidersService {
       }),
     );
     return this.availabilityRepo.save(rows);
+  }
+
+  // Workstream B (Oct 3 2026) — provider-specific appointment/service types.
+  // Charlene: "I do not want one global list that shows unrelated
+  // appointment types across different providers" — every method here is
+  // scoped to exactly one providerId, same assertCanManage boundary as
+  // availability/blocks above (practice-config-level, not a booking action).
+  async listAppointmentTypes(providerId: string, user: User) {
+    await this.assertCanManage(providerId, user);
+    return this.appointmentTypeRepo.find({ where: { providerId }, order: { name: 'ASC' } });
+  }
+
+  async createAppointmentType(
+    providerId: string,
+    input: { name: string; durationMin: number; category?: string },
+    user: User,
+  ) {
+    await this.assertCanManage(providerId, user);
+    const row = this.appointmentTypeRepo.create({
+      providerId,
+      name: input.name,
+      durationMin: input.durationMin,
+      category: (input.category as any) ?? undefined,
+    });
+    return this.appointmentTypeRepo.save(row);
+  }
+
+  async updateAppointmentType(
+    providerId: string,
+    typeId: string,
+    input: { name?: string; durationMin?: number; category?: string; isActive?: boolean },
+    user: User,
+  ) {
+    await this.assertCanManage(providerId, user);
+    const row = await this.appointmentTypeRepo.findOne({ where: { id: typeId, providerId } });
+    if (!row) throw new NotFoundException('Appointment type not found');
+    for (const field of ['name', 'durationMin', 'category', 'isActive'] as const) {
+      if (input[field] !== undefined) (row as any)[field] = input[field];
+    }
+    return this.appointmentTypeRepo.save(row);
+  }
+
+  // Soft delete (isActive: false), same convention as Practice's "Remove
+  // this partner" — existing appointments/waitlist entries already carry
+  // this type's id as a foreign key, so a hard delete would either orphan
+  // or cascade into real history. A deactivated type just stops appearing
+  // as a choice for new bookings.
+  async deactivateAppointmentType(providerId: string, typeId: string, user: User) {
+    await this.assertCanManage(providerId, user);
+    const row = await this.appointmentTypeRepo.findOne({ where: { id: typeId, providerId } });
+    if (!row) throw new NotFoundException('Appointment type not found');
+    row.isActive = false;
+    return this.appointmentTypeRepo.save(row);
   }
 
   async getBlocksForAdmin(providerId: string, user: User) {

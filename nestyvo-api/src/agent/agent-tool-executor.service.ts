@@ -281,27 +281,23 @@ export class AgentToolExecutorService {
     return this.appointmentsService.cancel(input.appointment_id, { reason: input.reason, user });
   }
 
+  // Workstream B (Oct 3 2026) — this used to duplicate the whole
+  // release-old/create-new flow inline (its own audit call too). Charlene:
+  // "I do not want normal scheduling actions maintained separately in the
+  // copilot path." Now a thin delegation to the same AppointmentsService
+  // method the new staff-facing REST route uses — one implementation.
   private async rescheduleAppointment(input: any, user: User) {
-    const appt = await this.appointmentRepo.findOne({ where: { id: input.appointment_id } });
-    if (!appt) return { error: 'Appointment not found' };
-
-    await this.appointmentsService.cancel(appt.id, { reason: input.reason || 'Rescheduled', user });
-
-    // Create new
-    const newAppt = this.appointmentRepo.create({
-      providerId: appt.providerId,
-      patientId: appt.patientId,
-      appointmentTypeId: appt.appointmentTypeId,
-      startAt: new Date(input.new_start_at),
-      endAt: new Date(new Date(input.new_start_at).getTime() + (appt.endAt.getTime() - appt.startAt.getTime())),
-      locationType: appt.locationType,
-      rescheduledFromId: appt.id,
-      createdBy: user.id,
-    });
-    const saved = await this.appointmentRepo.save(newAppt);
-    await this.audit('appointment.reschedule', 'appointment', saved.id, null, saved, user);
-    await this.remindersService.scheduleForAppointment(saved);
-    return { id: saved.id, startAt: saved.startAt };
+    try {
+      const saved = await this.appointmentsService.reschedule(input.appointment_id, {
+        newStartAt: new Date(input.new_start_at),
+        reason: input.reason,
+        user,
+      });
+      await this.remindersService.scheduleForAppointment(saved);
+      return { id: saved.id, startAt: saved.startAt };
+    } catch (err: any) {
+      return { error: err?.message || 'Appointment not found' };
+    }
   }
 
   private async searchWaitlist(input: any) {

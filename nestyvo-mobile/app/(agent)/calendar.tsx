@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Alert } from '../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { api, providersApi } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
@@ -68,17 +69,46 @@ const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function CalendarScreen() {
-  const { initialProviderId, bookingPatientId, bookingPatientName, callbackId } = useLocalSearchParams<{
+  const {
+    initialProviderId, bookingPatientId, bookingPatientName, callbackId,
+    rescheduleAppointmentId, rescheduleProviderId, reschedulePatientName,
+  } = useLocalSearchParams<{
     initialProviderId?: string;
     bookingPatientId?: string;
     bookingPatientName?: string;
     callbackId?: string;
+    // Workstream B (Oct 3 2026) — "pick a new time" mode, reached from the
+    // appointment-detail screen's Reschedule action. Reuses this same
+    // day/slot picker rather than building a second one; the appointment's
+    // provider can't change in a reschedule (AppointmentsService.reschedule
+    // keeps the same providerId), so the provider stays locked to this one.
+    rescheduleAppointmentId?: string;
+    rescheduleProviderId?: string;
+    reschedulePatientName?: string;
   }>();
+  const isRescheduling = !!rescheduleAppointmentId;
   const today = todayPT();
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState(today);
-  const [selectedProviderId, setSelectedProviderId] = useState(initialProviderId ?? '');
+  const [selectedProviderId, setSelectedProviderId] = useState(initialProviderId ?? rescheduleProviderId ?? '');
+  const queryClient = useQueryClient();
+
+  const rescheduleMutation = useMutation({
+    mutationFn: ({ newStartAt, newEndAt }: { newStartAt: string; newEndAt: string }) =>
+      providersApi.rescheduleAppointment(rescheduleProviderId!, rescheduleAppointmentId!, { newStartAt, newEndAt }),
+    onSuccess: (saved) => {
+      queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['provider-schedule'] });
+      router.replace({
+        pathname: '/(agent)/appointments/[id]',
+        params: { id: saved.id, providerId: rescheduleProviderId! },
+      });
+    },
+    onError: (err: any) => {
+      Alert.alert("Couldn't reschedule", err?.response?.data?.message || 'Please try again.');
+    },
+  });
 
   const { data, isLoading } = useDashboard();
 
@@ -139,6 +169,15 @@ export default function CalendarScreen() {
             <Ionicons name="person-add-outline" size={16} color="#2563eb" />
             <Text className="text-primary-700 text-sm font-medium flex-1">
               Pick an open slot to book {bookingPatientName}
+            </Text>
+          </View>
+        )}
+
+        {isRescheduling && (
+          <View className="mx-5 mb-3 bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 flex-row items-center gap-2">
+            <Ionicons name="swap-horizontal-outline" size={16} color="#7c3aed" />
+            <Text className="text-sm font-medium flex-1" style={{ color: '#7c3aed' }}>
+              Pick a new time{reschedulePatientName ? ` for ${reschedulePatientName}` : ''}
             </Text>
           </View>
         )}
@@ -343,34 +382,62 @@ export default function CalendarScreen() {
                   <Text className="text-gray-400 text-xs mt-0.5">{slot.durationMin} min · Open</Text>
                 </View>
                 <TouchableOpacity
-                  onPress={() =>
-                    bookingPatientId
-                      ? router.push({
-                          pathname: '/(agent)/book-slot',
-                          params: {
-                            providerId: activeProviderId,
-                            providerName: selectedProvider?.name ?? '',
-                            slotStartAt: slot.startAt,
-                            slotEndAt: slot.endAt,
-                            patientId: bookingPatientId,
-                            patientName: bookingPatientName ?? '',
-                            callbackId: callbackId ?? '',
+                  disabled={isRescheduling && rescheduleMutation.isPending}
+                  onPress={() => {
+                    if (isRescheduling) {
+                      Alert.alert(
+                        'Reschedule to this time?',
+                        `${fmt(slot.startAt)} – ${fmt(slot.endAt)}`,
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Confirm',
+                            onPress: () => rescheduleMutation.mutate({ newStartAt: slot.startAt, newEndAt: slot.endAt }),
                           },
-                        })
-                      : router.push({
-                          pathname: '/(agent)/fill-slot',
-                          params: {
-                            providerId: activeProviderId,
-                            providerName: selectedProvider?.name ?? '',
-                            slotStartAt: slot.startAt,
-                            slotEndAt: slot.endAt,
-                          },
-                        })
-                  }
+                        ],
+                      );
+                    } else if (bookingPatientId) {
+                      router.push({
+                        pathname: '/(agent)/book-slot',
+                        params: {
+                          providerId: activeProviderId,
+                          providerName: selectedProvider?.name ?? '',
+                          slotStartAt: slot.startAt,
+                          slotEndAt: slot.endAt,
+                          patientId: bookingPatientId,
+                          patientName: bookingPatientName ?? '',
+                          callbackId: callbackId ?? '',
+                        },
+                      });
+                    } else {
+                      router.push({
+                        pathname: '/(agent)/fill-slot',
+                        params: {
+                          providerId: activeProviderId,
+                          providerName: selectedProvider?.name ?? '',
+                          slotStartAt: slot.startAt,
+                          slotEndAt: slot.endAt,
+                        },
+                      });
+                    }
+                  }}
                   className="bg-primary-600 rounded-full px-4 py-2 flex-row items-center gap-1.5"
+                  style={isRescheduling ? { backgroundColor: '#7c3aed' } : undefined}
                 >
-                  <Ionicons name={bookingPatientId ? 'checkmark-outline' : 'people-outline'} size={14} color="#fff" />
-                  <Text className="text-white text-sm font-semibold">{bookingPatientId ? 'Book' : 'Fill'}</Text>
+                  {isRescheduling && rescheduleMutation.isPending ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name={isRescheduling ? 'swap-horizontal-outline' : bookingPatientId ? 'checkmark-outline' : 'people-outline'}
+                        size={14}
+                        color="#fff"
+                      />
+                      <Text className="text-white text-sm font-semibold">
+                        {isRescheduling ? 'Move Here' : bookingPatientId ? 'Book' : 'Fill'}
+                      </Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
             ))

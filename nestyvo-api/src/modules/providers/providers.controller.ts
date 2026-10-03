@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Delete, Param, Query, Body, Req, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Query, Body, Req, UseGuards, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { IsString, IsOptional, IsEnum, IsDateString, IsInt, Min, Max, Matches, ValidateNested, ArrayMaxSize, IsArray, ArrayMinSize, MinLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import type { Request } from 'express';
@@ -16,6 +16,7 @@ import { Appointment, AppointmentStatus, LocationType } from '../../database/ent
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { ProviderBlock, BlockType } from '../../database/entities/provider-block.entity';
 import { RemindersService } from '../sms/reminders.service';
+import { AppointmentsService } from '../appointments/appointments.service';
 
 class BookAppointmentDto {
   @IsString() patientId: string;
@@ -24,6 +25,33 @@ class BookAppointmentDto {
   @IsOptional() @IsString() appointmentTypeId?: string;
   @IsEnum(LocationType) locationType: LocationType;
   @IsOptional() @IsString() notes?: string;
+}
+
+// Workstream B (Oct 3 2026) — staff-facing cancel/reschedule, the one
+// scheduling action that previously had no REST route at all (only the
+// public self-cancel link and the AI copilot's tool-use path could do
+// either). Both are thin wrappers over AppointmentsService.
+class CancelAppointmentDto {
+  @IsOptional() @IsString() reason?: string;
+}
+
+class RescheduleAppointmentDto {
+  @IsString() newStartAt: string;
+  @IsOptional() @IsString() newEndAt?: string;
+  @IsOptional() @IsString() reason?: string;
+}
+
+class CreateAppointmentTypeDto {
+  @IsString() name: string;
+  @IsInt() @Min(5) durationMin: number;
+  @IsOptional() @IsString() category?: string;
+}
+
+class UpdateAppointmentTypeDto {
+  @IsOptional() @IsString() name?: string;
+  @IsOptional() @IsInt() @Min(5) durationMin?: number;
+  @IsOptional() @IsString() category?: string;
+  @IsOptional() isActive?: boolean;
 }
 
 class LogAttemptDto {
@@ -118,6 +146,7 @@ export class ProvidersController {
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
     @InjectRepository(ProviderBlock) private blockRepo: Repository<ProviderBlock>,
     private remindersService: RemindersService,
+    private appointmentsService: AppointmentsService,
   ) {}
 
   @Get()
@@ -282,6 +311,35 @@ export class ProvidersController {
     return { id: saved.id, startAt: saved.startAt, endAt: saved.endAt };
   }
 
+  @Patch(':id/appointments/:appointmentId/cancel')
+  @Roles(...OFFICE_STAFF)
+  async cancelAppointment(
+    @Param('appointmentId') appointmentId: string,
+    @Body() dto: CancelAppointmentDto,
+    @CurrentUser() user: User,
+  ) {
+    const result = await this.appointmentsService.cancel(appointmentId, { reason: dto.reason, user });
+    if ((result as any).error) throw new NotFoundException((result as any).error);
+    return result;
+  }
+
+  @Patch(':id/appointments/:appointmentId/reschedule')
+  @Roles(...OFFICE_STAFF)
+  async rescheduleAppointment(
+    @Param('appointmentId') appointmentId: string,
+    @Body() dto: RescheduleAppointmentDto,
+    @CurrentUser() user: User,
+  ) {
+    const saved = await this.appointmentsService.reschedule(appointmentId, {
+      newStartAt: new Date(dto.newStartAt),
+      newEndAt: dto.newEndAt ? new Date(dto.newEndAt) : undefined,
+      reason: dto.reason,
+      user,
+    });
+    await this.remindersService.scheduleForAppointment(saved);
+    return { id: saved.id, startAt: saved.startAt, endAt: saved.endAt };
+  }
+
   @Post(':id/log-attempt')
   @Roles(...OFFICE_STAFF)
   async logAttempt(
@@ -331,6 +389,39 @@ export class ProvidersController {
   @Roles(...OFFICE_STAFF)
   getBlocksForAdmin(@Param('id') id: string, @CurrentUser() user: User) {
     return this.providersService.getBlocksForAdmin(id, user);
+  }
+
+  // Workstream B (Oct 3 2026) — provider-specific appointment/service
+  // types. Same OFFICE_STAFF gating as availability/blocks just above
+  // (agents configure business hours/block times; this is the same kind
+  // of per-provider scheduling config, not partner onboarding).
+  @Get(':id/appointment-types')
+  @Roles(...OFFICE_STAFF)
+  listAppointmentTypes(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.providersService.listAppointmentTypes(id, user);
+  }
+
+  @Post(':id/appointment-types')
+  @Roles(...OFFICE_STAFF)
+  createAppointmentType(@Param('id') id: string, @Body() dto: CreateAppointmentTypeDto, @CurrentUser() user: User) {
+    return this.providersService.createAppointmentType(id, dto, user);
+  }
+
+  @Patch(':id/appointment-types/:typeId')
+  @Roles(...OFFICE_STAFF)
+  updateAppointmentType(
+    @Param('id') id: string,
+    @Param('typeId') typeId: string,
+    @Body() dto: UpdateAppointmentTypeDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.providersService.updateAppointmentType(id, typeId, dto, user);
+  }
+
+  @Delete(':id/appointment-types/:typeId')
+  @Roles(...OFFICE_STAFF)
+  deactivateAppointmentType(@Param('id') id: string, @Param('typeId') typeId: string, @CurrentUser() user: User) {
+    return this.providersService.deactivateAppointmentType(id, typeId, user);
   }
 
   @Post(':id/recurring-block')

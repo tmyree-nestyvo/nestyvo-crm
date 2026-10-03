@@ -9,21 +9,25 @@ import { AuditLog } from '../../database/entities/audit-log.entity';
 import { ProviderBlock } from '../../database/entities/provider-block.entity';
 import { ProviderAvailability } from '../../database/entities/provider-availability.entity';
 import { ExternalBusyBlock } from '../../database/entities/external-busy-block.entity';
+import { ProviderAppointmentType } from '../../database/entities/provider-appointment-type.entity';
 import { User } from '../../database/entities/user.entity';
 import { ProvidersService } from './providers.service';
 import { FillCandidatesService } from './fill-candidates.service';
 import { ProvidersController } from './providers.controller';
 import { SmsModule } from '../sms/sms.module';
 import { UsersModule } from '../users/users.module';
+import { AppointmentsModule } from '../appointments/appointments.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       Provider, Appointment, AgentProviderAssignment,
       WaitlistEntry, Patient, AuditLog, ProviderBlock, ProviderAvailability, ExternalBusyBlock, User,
+      ProviderAppointmentType,
     ]),
     SmsModule,
     UsersModule,
+    AppointmentsModule,
   ],
   providers: [ProvidersService, FillCandidatesService],
   controllers: [ProvidersController],

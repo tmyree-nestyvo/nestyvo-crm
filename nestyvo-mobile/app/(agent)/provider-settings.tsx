@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { practicesApi, providersApi, externalCalendarsApi, ExternalCalendarSource } from '../../lib/api';
+import { practicesApi, providersApi, externalCalendarsApi, ExternalCalendarSource, appointmentTypesApi, ProviderAppointmentType } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
 
 type Option = { id: string; label: string };
@@ -107,6 +107,105 @@ function timeAgo(iso: string | null) {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `Synced ${hrs}h ago`;
   return `Synced ${Math.floor(hrs / 24)}d ago`;
+}
+
+// Workstream B (Oct 3 2026) — Charlene: "Each provider should have a
+// configurable list of appointment/service types that apply specifically
+// to that provider" — never a global list across providers. Lives here
+// (not in partners.tsx's edit form) alongside Hours/Blocks/Calendars since
+// this is the same kind of per-provider schedule configuration.
+function AppointmentTypesSection({ providerId }: { providerId: string }) {
+  const queryClient = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState('');
+  const [duration, setDuration] = useState('50');
+
+  const { data: types = [], isLoading } = useQuery({
+    queryKey: ['appointment-types', providerId],
+    queryFn: () => appointmentTypesApi.list(providerId),
+  });
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['appointment-types', providerId] });
+
+  const addType = useMutation({
+    mutationFn: () => appointmentTypesApi.create(providerId, { name: name.trim(), durationMin: Number(duration) || 50 }),
+    onSuccess: () => { invalidate(); setName(''); setDuration('50'); setAdding(false); },
+    onError: (err: any) => Alert.alert('Could not add type', err?.response?.data?.message || 'Please try again.'),
+  });
+
+  const toggleActive = useMutation({
+    mutationFn: (t: ProviderAppointmentType) => appointmentTypesApi.update(providerId, t.id, { isActive: !t.isActive }),
+    onSuccess: invalidate,
+    onError: (err: any) => Alert.alert('Could not update type', err?.response?.data?.message || 'Please try again.'),
+  });
+
+  return (
+    <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-5">
+      <View className="flex-row items-center justify-between mb-1">
+        <Text className="text-base font-semibold text-gray-900">Appointment Types</Text>
+        <TouchableOpacity
+          onPress={() => setAdding((v) => !v)}
+          className="flex-row items-center gap-1 bg-primary-50 px-3 py-1.5 rounded-full"
+        >
+          <Ionicons name={adding ? 'close' : 'add'} size={14} color="#2563eb" />
+          <Text className="text-primary-700 text-xs font-semibold">{adding ? 'Cancel' : 'Add'}</Text>
+        </TouchableOpacity>
+      </View>
+      <Text className="text-gray-400 text-xs mb-3">
+        Specific to this provider — an agent booking their calendar only sees these, with the default duration
+        pre-filled (still adjustable per appointment).
+      </Text>
+
+      {adding && (
+        <View className="bg-gray-50 rounded-xl border border-gray-100 p-3 mb-3">
+          <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Name</Text>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="e.g. Individual Therapy"
+            placeholderTextColor="#9ca3af"
+            className="bg-white border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-900 mb-3"
+          />
+          <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Default duration (minutes)</Text>
+          <TextInput
+            value={duration}
+            onChangeText={setDuration}
+            keyboardType="number-pad"
+            placeholder="50"
+            placeholderTextColor="#9ca3af"
+            className="bg-white border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-900 mb-3"
+          />
+          <TouchableOpacity
+            onPress={() => addType.mutate()}
+            disabled={!name.trim() || addType.isPending}
+            className={`rounded-xl py-2.5 items-center ${!name.trim() ? 'bg-gray-300' : 'bg-gray-900'}`}
+          >
+            {addType.isPending ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-semibold text-sm">Add Type</Text>}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {isLoading ? (
+        <ActivityIndicator color="#2563eb" className="mt-2" />
+      ) : types.length === 0 ? (
+        !adding && <Text className="text-gray-400 text-sm text-center py-3">No appointment types set up yet.</Text>
+      ) : (
+        types.map((t) => (
+          <View key={t.id} className="flex-row items-center gap-2 py-2.5 border-t border-gray-50">
+            <View className="flex-1">
+              <Text className={`text-sm font-medium ${t.isActive ? 'text-gray-900' : 'text-gray-400'}`}>{t.name}</Text>
+              <Text className="text-gray-400 text-xs mt-0.5">{t.durationMin} min{!t.isActive ? ' · inactive' : ''}</Text>
+            </View>
+            <TouchableOpacity onPress={() => toggleActive.mutate(t)} disabled={toggleActive.isPending} className="px-2 py-1">
+              <Text className={`text-xs font-medium ${t.isActive ? 'text-red-500' : 'text-green-600'}`}>
+                {t.isActive ? 'Deactivate' : 'Reactivate'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ))
+      )}
+    </View>
+  );
 }
 
 function ExternalCalendarsSection({ providerId }: { providerId: string }) {
@@ -670,6 +769,8 @@ export default function ProviderSettingsScreen() {
                 </View>
               ) : null}
             </View>
+
+            <AppointmentTypesSection providerId={provider.id} />
 
             <ExternalCalendarsSection providerId={provider.id} />
           </>
