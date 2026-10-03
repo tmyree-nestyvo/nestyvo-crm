@@ -98,6 +98,8 @@ export const providersApi = {
   list: (practiceId?: string) => api.get('/providers', { params: { practiceId } }).then((r) => r.data),
   getSchedule: (id: string, date?: string) =>
     api.get(`/providers/${id}/schedule`, { params: { date } }).then((r) => r.data),
+  getAppointmentDetail: (providerId: string, appointmentId: string) =>
+    api.get(`/providers/${providerId}/appointments/${appointmentId}`).then((r) => r.data),
   getAvailability: (id: string) => api.get(`/providers/${id}/availability`).then((r) => r.data),
   replaceAvailability: (id: string, windows: { dayOfWeek: number; startTime: string; endTime: string }[]) =>
     api.put(`/providers/${id}/availability`, { windows }).then((r) => r.data),

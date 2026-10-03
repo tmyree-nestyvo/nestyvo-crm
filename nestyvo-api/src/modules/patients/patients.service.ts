@@ -105,6 +105,12 @@ export class PatientsService {
         // is the provider's name, which is the correct "who" to headline
         // from a client-profile vantage point.
         patient: `${a.provider.firstName} ${a.provider.lastName}`,
+        // Workstream A (Oct 3 2026) — Charlene: the provider shown here
+        // should be determined by the appointment itself, not the client's
+        // assignedProviderId (their home provider can differ from who
+        // actually saw them on a given visit). providerId lets the client
+        // profile link each row into that specific appointment's context.
+        providerId: a.providerId,
         type: a.appointmentType?.name,
         status: a.status,
         locationType: a.locationType,

@@ -403,22 +403,27 @@ export class ProvidersService {
   // comment), so it would incorrectly block every provider from viewing
   // even their own schedule. Providers get a stricter, separate check here:
   // only their own schedule, not "same practice."
-  async getSchedule(providerId: string, date?: string, user?: User): Promise<any[]> {
-    if (user) {
-      if (user.role === UserRole.PRACTICE_MANAGER) {
-        const target = await this.providerRepo.findOne({ where: { id: providerId } });
-        if (!target || target.practiceId !== user.practiceId) {
-          throw new ForbiddenException('Not your practice');
-        }
-      } else if (user.role === UserRole.PROVIDER) {
-        const self = await this.providerRepo.findOne({ where: { userId: user.id } });
-        if (!self || self.id !== providerId) {
-          throw new ForbiddenException('Not your schedule');
-        }
+  // Shared by getSchedule and getAppointmentDetail — see the long comment
+  // above for why assertCanManage itself can't be reused here as-is.
+  private async assertScheduleAccess(providerId: string, user?: User): Promise<void> {
+    if (!user) return;
+    if (user.role === UserRole.PRACTICE_MANAGER) {
+      const target = await this.providerRepo.findOne({ where: { id: providerId } });
+      if (!target || target.practiceId !== user.practiceId) {
+        throw new ForbiddenException('Not your practice');
       }
-      // ADMINISTRATOR and SCHEDULING_AGENT stay unrestricted, matching
-      // assertCanManage's convention everywhere else in this file.
+    } else if (user.role === UserRole.PROVIDER) {
+      const self = await this.providerRepo.findOne({ where: { userId: user.id } });
+      if (!self || self.id !== providerId) {
+        throw new ForbiddenException('Not your schedule');
+      }
     }
+    // ADMINISTRATOR and SCHEDULING_AGENT stay unrestricted, matching
+    // assertCanManage's convention everywhere else in this file.
+  }
+
+  async getSchedule(providerId: string, date?: string, user?: User): Promise<any[]> {
+    await this.assertScheduleAccess(providerId, user);
 
     const target = date ? new Date(date + 'T00:00:00') : new Date();
     const start = new Date(target);
@@ -448,6 +453,7 @@ export class ProvidersService {
       id: a.id,
       startAt: a.startAt,
       endAt: a.endAt,
+      patientId: a.patientId,
       patient: `${a.patient.firstName} ${a.patient.lastName}`,
       type: a.appointmentType?.name,
       status: a.status,
@@ -467,6 +473,35 @@ export class ProvidersService {
     }));
 
     return [...nestyvoRows, ...externalRows].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+  }
+
+  // Phase 0 audit (Oct 2 2026) / Workstream A (Oct 3 2026) — the one thing
+  // missing for "Calendar -> Appointment -> Client/Provider continuity" on
+  // the agent/admin side: a single real appointment, full detail, for the
+  // new appointment-detail screen. Same ownership check as getSchedule
+  // (reused, not re-derived) since this is the same trust boundary.
+  async getAppointmentDetail(providerId: string, appointmentId: string, user?: User): Promise<any> {
+    await this.assertScheduleAccess(providerId, user);
+
+    const appt = await this.appointmentRepo.findOne({
+      where: { id: appointmentId, providerId },
+      relations: { patient: true, provider: { practice: true }, appointmentType: true },
+    });
+    if (!appt) throw new NotFoundException('Appointment not found');
+
+    return {
+      id: appt.id,
+      startAt: appt.startAt,
+      endAt: appt.endAt,
+      status: appt.status,
+      locationType: appt.locationType,
+      cancellationReason: appt.cancellationReason,
+      rescheduledFromId: appt.rescheduledFromId,
+      patient: { id: appt.patient.id, name: `${appt.patient.firstName} ${appt.patient.lastName}`, phone: appt.patient.phone, email: appt.patient.email },
+      provider: { id: appt.provider.id, name: `${appt.provider.firstName} ${appt.provider.lastName}` },
+      practice: { id: appt.provider.practice.id, name: appt.provider.practice.name },
+      appointmentType: appt.appointmentType ? { id: appt.appointmentType.id, name: appt.appointmentType.name, durationMin: appt.appointmentType.durationMin } : null,
+    };
   }
 
   async findByUserId(userId: string): Promise<Provider | null> {

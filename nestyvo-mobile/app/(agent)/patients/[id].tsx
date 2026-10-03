@@ -158,7 +158,15 @@ export default function PatientDetailScreen() {
         <Text className="text-base font-semibold text-gray-900 mb-3">Recent Appointments</Text>
         {patient?.recentAppointments?.length ? (
           patient.recentAppointments.map((appt: any) => (
-            <AppointmentCard key={appt.id} appt={appt} />
+            <AppointmentCard
+              key={appt.id}
+              appt={appt}
+              onPress={
+                appt.source !== 'external' && appt.providerId
+                  ? () => router.push({ pathname: '/(agent)/appointments/[id]', params: { id: appt.id, providerId: appt.providerId } })
+                  : undefined
+              }
+            />
           ))
         ) : (
           <View className="bg-white rounded-xl border border-gray-100 p-6 items-center">

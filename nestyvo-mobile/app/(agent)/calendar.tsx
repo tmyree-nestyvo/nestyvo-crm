@@ -4,8 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { api } from '../../lib/api';
+import { api, providersApi } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
+import { AppointmentCard } from '../../components/dashboard/AppointmentCard';
 
 // ── Data ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,19 @@ function useDashboard() {
     queryKey: ['agent-dashboard'],
     queryFn: () => api.get('/dashboard/agent').then((r) => r.data),
     staleTime: 60_000,
+  });
+}
+
+// Workstream A (Oct 3 2026) — this screen previously only ever showed open
+// slots (slotsByDate off the dashboard response). getSchedule already
+// existed, already ownership-checked, already merges in real Nestyvo
+// appointments + synced Rula/Headway busy blocks for a given provider/day —
+// it just had no caller on the agent/admin side. This is that caller.
+function useBookedAppointments(providerId: string, date: string) {
+  return useQuery({
+    queryKey: ['provider-schedule', providerId, date],
+    queryFn: () => providersApi.getSchedule(providerId, date),
+    enabled: !!providerId,
   });
 }
 
@@ -72,6 +86,8 @@ export default function CalendarScreen() {
 
   // Auto-select first provider when data loads (or the one passed in via params)
   const activeProviderId = selectedProviderId || initialProviderId || providers[0]?.id || '';
+
+  const { data: bookedForDay = [], isLoading: bookedLoading } = useBookedAppointments(activeProviderId, selectedDate);
 
   // Build a map: date → slot array for the active provider
   const slotsMap = useMemo<Record<string, any[]>>(() => {
@@ -243,24 +259,61 @@ export default function CalendarScreen() {
           </View>
         </View>
 
+        {/* Day heading, shared by the Booked and Open Slots sections below */}
+        <View className="px-4 mb-1">
+          <Text className="text-sm font-semibold text-gray-900">
+            {selectedDate === today
+              ? 'Today'
+              : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', {
+                  weekday: 'long', month: 'long', day: 'numeric',
+                })}
+          </Text>
+          {selectedProvider && <Text className="text-xs text-gray-400 mt-0.5">{selectedProvider.name}</Text>}
+        </View>
+
+        {/* Booked appointments for the selected day — Workstream A (Oct 3
+            2026): Charlene's literal example (Peace of Mind -> Gencia ->
+            a specific date) was that an admin/agent could see a slot was
+            occupied but not who, or click into it. getSchedule already
+            carries real Nestyvo appointments + synced external (Rula/
+            Headway) busy blocks for this exact day. */}
+        {activeProviderId && (
+          <View className="px-4 mb-2 mt-2">
+            <Text className="text-sm font-semibold text-gray-900 mb-3">
+              Booked{bookedForDay.length > 0 ? ` (${bookedForDay.length})` : ''}
+            </Text>
+            {bookedLoading ? (
+              <ActivityIndicator color="#2563eb" />
+            ) : bookedForDay.length === 0 ? (
+              <View className="bg-white rounded-2xl border border-gray-100 p-5 items-center mb-2">
+                <Text className="text-gray-400 text-sm">Nothing booked this day</Text>
+              </View>
+            ) : (
+              bookedForDay.map((a: any) => (
+                <AppointmentCard
+                  key={a.id}
+                  appt={a}
+                  onPress={
+                    a.source !== 'external'
+                      ? () =>
+                          router.push({
+                            pathname: '/(agent)/appointments/[id]',
+                            params: { id: a.id, providerId: activeProviderId },
+                          })
+                      : undefined
+                  }
+                />
+              ))
+            )}
+          </View>
+        )}
+
         {/* Selected day slots */}
         <View className="px-4">
           <View className="flex-row items-center justify-between mb-3">
-            <View>
-              <Text className="text-sm font-semibold text-gray-900">
-                {selectedDate === today
-                  ? 'Today'
-                  : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', {
-                      weekday: 'long', month: 'long', day: 'numeric',
-                    })}
-              </Text>
-              <Text className="text-xs text-gray-400 mt-0.5">
-                {selectedSlots.length > 0
-                  ? `${selectedSlots.length} open slot${selectedSlots.length !== 1 ? 's' : ''}`
-                  : 'No open slots'}
-                {selectedProvider ? ` · ${selectedProvider.name}` : ''}
-              </Text>
-            </View>
+            <Text className="text-sm font-semibold text-gray-900">
+              Open Slots{selectedSlots.length > 0 ? ` (${selectedSlots.length})` : ''}
+            </Text>
           </View>
 
           {selectedSlots.length === 0 ? (

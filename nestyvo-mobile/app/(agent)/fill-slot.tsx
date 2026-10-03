@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, Linking, Modal,
+  ActivityIndicator, Linking, Modal, TextInput,
 } from 'react-native';
 import { Alert } from '../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { api, patientsApi } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -333,6 +333,118 @@ function DetailPill({ icon, label }: { icon: any; label: string }) {
   );
 }
 
+// ─── Search Existing Client ──────────────────────────────────────────────────
+// Workstream A (Oct 3 2026) — Fill Slot could already create a brand-new
+// client (Oct 1 fix) but had no way to find an existing one by name/phone/
+// email. GET /patients?q= already exists, already role-scoped correctly,
+// already used by the roster screen (patients/index.tsx) — reused as-is.
+
+function SearchClientModal({
+  visible,
+  onClose,
+  providerId,
+  providerName,
+  slotStartAt,
+  slotEndAt,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  providerId: string;
+  providerName: string;
+  slotStartAt: string;
+  slotEndAt: string;
+}) {
+  const [query, setQuery] = useState('');
+  const { data: results = [], isLoading } = useQuery({
+    queryKey: ['patient-search', query],
+    queryFn: () => patientsApi.search(query),
+    enabled: query.trim().length >= 2,
+  });
+
+  const selectPatient = (patient: any) => {
+    onClose();
+    setQuery('');
+    router.push({
+      pathname: '/(agent)/book-slot',
+      params: {
+        providerId,
+        providerName,
+        slotStartAt,
+        slotEndAt,
+        patientId: patient.id,
+        patientName: patient.name,
+      },
+    });
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
+        <View className="px-5 pt-3 pb-4 flex-row items-center gap-3 bg-white border-b border-gray-100">
+          <TouchableOpacity onPress={onClose} className="p-1">
+            <Ionicons name="close" size={22} color="#374151" />
+          </TouchableOpacity>
+          <Text className="text-lg font-bold text-gray-900 flex-1">Search Existing Client</Text>
+        </View>
+        <View className="px-5 py-3">
+          <View className="flex-row items-center bg-white border border-gray-200 rounded-xl px-4 gap-3">
+            <Ionicons name="search" size={18} color="#9ca3af" />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Name, phone, or email…"
+              placeholderTextColor="#9ca3af"
+              className="flex-1 py-3.5 text-sm text-gray-800"
+              autoCapitalize="none"
+              autoFocus
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => setQuery('')}>
+                <Ionicons name="close-circle" size={18} color="#9ca3af" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+        {query.trim().length < 2 ? (
+          <View className="flex-1 items-center pt-16 px-8">
+            <Ionicons name="people-outline" size={40} color="#e5e7eb" />
+            <Text className="text-gray-400 mt-3 text-sm text-center">Enter at least 2 characters to search</Text>
+          </View>
+        ) : isLoading ? (
+          <View className="flex-1 items-center pt-16">
+            <ActivityIndicator color="#2563eb" />
+          </View>
+        ) : (
+          <ScrollView className="flex-1 px-5">
+            {results.length === 0 ? (
+              <Text className="text-gray-400 text-sm text-center pt-12">No clients found</Text>
+            ) : (
+              results.map((item: any) => (
+                <TouchableOpacity
+                  key={item.id}
+                  onPress={() => selectPatient(item)}
+                  className="bg-white rounded-xl border border-gray-100 px-4 py-3.5 mb-2 flex-row items-center gap-3"
+                >
+                  <View className="w-10 h-10 bg-primary-100 rounded-full items-center justify-center flex-shrink-0">
+                    <Text className="text-primary-700 font-bold text-sm">{item.name?.charAt(0)?.toUpperCase()}</Text>
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-gray-900 font-semibold text-sm">{item.name}</Text>
+                    <Text className="text-gray-500 text-xs mt-0.5">
+                      {item.phone} {item.assignedProvider ? `· ${item.assignedProvider}` : ''}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function FillSlotScreen() {
@@ -342,6 +454,7 @@ export default function FillSlotScreen() {
     slotStartAt: string;
     slotEndAt: string;
   }>();
+  const [searchModal, setSearchModal] = useState(false);
 
   const { data: candidates, isLoading } = useQuery({
     queryKey: ['fill-candidates', providerId, slotStartAt],
@@ -378,22 +491,40 @@ export default function FillSlotScreen() {
         <Text className="text-gray-400 text-xs mt-1">
           {candidates?.length ?? 0} clients to call · ranked by priority
         </Text>
-        <TouchableOpacity
-          onPress={() => router.push({
-            pathname: '/(agent)/patients/new',
-            params: {
-              presetProviderId: providerId,
-              presetProviderName: providerName,
-              bookSlotStartAt: slotStartAt,
-              bookSlotEndAt: slotEndAt,
-            },
-          })}
-          className="mt-3 flex-row items-center justify-center gap-1.5 bg-primary-50 border border-primary-100 py-2.5 rounded-xl"
-        >
-          <Ionicons name="person-add-outline" size={15} color="#2563eb" />
-          <Text className="text-primary-700 text-sm font-medium">New Client for This Slot</Text>
-        </TouchableOpacity>
+        <View className="flex-row gap-2 mt-3">
+          <TouchableOpacity
+            onPress={() => setSearchModal(true)}
+            className="flex-1 flex-row items-center justify-center gap-1.5 bg-primary-50 border border-primary-100 py-2.5 rounded-xl"
+          >
+            <Ionicons name="search-outline" size={15} color="#2563eb" />
+            <Text className="text-primary-700 text-sm font-medium">Search Existing</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push({
+              pathname: '/(agent)/patients/new',
+              params: {
+                presetProviderId: providerId,
+                presetProviderName: providerName,
+                bookSlotStartAt: slotStartAt,
+                bookSlotEndAt: slotEndAt,
+              },
+            })}
+            className="flex-1 flex-row items-center justify-center gap-1.5 bg-primary-50 border border-primary-100 py-2.5 rounded-xl"
+          >
+            <Ionicons name="person-add-outline" size={15} color="#2563eb" />
+            <Text className="text-primary-700 text-sm font-medium">New Client</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      <SearchClientModal
+        visible={searchModal}
+        onClose={() => setSearchModal(false)}
+        providerId={providerId}
+        providerName={providerName}
+        slotStartAt={slotStartAt}
+        slotEndAt={slotEndAt}
+      />
 
       <ScrollView className="flex-1" contentContainerClassName="px-5 pt-4 pb-10">
         {isLoading ? (

@@ -227,6 +227,16 @@ export class ProvidersController {
     return this.providersService.getSchedule(id, date, user!);
   }
 
+  @Get(':id/appointments/:appointmentId')
+  @Roles(...ALL_STAFF)
+  getAppointmentDetail(
+    @Param('id') id: string,
+    @Param('appointmentId') appointmentId: string,
+    @CurrentUser() user?: User,
+  ) {
+    return this.providersService.getAppointmentDetail(id, appointmentId, user);
+  }
+
   @Get(':id/fill-candidates')
   @Roles(...OFFICE_STAFF)
   getFillCandidates(
