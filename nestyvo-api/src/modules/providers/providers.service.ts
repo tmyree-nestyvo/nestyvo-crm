@@ -531,6 +531,7 @@ export class ProvidersService {
       // neither Rula's nor Headway's feed carries one (see the entity's
       // comment); this is everything the raw data actually supports.
       telehealthLink: b.telehealthLink,
+      managementLink: b.managementLink,
       externalLocation: b.location,
     }));
 

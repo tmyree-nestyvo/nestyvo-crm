@@ -59,6 +59,13 @@ export class ExternalBusyBlock {
   @Column({ type: 'varchar', nullable: true })
   telehealthLink: string | null;
 
+  // Charlene, Oct 4 2026 — confirmed from the provider's own subscribed-
+  // calendar screenshots: a separate platform-management link, distinct
+  // from the telehealth join link (Rula's provider portal, Headway's
+  // per-event "manage this appointment" deep link).
+  @Column({ type: 'varchar', nullable: true })
+  managementLink: string | null;
+
   @Column({ type: 'varchar', nullable: true })
   location: string | null;
 

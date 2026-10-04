@@ -20,12 +20,31 @@ const TELEHEALTH_LINK_PATTERNS: Partial<Record<ExternalCalendarSource, RegExp>> 
   [ExternalCalendarSource.HEADWAY]: /https:\/\/sessions\.psychologytoday\.com\/\S+/,
 };
 
-function extractTelehealthLink(source: ExternalCalendarSource, description: string | null): string | null {
+// Charlene, Oct 4 2026 — confirmed directly from the provider's real
+// subscribed-calendar screenshots (not just the raw feed) that both
+// platforms also carry a separate platform-management link, distinct
+// from the telehealth join link: Rula's is a generic provider-portal URL
+// (same every event), Headway's is a real per-event deep link ("View the
+// patient appointment at https://sigmund.headway.co/calendar?event_id=
+// ...&start_date=..."). Different domain per source, so no risk of
+// colliding with the telehealth patterns above.
+const MANAGEMENT_LINK_PATTERNS: Partial<Record<ExternalCalendarSource, RegExp>> = {
+  [ExternalCalendarSource.RULA]: /https:\/\/provider\.pathapplication\.com\S*/,
+  [ExternalCalendarSource.HEADWAY]: /https:\/\/sigmund\.headway\.co\/calendar\?\S+/,
+};
+
+function extractLink(
+  patterns: Partial<Record<ExternalCalendarSource, RegExp>>,
+  source: ExternalCalendarSource,
+  description: string | null,
+): string | null {
   if (!description) return null;
-  const pattern = TELEHEALTH_LINK_PATTERNS[source];
+  const pattern = patterns[source];
   if (!pattern) return null;
   const match = description.match(pattern);
-  return match ? match[0] : null;
+  // Trailing "." from a sentence ending right after the URL (seen in
+  // Rula's own description text) isn't part of the link.
+  return match ? match[0].replace(/\.$/, '') : null;
 }
 
 // Pulls a provider's Rula/Headway (or other) calendar-export .ics feed and
@@ -112,7 +131,8 @@ export class ExternalCalendarSyncService {
       row.summary = event.summary ? String(event.summary) : 'Busy';
       const description = event.description ? String(event.description) : null;
       row.description = description;
-      row.telehealthLink = extractTelehealthLink(feed.source, description);
+      row.telehealthLink = extractLink(TELEHEALTH_LINK_PATTERNS, feed.source, description);
+      row.managementLink = extractLink(MANAGEMENT_LINK_PATTERNS, feed.source, description);
       row.location = event.location ? String(event.location) : null;
       row.lastSeenAt = now;
       await this.blockRepo.save(row);
