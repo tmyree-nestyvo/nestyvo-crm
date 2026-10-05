@@ -9,7 +9,7 @@ import { api, patientLinksApi, clientTagsApi, ticketsApi, waitlistApi } from '..
 import { AppointmentCard } from '../../../components/dashboard/AppointmentCard';
 import { HomeButton } from '../../../components/HomeButton';
 import { useAuthStore } from '../../../lib/store';
-import { hasRole, ADMIN_ONLY, PRACTICE_MANAGEMENT } from '../../../lib/role-groups';
+import { hasRole, ADMIN_ONLY, OFFICE_STAFF } from '../../../lib/role-groups';
 
 function usePatient(id: string) {
   return useQuery({
@@ -494,14 +494,19 @@ function TagSection({
   return (
     <>
       <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
-        <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Block Size</Text>
+        {/* Charlene, Oct 5 2026 — "Block Size" reinforced the old,
+            incorrect idea that a client's tag controls appointment
+            duration. Renamed to Client Tag; it's classification/Smart
+            Fill matching only, never binding on the actual appointment
+            duration (set independently at booking time). */}
+        <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Client Tag</Text>
         <TouchableOpacity onPress={() => setPicker(true)} className="flex-row items-center gap-3">
           <View className="w-7 h-7 bg-gray-50 rounded-lg items-center justify-center">
-            <Ionicons name="time-outline" size={14} color="#6b7280" />
+            <Ionicons name="pricetag-outline" size={14} color="#6b7280" />
           </View>
           <View className="flex-1">
             <Text className="text-gray-900 text-sm font-medium">{tag ? tag.name : 'No tag set'}</Text>
-            {tag ? <Text className="text-gray-400 text-xs">{tag.blockMinutes} min</Text> : null}
+            {tag ? <Text className="text-gray-400 text-xs">Smart Fill: {tag.blockMinutes} min</Text> : null}
           </View>
           <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
         </TouchableOpacity>
@@ -510,7 +515,7 @@ function TagSection({
       <Modal visible={picker} transparent animationType="slide" onRequestClose={() => setPicker(false)}>
         <View className="flex-1 justify-end bg-black/40">
           <View className="bg-white rounded-t-3xl px-5 pt-5 pb-10">
-            <Text className="text-base font-bold text-gray-900">Set Block Size</Text>
+            <Text className="text-base font-bold text-gray-900">Set Client Tag</Text>
             {isCrossPractice ? (
               <Text className="text-gray-400 text-xs mb-4">{practiceName}'s tags</Text>
             ) : (
@@ -524,7 +529,7 @@ function TagSection({
                   className="flex-row items-center justify-between px-4 py-3.5 rounded-xl border border-gray-100 bg-gray-50"
                 >
                   <Text className="text-gray-800 font-medium text-sm">{t.name}</Text>
-                  <Text className="text-gray-400 text-xs">{t.blockMinutes} min</Text>
+                  <Text className="text-gray-400 text-xs">Smart Fill: {t.blockMinutes} min</Text>
                 </TouchableOpacity>
               ))}
               {tags.length === 0 ? (
@@ -536,9 +541,12 @@ function TagSection({
                 <Text className="text-red-500 text-sm">Clear tag</Text>
               </TouchableOpacity>
             ) : null}
-            {hasRole(role, PRACTICE_MANAGEMENT) && !isCrossPractice && (
+            {hasRole(role, OFFICE_STAFF) && (
               <TouchableOpacity
-                onPress={() => { setPicker(false); router.push('/(agent)/tags'); }}
+                onPress={() => {
+                  setPicker(false);
+                  router.push({ pathname: '/(agent)/tags', params: practiceId ? { practiceId } : {} });
+                }}
                 className="mt-2 items-center py-2"
               >
                 <Text className="text-primary-600 text-sm font-medium">Manage tags</Text>

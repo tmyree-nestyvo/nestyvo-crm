@@ -11,12 +11,17 @@ import { ClientTagsService } from './client-tags.service';
 class CreateTagDto {
   @IsString() name: string;
   @IsInt() @Min(1) blockMinutes: number;
+  // Charlene, Oct 5 2026 — required for ADMINISTRATOR/SCHEDULING_AGENT
+  // (cross-practice, no fixed practiceId of their own); ignored for
+  // PRACTICE_MANAGER, who always writes to their own practice.
+  @IsOptional() @IsString() practiceId?: string;
 }
 
 class UpdateTagDto {
   @IsOptional() @IsString() name?: string;
   @IsOptional() @IsInt() @Min(1) blockMinutes?: number;
   @IsOptional() @IsBoolean() isActive?: boolean;
+  @IsOptional() @IsString() practiceId?: string;
 }
 
 @Controller('client-tags')
@@ -30,21 +35,26 @@ export class ClientTagsController {
     return this.tagsService.list(user, practiceId);
   }
 
+  // Charlene, Oct 5 2026 — "Admin AND Agent users must be able to create
+  // new custom client tag names" — widened from PRACTICE_MANAGEMENT to
+  // OFFICE_STAFF (same as list() already is), with the practiceId
+  // resolution fix in the service above so an agent's write actually
+  // lands somewhere visible instead of silently orphaning.
   @Post()
-  @Roles(...PRACTICE_MANAGEMENT)
+  @Roles(...OFFICE_STAFF)
   create(@Body() dto: CreateTagDto, @CurrentUser() user: User) {
-    return this.tagsService.create(dto.name, dto.blockMinutes, user);
+    return this.tagsService.create(dto.name, dto.blockMinutes, user, dto.practiceId);
   }
 
   @Patch(':id')
-  @Roles(...PRACTICE_MANAGEMENT)
+  @Roles(...OFFICE_STAFF)
   update(@Param('id') id: string, @Body() dto: UpdateTagDto, @CurrentUser() user: User) {
-    return this.tagsService.update(id, dto, user);
+    return this.tagsService.update(id, dto, user, dto.practiceId);
   }
 
   @Delete(':id')
-  @Roles(...PRACTICE_MANAGEMENT)
-  remove(@Param('id') id: string, @CurrentUser() user: User) {
-    return this.tagsService.remove(id, user);
+  @Roles(...OFFICE_STAFF)
+  remove(@Param('id') id: string, @Query('practiceId') practiceId: string | undefined, @CurrentUser() user: User) {
+    return this.tagsService.remove(id, user, practiceId);
   }
 }

@@ -315,11 +315,17 @@ export default function NewClientScreen() {
           disabled={!effectivePracticeId}
         />
 
+        {/* Charlene, Oct 5 2026 — "Block Size Tag" reinforced the old,
+            incorrect idea that a client's tag controls appointment
+            duration. Renamed to Client Tag; blockMinutes still shown as
+            context (it feeds Smart Fill matching) but never constrains
+            what the agent can actually book — see book-slot.tsx's
+            independent duration field. */}
         <PickerField
-          label="Block Size Tag"
+          label="Client Tag"
           placeholder={effectivePracticeId ? 'Select a tag' : 'Pick a practice first'}
           value={tag}
-          options={tags.map((t: any) => ({ id: t.id, label: t.name, sublabel: `${t.blockMinutes} min` }))}
+          options={tags.map((t: any) => ({ id: t.id, label: t.name, sublabel: `Smart Fill: ${t.blockMinutes} min` }))}
           onSelect={setTag}
           disabled={!effectivePracticeId}
         />

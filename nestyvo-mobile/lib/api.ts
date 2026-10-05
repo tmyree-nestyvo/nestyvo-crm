@@ -285,11 +285,12 @@ export const patientLinksApi = {
 // Client tags (block-size classification)
 export const clientTagsApi = {
   list: (practiceId?: string) => api.get('/client-tags', { params: { practiceId } }).then((r) => r.data),
-  create: (name: string, blockMinutes: number) =>
-    api.post('/client-tags', { name, blockMinutes }).then((r) => r.data),
-  update: (id: string, updates: { name?: string; blockMinutes?: number; isActive?: boolean }) =>
+  create: (name: string, blockMinutes: number, practiceId?: string) =>
+    api.post('/client-tags', { name, blockMinutes, practiceId }).then((r) => r.data),
+  update: (id: string, updates: { name?: string; blockMinutes?: number; isActive?: boolean; practiceId?: string }) =>
     api.patch(`/client-tags/${id}`, updates).then((r) => r.data),
-  remove: (id: string) => api.delete(`/client-tags/${id}`).then((r) => r.data),
+  remove: (id: string, practiceId?: string) =>
+    api.delete(`/client-tags/${id}`, { params: { practiceId } }).then((r) => r.data),
   setPatientTag: (patientId: string, tagId: string | null) =>
     api.patch(`/patients/${patientId}/tag`, { tagId }).then((r) => r.data),
 };

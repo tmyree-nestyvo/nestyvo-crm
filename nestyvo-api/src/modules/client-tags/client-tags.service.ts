@@ -25,19 +25,43 @@ export class ClientTagsService {
     });
   }
 
-  create(name: string, blockMinutes: number, user: User) {
-    return this.tagRepo.save(this.tagRepo.create({ practiceId: user.practiceId, name, blockMinutes }));
+  // Charlene, Oct 5 2026 — "Admin AND Agent users must be able to create
+  // new custom client tag names." Widening the @Roles() alone would have
+  // been wrong on its own: ADMINISTRATOR and SCHEDULING_AGENT carry
+  // practiceId: null on their own User row (same reason providers.service
+  // .ts's targetPracticeId branches exist) — using user.practiceId
+  // directly here would have silently created an orphaned tag no one
+  // could ever see again. Same targetPracticeId-for-cross-practice-roles
+  // pattern this file's own list() already established, applied to the
+  // three write methods too.
+  private resolvePracticeId(user: User, targetPracticeId?: string): string {
+    const isCrossPractice = user.role === UserRole.ADMINISTRATOR || user.role === UserRole.SCHEDULING_AGENT;
+    const practiceId = isCrossPractice ? targetPracticeId : user.practiceId;
+    if (!practiceId) throw new NotFoundException('A practice must be selected.');
+    return practiceId;
   }
 
-  async update(id: string, updates: { name?: string; blockMinutes?: number; isActive?: boolean }, user: User) {
-    const tag = await this.tagRepo.findOne({ where: { id, practiceId: user.practiceId } });
+  create(name: string, blockMinutes: number, user: User, targetPracticeId?: string) {
+    const practiceId = this.resolvePracticeId(user, targetPracticeId);
+    return this.tagRepo.save(this.tagRepo.create({ practiceId, name, blockMinutes }));
+  }
+
+  async update(
+    id: string,
+    updates: { name?: string; blockMinutes?: number; isActive?: boolean },
+    user: User,
+    targetPracticeId?: string,
+  ) {
+    const practiceId = this.resolvePracticeId(user, targetPracticeId);
+    const tag = await this.tagRepo.findOne({ where: { id, practiceId } });
     if (!tag) throw new NotFoundException('Tag not found');
     Object.assign(tag, updates);
     return this.tagRepo.save(tag);
   }
 
-  async remove(id: string, user: User) {
-    const tag = await this.tagRepo.findOne({ where: { id, practiceId: user.practiceId } });
+  async remove(id: string, user: User, targetPracticeId?: string) {
+    const practiceId = this.resolvePracticeId(user, targetPracticeId);
+    const tag = await this.tagRepo.findOne({ where: { id, practiceId } });
     if (!tag) throw new NotFoundException('Tag not found');
     await this.tagRepo.remove(tag);
     return { success: true };
