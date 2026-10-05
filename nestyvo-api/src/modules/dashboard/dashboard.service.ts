@@ -90,8 +90,21 @@ export class DashboardService {
           where: { providerId: In(providerIds), status: WaitlistEntryStatus.ACTIVE },
         }),
 
+        // Charlene, Phase 6 item 18 (Oct 5 2026) — "establish source, what
+        // clears it, where clicking it goes" for every dashboard card. This
+        // count used to filter by assignedAgentId: user.id, but the actual
+        // list screen it links to (getAgentCallbacks, fixed Aug 27 2026 —
+        // see [[project_decisions]]) is a shared work queue, not a personal
+        // inbox. Card and destination disagreed: an admin, or any agent who
+        // didn't personally create the callback, would see a 0/low badge on
+        // the dashboard while the linked screen showed every open callback.
+        // Mirrors getAgentCallbacks' exact where-clause so the two can never
+        // drift apart again.
         this.callbackRepo.count({
-          where: { assignedAgentId: user.id, status: In([CallbackStatus.OPEN, CallbackStatus.OVERDUE]) },
+          where: {
+            status: In([CallbackStatus.OPEN, CallbackStatus.IN_PROGRESS, CallbackStatus.OVERDUE]),
+            ...(user.role === UserRole.PRACTICE_MANAGER ? { patient: { practiceId: user.practiceId } } : {}),
+          },
         }),
       ]);
 
