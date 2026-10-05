@@ -135,6 +135,25 @@ export class DashboardService {
 
       const totalSlots = slotsByDate.reduce((sum, d) => sum + d.slots.length, 0);
 
+      // Charlene, Phase 7 item 20 (Oct 5 2026) — "clear days containing
+      // activity" on the agent/admin calendar grid. computeSlotsByDate only
+      // ever returns days with OPEN slots, so a fully-booked day (real
+      // appointments, zero remaining openings) renders identically to a day
+      // the provider simply doesn't work — deliberately NOT changing that
+      // shared function (getProviderAvailableSlots also calls it, and that
+      // screen's whole point is "days WITH open slots," not every day — a
+      // day-agnostic change there would clutter it with empty rows). Instead,
+      // a small caller-local date set from the data already fetched here.
+      // PT date-key, not toISOString() (see the Aug 27 2026 timezone-bug
+      // entry) — a booking at 11pm PT must land on today, not tomorrow UTC.
+      const activeDates = new Set<string>();
+      for (const a of booked) {
+        activeDates.add(new Date(a.startAt).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }));
+      }
+      for (const b of blocks) {
+        activeDates.add(new Date(b.startAt).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }));
+      }
+
       return {
         id: provider.id,
         name: `${provider.firstName} ${provider.lastName}`,
@@ -148,6 +167,7 @@ export class DashboardService {
         // "Fully booked" when the real problem was no availability saved.
         hasAvailability: availability.length > 0,
         openSlotCount: totalSlots,
+        activeDates: Array.from(activeDates),
         slotsByDate,
       };
     });
@@ -218,6 +238,16 @@ export class DashboardService {
     const availableSlots = totalWeeklyMinutes > 0 ? Math.max(0, Math.floor((totalWeeklyMinutes - bookedMinutes) / 50)) : 0;
 
     return {
+      // Charlene, Phase 7 item 21 (Oct 5 2026) — "remove automatic Dr."
+      // Previously the provider header screen built its own greeting from
+      // the logged-in User's name and always prepended "Dr." (Gencia
+      // Williams, LMFT, isn't a doctor). This response never carried the
+      // provider's actual configured name/credentials at all, so the
+      // frontend had nothing real to show instead. Added here — the
+      // Provider row is already loaded above.
+      firstName: provider.firstName,
+      lastName: provider.lastName,
+      credentials: provider.credentials,
       availableSlots,
       waitlistCount,
       utilizationRate: Math.min(utilizationRate, 100),

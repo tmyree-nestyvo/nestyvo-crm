@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useState, useMemo, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { Alert } from '../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -66,6 +66,88 @@ const MONTH_NAMES = [
 ];
 const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
+// Charlene, Phase 7 item 19 (Oct 5 2026) — "Provider selection must scale."
+// The horizontal row of provider bubbles across the top doesn't scale past
+// a handful of providers. Replaced with a single button that opens this
+// searchable picker — same list, same selection behavior, underlying
+// calendar/scheduling logic (slotsMap, getSchedule, booking) untouched.
+// Inactive providers already don't reach this list at all — `providers`
+// comes from the dashboard's getScopedProviderIds, already filtered to
+// ACTIVE_PROVIDER_WHERE (see provider.entity.ts).
+function ProviderPickerModal({
+  visible, onClose, providers, activeProviderId, onSelect,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  providers: any[];
+  activeProviderId: string;
+  onSelect: (id: string) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return providers;
+    return providers.filter((p) => p.name.toLowerCase().includes(q) || p.practiceName?.toLowerCase().includes(q));
+  }, [providers, query]);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View className="flex-1 justify-end bg-black/40">
+        <View className="bg-white rounded-t-3xl px-5 pt-5 pb-8 max-h-[75%]">
+          <Text className="text-base font-bold text-gray-900 mb-3">Select Provider</Text>
+          <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-3 mb-3">
+            <Ionicons name="search" size={16} color="#9ca3af" />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search providers…"
+              placeholderTextColor="#9ca3af"
+              className="flex-1 py-2.5 px-2 text-sm text-gray-900"
+              autoCapitalize="none"
+              autoFocus
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => setQuery('')}>
+                <Ionicons name="close-circle" size={16} color="#9ca3af" />
+              </TouchableOpacity>
+            )}
+          </View>
+          <ScrollView className="max-h-96">
+            {filtered.length === 0 ? (
+              <Text className="text-gray-400 text-sm text-center py-6">No providers match</Text>
+            ) : (
+              filtered.map((p) => {
+                const active = p.id === activeProviderId;
+                const openCount = (p.slotsByDate ?? []).reduce((s: number, d: any) => s + d.slots.length, 0);
+                return (
+                  <TouchableOpacity
+                    key={p.id}
+                    onPress={() => { onSelect(p.id); setQuery(''); onClose(); }}
+                    className={`flex-row items-center justify-between px-4 py-3.5 rounded-xl border mb-2 ${
+                      active ? 'bg-primary-50 border-primary-200' : 'bg-gray-50 border-gray-100'
+                    }`}
+                  >
+                    <View className="flex-1">
+                      <Text className={`font-medium text-sm ${active ? 'text-primary-700' : 'text-gray-800'}`}>{p.name}</Text>
+                      {p.practiceName ? <Text className="text-gray-400 text-xs mt-0.5">{p.practiceName}</Text> : null}
+                    </View>
+                    {openCount > 0 && (
+                      <View className={`rounded-full px-2 py-0.5 ${active ? 'bg-primary-100' : 'bg-green-100'}`}>
+                        <Text className={`text-xs font-bold ${active ? 'text-primary-700' : 'text-green-700'}`}>{openCount}</Text>
+                      </View>
+                    )}
+                    {active && <Ionicons name="checkmark-circle" size={18} color="#2563eb" style={{ marginLeft: 8 }} />}
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function CalendarScreen() {
@@ -92,7 +174,10 @@ export default function CalendarScreen() {
   const [month, setMonth] = useState(() => new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState(today);
   const [selectedProviderId, setSelectedProviderId] = useState(initialProviderId ?? rescheduleProviderId ?? '');
+  const [providerPickerOpen, setProviderPickerOpen] = useState(false);
   const queryClient = useQueryClient();
+  const scrollRef = useRef<ScrollView>(null);
+  const dayDetailY = useRef(0);
 
   const rescheduleMutation = useMutation({
     mutationFn: ({ newStartAt, newEndAt }: { newStartAt: string; newEndAt: string }) =>
@@ -133,6 +218,15 @@ export default function CalendarScreen() {
   // Slots for the currently selected date
   const selectedSlots: any[] = slotsMap[selectedDate] ?? [];
 
+  const selectedProvider = providers.find((p) => p.id === activeProviderId);
+
+  // Charlene, Phase 7 item 20 — "clear days containing activity." A day
+  // that's fully booked (real appointments, zero remaining open slots)
+  // used to look identical to a day the provider just doesn't work, since
+  // only slot data drove the dots. activeDates (booked appts + blocks,
+  // from the dashboard response) fills that gap without touching slot math.
+  const activeDatesSet = useMemo(() => new Set<string>(selectedProvider?.activeDates ?? []), [selectedProvider]);
+
   // Month navigation
   const prevMonth = () => {
     if (month === 0) { setYear(y => y - 1); setMonth(11); }
@@ -141,6 +235,18 @@ export default function CalendarScreen() {
   const nextMonth = () => {
     if (month === 11) { setYear(y => y + 1); setMonth(0); }
     else setMonth(m => m + 1);
+  };
+
+  // Charlene, Phase 7 item 20 — "smooth transition between calendar/date and
+  // daily schedule." Tapping a date already updated the day-detail section
+  // below in place (no screen change), but on a short screen it could sit
+  // below the fold with no visible change until the user scrolled manually.
+  // Auto-scroll to it on selection — presentation only, no scheduling logic.
+  const selectDate = (iso: string) => {
+    setSelectedDate(iso);
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(dayDetailY.current - 12, 0), animated: true });
+    });
   };
 
   // Build calendar grid cells
@@ -153,11 +259,9 @@ export default function CalendarScreen() {
   // Pad to full week rows
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const selectedProvider = providers.find((p) => p.id === activeProviderId);
-
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
-      <ScrollView className="flex-1" contentContainerClassName="pb-10">
+      <ScrollView ref={scrollRef} className="flex-1" contentContainerClassName="pb-10">
         {/* Header */}
         <View className="px-5 pt-4 pb-2 flex-row items-center gap-3">
           <Text className="text-xl font-bold text-gray-900 flex-1">Calendar</Text>
@@ -182,39 +286,40 @@ export default function CalendarScreen() {
           </View>
         )}
 
-        {/* Provider chips */}
+        {/* Provider selector — Phase 7 item 19, see ProviderPickerModal above */}
         {isLoading ? (
           <View className="px-5 pb-3">
             <ActivityIndicator color="#2563eb" />
           </View>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-4 pb-3">
-            {providers.map((p: any) => {
-              const active = p.id === activeProviderId;
-              const openCount = (p.slotsByDate ?? []).reduce((s: number, d: any) => s + d.slots.length, 0);
-              return (
-                <TouchableOpacity
-                  key={p.id}
-                  onPress={() => setSelectedProviderId(p.id)}
-                  className={`mr-2 px-4 py-2 rounded-full border flex-row items-center gap-1.5 ${
-                    active ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'
-                  }`}
-                >
-                  <Text className={`text-sm font-medium ${active ? 'text-white' : 'text-gray-700'}`}>
-                    {p.name}
-                  </Text>
-                  {openCount > 0 && (
-                    <View className={`rounded-full px-1.5 py-0.5 ${active ? 'bg-white/20' : 'bg-green-100'}`}>
-                      <Text className={`text-xs font-bold ${active ? 'text-white' : 'text-green-700'}`}>
-                        {openCount}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          <View className="px-4 pb-3">
+            <TouchableOpacity
+              onPress={() => setProviderPickerOpen(true)}
+              className="flex-row items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-3"
+            >
+              <View className="flex-row items-center gap-2 flex-1">
+                <Ionicons name="person-outline" size={16} color="#6b7280" />
+                <Text className="text-gray-900 font-medium text-sm flex-1" numberOfLines={1}>
+                  {selectedProvider?.name ?? 'Select a provider'}
+                </Text>
+                {(selectedProvider?.openSlotCount ?? 0) > 0 && (
+                  <View className="bg-green-100 rounded-full px-2 py-0.5">
+                    <Text className="text-green-700 text-xs font-bold">{selectedProvider.openSlotCount}</Text>
+                  </View>
+                )}
+              </View>
+              <Ionicons name="chevron-down" size={16} color="#9ca3af" style={{ marginLeft: 8 }} />
+            </TouchableOpacity>
+          </View>
         )}
+
+        <ProviderPickerModal
+          visible={providerPickerOpen}
+          onClose={() => setProviderPickerOpen(false)}
+          providers={providers}
+          activeProviderId={activeProviderId}
+          onSelect={setSelectedProviderId}
+        />
 
         {/* Month grid */}
         <View className="bg-white mx-4 rounded-2xl border border-gray-100 overflow-hidden mb-4">
@@ -252,17 +357,24 @@ export default function CalendarScreen() {
                   const hasSlots = (slotsMap[iso]?.length ?? 0) > 0;
                   const slotCount = slotsMap[iso]?.length ?? 0;
                   const isPast = iso < today;
+                  // Phase 7 item 20 — "clear days containing activity." A
+                  // fully-booked day (real appointments, no open slots left)
+                  // previously looked exactly like an empty one. Distinct
+                  // dot color so it isn't confused with "nothing this day."
+                  const hasBookedOnly = !hasSlots && activeDatesSet.has(iso);
 
                   return (
                     <TouchableOpacity
                       key={i}
-                      onPress={() => setSelectedDate(iso)}
+                      onPress={() => selectDate(iso)}
                       className="flex-1 aspect-square items-center justify-center rounded-xl m-0.5"
                       style={
                         isSelected
                           ? { backgroundColor: '#2563eb' }
                           : hasSlots
                           ? { backgroundColor: '#f0fdf4' }
+                          : hasBookedOnly
+                          ? { backgroundColor: '#f5f3ff' }
                           : undefined
                       }
                     >
@@ -276,6 +388,8 @@ export default function CalendarScreen() {
                             ? 'text-gray-300'
                             : hasSlots
                             ? 'text-green-800'
+                            : hasBookedOnly
+                            ? 'text-purple-700'
                             : 'text-gray-700'
                         }`}
                       >
@@ -284,10 +398,13 @@ export default function CalendarScreen() {
                       {hasSlots && !isSelected && (
                         <View className="w-1 h-1 rounded-full bg-green-500 mt-0.5" />
                       )}
+                      {hasBookedOnly && !isSelected && (
+                        <View className="w-1 h-1 rounded-full bg-purple-500 mt-0.5" />
+                      )}
                       {isSelected && slotCount > 0 && (
                         <View className="w-1 h-1 rounded-full bg-white/60 mt-0.5" />
                       )}
-                      {isToday && !isSelected && !hasSlots && (
+                      {isToday && !isSelected && !hasSlots && !hasBookedOnly && (
                         <View className="w-1 h-1 rounded-full bg-primary-400 mt-0.5" />
                       )}
                     </TouchableOpacity>
@@ -298,8 +415,22 @@ export default function CalendarScreen() {
           </View>
         </View>
 
-        {/* Day heading, shared by the Booked and Open Slots sections below */}
-        <View className="px-4 mb-1">
+        {/* Legend — the purple "booked" dot is new (Phase 7 item 20); worth
+            one line so it doesn't read as an unexplained color change. */}
+        <View className="flex-row items-center gap-4 px-5 mb-3">
+          <View className="flex-row items-center gap-1.5">
+            <View className="w-2 h-2 rounded-full bg-green-500" />
+            <Text className="text-xs text-gray-400">Open</Text>
+          </View>
+          <View className="flex-row items-center gap-1.5">
+            <View className="w-2 h-2 rounded-full bg-purple-500" />
+            <Text className="text-xs text-gray-400">Booked</Text>
+          </View>
+        </View>
+
+        {/* Day heading, shared by the Booked and Open Slots sections below.
+            onLayout feeds selectDate()'s auto-scroll target. */}
+        <View className="px-4 mb-1" onLayout={(e) => { dayDetailY.current = e.nativeEvent.layout.y; }}>
           <Text className="text-sm font-semibold text-gray-900">
             {selectedDate === today
               ? 'Today'

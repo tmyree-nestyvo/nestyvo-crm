@@ -72,7 +72,17 @@ export default function ProviderScheduleScreen() {
           <View>
             <Text className="text-gray-500 text-sm">Provider View</Text>
             <Text className="text-xl font-bold text-gray-900">
-              {noProviderAccount ? 'No provider linked' : `Dr. ${name?.split(' ').pop()}`}
+              {noProviderAccount
+                ? 'No provider linked'
+                // Charlene, Phase 7 item 21 — no inferred "Dr." Show the
+                // configured name + credentials (e.g. "Gencia Williams,
+                // LMFT"); an honorific only ever appears if someone actually
+                // configures one, which doesn't exist as a field today, so
+                // none is shown. Falls back to the login's own name only
+                // while /dashboard/provider is still loading.
+                : data?.firstName
+                ? `${data.firstName} ${data.lastName}${data.credentials ? `, ${data.credentials}` : ''}`
+                : name}
             </Text>
           </View>
         </View>
