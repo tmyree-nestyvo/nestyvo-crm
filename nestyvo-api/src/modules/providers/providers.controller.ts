@@ -253,6 +253,19 @@ export class ProvidersController {
     });
   }
 
+  // Charlene, Oct 5 2026 — Phase 5 (Provider self-service client/waitlist
+  // creation). The provider-facing screens for both need to know their
+  // own providerId/practiceId without a practice/provider picker (unlike
+  // the admin/agent create-client flow) — this is the shared lookup both
+  // reuse.
+  @Get('self')
+  @Roles(...PROVIDER_ONLY)
+  async getSelf(@CurrentUser() user: User) {
+    const provider = await this.providersService.findByUserId(user.id);
+    if (!provider) throw new ForbiddenException('Not a provider account');
+    return { id: provider.id, practiceId: provider.practiceId, firstName: provider.firstName, lastName: provider.lastName };
+  }
+
   @Get('self/blocks')
   @Roles(...PROVIDER_ONLY)
   async getBlocks(@CurrentUser() user: User) {
@@ -426,7 +439,7 @@ export class ProvidersController {
   // (agents configure business hours/block times; this is the same kind
   // of per-provider scheduling config, not partner onboarding).
   @Get(':id/appointment-types')
-  @Roles(...OFFICE_STAFF)
+  @Roles(...ALL_STAFF)
   listAppointmentTypes(@Param('id') id: string, @CurrentUser() user: User) {
     return this.providersService.listAppointmentTypes(id, user);
   }

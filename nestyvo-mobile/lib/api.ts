@@ -98,6 +98,10 @@ export const providersApi = {
   list: (practiceId?: string) => api.get('/providers', { params: { practiceId } }).then((r) => r.data),
   getSchedule: (id: string, date?: string) =>
     api.get(`/providers/${id}/schedule`, { params: { date } }).then((r) => r.data),
+  /** Charlene, Oct 5 2026 — a provider's own id/practiceId, for self-service
+   * screens (client creation, waitlist) that don't need/want the admin's
+   * cross-practice picker UI. */
+  getSelf: () => api.get(`/providers/self`).then((r) => r.data),
   getAppointmentDetail: (providerId: string, appointmentId: string) =>
     api.get(`/providers/${providerId}/appointments/${appointmentId}`).then((r) => r.data),
   cancelAppointment: (providerId: string, appointmentId: string, reason?: string) =>
@@ -263,7 +267,10 @@ export const waitlistApi = {
     preferredDays?: number[];
     preferredTimes?: Record<string, boolean>;
     notes?: string;
+    appointmentTypeId?: string;
   }) => api.post('/waitlist', input).then((r) => r.data),
+  /** Charlene, Oct 5 2026 — previously had no way to remove an entry at all. */
+  remove: (id: string) => api.delete(`/waitlist/${id}`).then((r) => r.data),
 };
 
 // Reminders (public, unauthenticated — patient self-service cancel link)

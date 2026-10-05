@@ -153,6 +153,13 @@ export default function ClientsScreen() {
       {/* Header */}
       <View className="px-5 pt-4 pb-2 flex-row items-center gap-3">
         <Text className="text-2xl font-bold text-gray-900 flex-1">My Clients</Text>
+        <TouchableOpacity
+          onPress={() => router.push('/(provider)/clients/new')}
+          className="flex-row items-center gap-1.5 bg-primary-600 px-3 py-2 rounded-full"
+        >
+          <Ionicons name="add" size={16} color="#fff" />
+          <Text className="text-white text-xs font-semibold">Add</Text>
+        </TouchableOpacity>
         <HomeButton href="/(provider)" />
       </View>
 

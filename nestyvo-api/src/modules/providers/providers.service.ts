@@ -221,8 +221,16 @@ export class ProvidersService {
   // appointment types across different providers" — every method here is
   // scoped to exactly one providerId, same assertCanManage boundary as
   // availability/blocks above (practice-config-level, not a booking action).
+  // Charlene, Oct 5 2026 — Provider self-service waitlist (item 17) needs
+  // to read their own types ("select the applicable appointment type...
+  // they are waiting for"). assertCanManage (used below for the write
+  // methods, correctly PROVIDER-excluded — type *definitions* stay staff-
+  // configured) has no PROVIDER branch at all, so a provider calling this
+  // would always 403 even for their own record — assertScheduleAccess is
+  // the right check here instead, same self-access pattern getSchedule
+  // already uses.
   async listAppointmentTypes(providerId: string, user: User) {
-    await this.assertCanManage(providerId, user);
+    await this.assertScheduleAccess(providerId, user);
     return this.appointmentTypeRepo.find({ where: { providerId }, order: { name: 'ASC' } });
   }
 

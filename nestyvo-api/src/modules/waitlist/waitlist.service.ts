@@ -20,6 +20,7 @@ export class WaitlistService {
       preferredDays?: number[];
       preferredTimes?: Record<string, boolean>;
       notes?: string;
+      appointmentTypeId?: string;
     },
     user: User,
   ) {
@@ -41,11 +42,32 @@ export class WaitlistService {
       preferredDays: input.preferredDays,
       preferredTimes: input.preferredTimes,
       notes: input.notes,
+      appointmentTypeId: input.appointmentTypeId,
       dateAdded: new Date(),
       createdBy: user.id,
     });
     const saved = await this.waitlistRepo.save(entry);
     return { id: saved.id };
+  }
+
+  // Charlene, Oct 5 2026 — had no route or method at all before this.
+  // Provider can only remove their own entries; staff follow the same
+  // practice-scoping assertCanManage-equivalent as everywhere else (admin/
+  // agent unrestricted, practice_manager confined to their own practice).
+  async removeEntry(id: string, user: User): Promise<{ success: true }> {
+    const entry = await this.waitlistRepo.findOne({ where: { id }, relations: { provider: true } });
+    if (!entry) throw new BadRequestException('Waitlist entry not found');
+
+    if (user.role === UserRole.PROVIDER) {
+      const own = await this.providerRepo.findOne({ where: { userId: user.id } });
+      if (!own || own.id !== entry.providerId) throw new BadRequestException('Not your waitlist entry');
+    } else if (user.role === UserRole.PRACTICE_MANAGER && entry.provider.practiceId !== user.practiceId) {
+      throw new BadRequestException('Not your practice');
+    }
+
+    entry.status = WaitlistEntryStatus.REMOVED;
+    await this.waitlistRepo.save(entry);
+    return { success: true };
   }
 
   async getForProvider(user: User): Promise<any[]> {
