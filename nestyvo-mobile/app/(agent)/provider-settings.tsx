@@ -57,6 +57,23 @@ function PickerField({
 const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+// Charlene, Oct 5 2026 — "Use easy start/end time dropdown/select
+// controls" instead of free-text HH:mm entry. 15-min increments, reusing
+// the PickerField component already defined above rather than a new
+// time-picker widget.
+const TIME_OPTIONS: Option[] = Array.from({ length: 24 * 4 }, (_, i) => {
+  const h = Math.floor(i / 4);
+  const m = (i % 4) * 15;
+  const hh = String(h).padStart(2, '0');
+  const mm = String(m).padStart(2, '0');
+  const period = h < 12 ? 'AM' : 'PM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return { id: `${hh}:${mm}`, label: `${h12}:${mm} ${period}` };
+});
+function timeLabel(value: string) {
+  return TIME_OPTIONS.find((t) => t.id === value)?.label ?? value;
+}
+
 type DayWindow = { enabled: boolean; startTime: string; endTime: string };
 
 function defaultDays(): DayWindow[] {
@@ -348,16 +365,25 @@ export default function ProviderSettingsScreen() {
   const [provider, setProvider] = useState<Option | null>(null);
   const [days, setDays] = useState<DayWindow[]>(defaultDays());
 
-  const [blockFrequency, setBlockFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  // Charlene, Oct 5 2026 — "Allow blocks to be: One-time / Weekly
+  // recurring / Recurring indefinitely / Recurring through a selected end
+  // date." 'once' added alongside the existing daily/weekly/monthly.
+  const [blockFrequency, setBlockFrequency] = useState<'once' | 'daily' | 'weekly' | 'monthly'>('weekly');
+  const [blockDate, setBlockDate] = useState(''); // YYYY-MM-DD, 'once' only
   const [blockDays, setBlockDays] = useState<number[]>([4]); // Thursday default; multi-select
   const toggleBlockDay = (i: number) =>
     setBlockDays((prev) => (prev.includes(i) ? prev.filter((d) => d !== i) : [...prev, i].sort()));
   const [blockDayOfMonth, setBlockDayOfMonth] = useState('1');
   const [blockStart, setBlockStart] = useState('10:00');
   const [blockEnd, setBlockEnd] = useState('12:00');
-  const [blockWeeks, setBlockWeeks] = useState('12');
-  const [blockEndDate, setBlockEndDate] = useState(''); // optional YYYY-MM-DD, overrides blockWeeks/default range
+  // 'indefinite' uses the existing MAX_RECURRING_WEEKS cap server-side
+  // (not a true infinite rule — individual rows are still pre-generated —
+  // but functions as "indefinitely" for pilot purposes) rather than
+  // asking the agent to type a week count.
+  const [blockRecurrenceEnd, setBlockRecurrenceEnd] = useState<'indefinite' | 'date'>('indefinite');
+  const [blockEndDate, setBlockEndDate] = useState(''); // YYYY-MM-DD, only shown when blockRecurrenceEnd === 'date'
   const [blockReason, setBlockReason] = useState('');
+  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
 
   const { data: practices = [] } = useQuery({ queryKey: ['practices'], queryFn: practicesApi.list });
   const { data: providers = [] } = useQuery({
@@ -457,6 +483,19 @@ export default function ProviderSettingsScreen() {
     saveAvailability.mutate(windows);
   }
 
+  function resetBlockForm() {
+    setBlockFrequency('weekly');
+    setBlockDate('');
+    setBlockDays([4]);
+    setBlockDayOfMonth('1');
+    setBlockStart('10:00');
+    setBlockEnd('12:00');
+    setBlockRecurrenceEnd('indefinite');
+    setBlockEndDate('');
+    setBlockReason('');
+    setEditingBlockId(null);
+  }
+
   const addRecurringBlock = useMutation({
     mutationFn: () => {
       // Same HH:mm strictness as weekly hours above — normalize rather than
@@ -469,26 +508,57 @@ export default function ProviderSettingsScreen() {
       if (toMinutes(startTime) >= toMinutes(endTime)) {
         throw new Error(`Start (${startTime}) has to be before end (${endTime}).`);
       }
-      return providersApi.createRecurringBlock(provider!.id, {
-        frequency: blockFrequency,
-        daysOfWeek: blockFrequency === 'weekly' ? blockDays : undefined,
-        dayOfMonth: blockFrequency === 'monthly' ? Number(blockDayOfMonth) || 1 : undefined,
-        startTime,
-        endTime,
-        endDate: blockEndDate || undefined,
-        weeks: blockFrequency === 'weekly' && !blockEndDate ? Number(blockWeeks) || 12 : undefined,
-        reason: blockReason || undefined,
-      });
+
+      // Editing an existing block (recurring-originated or not) is modeled
+      // as replace-in-place: remove the one row being edited, then create
+      // its replacement below — there's no bulk "edit a whole series"
+      // concept in this architecture (each occurrence is its own row), and
+      // per-occurrence replace is both simpler and more useful (move just
+      // this Tuesday without touching the rest of the series).
+      const removeOld = editingBlockId
+        ? providersApi.deleteBlock(provider!.id, editingBlockId)
+        : Promise.resolve();
+
+      if (blockFrequency === 'once') {
+        if (!blockDate) throw new Error('Pick a date.');
+        return removeOld.then(() =>
+          providersApi.createBlock(provider!.id, {
+            startAt: `${blockDate}T${startTime}:00`,
+            endAt: `${blockDate}T${endTime}:00`,
+            reason: blockReason || undefined,
+          }),
+        );
+      }
+
+      const useIndefinite = blockFrequency === 'weekly' && blockRecurrenceEnd === 'indefinite';
+      return removeOld.then(() =>
+        providersApi.createRecurringBlock(provider!.id, {
+          frequency: blockFrequency,
+          daysOfWeek: blockFrequency === 'weekly' ? blockDays : undefined,
+          dayOfMonth: blockFrequency === 'monthly' ? Number(blockDayOfMonth) || 1 : undefined,
+          startTime,
+          endTime,
+          endDate: useIndefinite ? undefined : blockEndDate || undefined,
+          // "Indefinitely" asks for more weeks than the service will ever
+          // allow (buildRecurringOccurrences clamps to its own
+          // MAX_RECURRING_WEEKS) — passing an intentionally-oversized
+          // number here just rides that existing clamp rather than
+          // duplicating the real cap value on the frontend.
+          weeks: useIndefinite ? 999 : undefined,
+          reason: blockReason || undefined,
+        }),
+      );
     },
     onSuccess: () => {
-      setBlockReason('');
+      const wasEditing = !!editingBlockId;
+      resetBlockForm();
       queryClient.invalidateQueries({ queryKey: ['provider-blocks', provider?.id] });
       queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
-      Alert.alert('Added', 'Recurring block created.');
+      Alert.alert(wasEditing ? 'Updated' : 'Added', wasEditing ? 'Block updated.' : 'Block created.');
     },
     onError: (err: any) => {
       Alert.alert(
-        "Couldn't add block",
+        "Couldn't save block",
         err?.response?.data?.message || err?.message || 'Please check the times and try again.',
       );
     },
@@ -504,6 +574,16 @@ export default function ProviderSettingsScreen() {
       Alert.alert("Couldn't remove block", err?.response?.data?.message || 'Please try again.');
     },
   });
+
+  function startEditBlock(b: any) {
+    setEditingBlockId(b.id);
+    setBlockFrequency('once');
+    const start = new Date(b.startAt);
+    setBlockDate(start.toLocaleDateString('en-CA', { timeZone: TZ }));
+    setBlockStart(start.toLocaleTimeString('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }));
+    setBlockEnd(new Date(b.endAt).toLocaleTimeString('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }));
+    setBlockReason(b.reason ?? '');
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
@@ -633,25 +713,49 @@ export default function ProviderSettingsScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Recurring blocks */}
+            {/* Blocks */}
             <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-5">
-              <Text className="text-base font-semibold text-gray-900 mb-1">Recurring Blocks</Text>
+              <View className="flex-row items-center justify-between mb-1">
+                <Text className="text-base font-semibold text-gray-900">
+                  {editingBlockId ? 'Edit Block' : 'Block Time'}
+                </Text>
+                {editingBlockId && (
+                  <TouchableOpacity onPress={resetBlockForm}>
+                    <Text className="text-gray-400 text-xs font-medium">Cancel edit</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
               <Text className="text-gray-400 text-xs mb-4">
-                e.g. "No bookings Thursdays 10am–12pm" — generates blocked slots on a repeating cadence, optionally through a specific end date.
+                Provider unavailable during this time — once, or on a repeating cadence.
               </Text>
 
               {/* Frequency */}
-              <View className="flex-row gap-1.5 mb-3">
-                {(['daily', 'weekly', 'monthly'] as const).map((f) => (
+              <View className="flex-row flex-wrap gap-1.5 mb-3">
+                {(['once', 'daily', 'weekly', 'monthly'] as const).map((f) => (
                   <TouchableOpacity
                     key={f}
                     onPress={() => setBlockFrequency(f)}
                     className={`px-3 py-1.5 rounded-full border capitalize ${blockFrequency === f ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`}
                   >
-                    <Text className={`text-xs font-medium capitalize ${blockFrequency === f ? 'text-white' : 'text-gray-600'}`}>{f}</Text>
+                    <Text className={`text-xs font-medium capitalize ${blockFrequency === f ? 'text-white' : 'text-gray-600'}`}>
+                      {f === 'once' ? 'One-time' : f}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
+
+              {blockFrequency === 'once' && (
+                <>
+                  <Text className="text-gray-500 text-xs font-medium mb-2">Date</Text>
+                  <TextInput
+                    value={blockDate}
+                    onChangeText={setBlockDate}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#9ca3af"
+                    className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-900 mb-3"
+                  />
+                </>
+              )}
 
               {blockFrequency === 'weekly' && (
                 <>
@@ -686,43 +790,64 @@ export default function ProviderSettingsScreen() {
                 </View>
               )}
 
-              <View className="flex-row items-center gap-2 mb-3">
-                <TextInput
-                  value={blockStart}
-                  onChangeText={setBlockStart}
-                  placeholder="10:00"
-                  className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-900 w-20 text-center"
-                />
-                <Text className="text-gray-400 text-xs">to</Text>
-                <TextInput
-                  value={blockEnd}
-                  onChangeText={setBlockEnd}
-                  placeholder="12:00"
-                  className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-900 w-20 text-center"
-                />
-                {blockFrequency === 'weekly' && !blockEndDate && (
-                  <>
-                    <Text className="text-gray-400 text-xs ml-2">for</Text>
-                    <TextInput
-                      value={blockWeeks}
-                      onChangeText={setBlockWeeks}
-                      placeholder="12"
-                      keyboardType="number-pad"
-                      className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-2 text-sm text-gray-900 w-14 text-center"
-                    />
-                    <Text className="text-gray-400 text-xs">weeks</Text>
-                  </>
-                )}
+              <View className="flex-row gap-3">
+                <View className="flex-1">
+                  <PickerField
+                    label="Start time"
+                    placeholder="Select"
+                    value={{ id: blockStart, label: timeLabel(blockStart) }}
+                    options={TIME_OPTIONS}
+                    onSelect={(opt) => setBlockStart(opt.id)}
+                  />
+                </View>
+                <View className="flex-1">
+                  <PickerField
+                    label="End time"
+                    placeholder="Select"
+                    value={{ id: blockEnd, label: timeLabel(blockEnd) }}
+                    options={TIME_OPTIONS}
+                    onSelect={(opt) => setBlockEnd(opt.id)}
+                  />
+                </View>
               </View>
 
-              <Text className="text-gray-500 text-xs font-medium mb-2">End date (optional)</Text>
-              <TextInput
-                value={blockEndDate}
-                onChangeText={setBlockEndDate}
-                placeholder="YYYY-MM-DD — leave blank for a default range"
-                placeholderTextColor="#9ca3af"
-                className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-900 mb-3"
-              />
+              {blockFrequency !== 'once' && (
+                <>
+                  {blockFrequency === 'weekly' && (
+                    <>
+                      <Text className="text-gray-500 text-xs font-medium mb-2">Ends</Text>
+                      <View className="flex-row gap-1.5 mb-3">
+                        {(['indefinite', 'date'] as const).map((opt) => (
+                          <TouchableOpacity
+                            key={opt}
+                            onPress={() => setBlockRecurrenceEnd(opt)}
+                            className={`px-3 py-1.5 rounded-full border ${blockRecurrenceEnd === opt ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`}
+                          >
+                            <Text className={`text-xs font-medium ${blockRecurrenceEnd === opt ? 'text-white' : 'text-gray-600'}`}>
+                              {opt === 'indefinite' ? 'Indefinitely' : 'Through a date'}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </>
+                  )}
+
+                  {(blockFrequency !== 'weekly' || blockRecurrenceEnd === 'date') && (
+                    <>
+                      <Text className="text-gray-500 text-xs font-medium mb-2">
+                        {blockFrequency === 'weekly' ? 'Through' : 'End date (optional)'}
+                      </Text>
+                      <TextInput
+                        value={blockEndDate}
+                        onChangeText={setBlockEndDate}
+                        placeholder="YYYY-MM-DD"
+                        placeholderTextColor="#9ca3af"
+                        className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-900 mb-3"
+                      />
+                    </>
+                  )}
+                </>
+              )}
 
               <TextInput
                 value={blockReason}
@@ -734,22 +859,30 @@ export default function ProviderSettingsScreen() {
 
               <TouchableOpacity
                 onPress={() => addRecurringBlock.mutate()}
-                disabled={addRecurringBlock.isPending || (blockFrequency === 'weekly' && blockDays.length === 0)}
+                disabled={
+                  addRecurringBlock.isPending ||
+                  (blockFrequency === 'weekly' && blockDays.length === 0) ||
+                  (blockFrequency === 'once' && !blockDate)
+                }
                 className={`rounded-xl py-2.5 items-center mb-1 ${
-                  blockFrequency === 'weekly' && blockDays.length === 0 ? 'bg-gray-300' : 'bg-gray-900'
+                  (blockFrequency === 'weekly' && blockDays.length === 0) || (blockFrequency === 'once' && !blockDate)
+                    ? 'bg-gray-300'
+                    : 'bg-gray-900'
                 }`}
               >
                 {addRecurringBlock.isPending ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text className="text-white font-semibold text-sm">
-                    Add — {blockFrequency === 'daily'
-                      ? `Every day${blockEndDate ? ` through ${blockEndDate}` : ''}`
+                    {editingBlockId ? 'Save Changes' : blockFrequency === 'once'
+                      ? (blockDate ? `Add — ${blockDate}` : 'Pick a date')
+                      : blockFrequency === 'daily'
+                      ? `Add — Every day${blockEndDate ? ` through ${blockEndDate}` : ''}`
                       : blockFrequency === 'monthly'
-                      ? `Monthly on the ${blockDayOfMonth || '1'}${blockEndDate ? ` through ${blockEndDate}` : ''}`
+                      ? `Add — Monthly on the ${blockDayOfMonth || '1'}${blockEndDate ? ` through ${blockEndDate}` : ''}`
                       : blockDays.length === 0
                       ? 'Pick at least one day'
-                      : `Every ${blockDays.map((d) => DAY_LABELS[d]).join(', ')}${blockEndDate ? ` through ${blockEndDate}` : `, ${blockWeeks || '12'} weeks`}`}
+                      : `Add — Every ${blockDays.map((d) => DAY_LABELS[d]).join(', ')}${blockRecurrenceEnd === 'date' && blockEndDate ? ` through ${blockEndDate}` : ', indefinitely'}`}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -767,6 +900,9 @@ export default function ProviderSettingsScreen() {
                         {fmtBlockDate(b.startAt)} – {new Date(b.endAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: TZ })}
                         {b.reason ? ` · ${b.reason}` : ''}
                       </Text>
+                      <TouchableOpacity onPress={() => startEditBlock(b)} className="p-1 ml-1">
+                        <Ionicons name="pencil-outline" size={15} color="#9ca3af" />
+                      </TouchableOpacity>
                       <TouchableOpacity onPress={() => removeBlock.mutate(b.id)} className="p-1">
                         <Ionicons name="close-circle" size={16} color="#d1d5db" />
                       </TouchableOpacity>

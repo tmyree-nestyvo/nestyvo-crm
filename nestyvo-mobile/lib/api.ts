@@ -142,6 +142,7 @@ export const providersApi = {
       loginEmail?: string;
       loginPassword?: string;
       defaultSlotDurationMin?: number;
+      status?: 'active' | 'inactive' | 'vacation';
     },
   ) => api.patch(`/providers/${id}`, input).then((r) => r.data),
   /** Always issues a fresh temp password and forces a change on next sign-in. */
@@ -162,6 +163,9 @@ export const providersApi = {
   ) => api.post(`/providers/${id}/recurring-block`, input).then((r) => r.data),
   deleteBlock: (id: string, blockId: string) =>
     api.delete(`/providers/${id}/blocks/${blockId}`).then((r) => r.data),
+  /** One-time block — Charlene, Oct 5 2026, "Allow blocks to be: One-time". */
+  createBlock: (id: string, input: { startAt: string; endAt: string; reason?: string }) =>
+    api.post(`/providers/${id}/blocks`, input).then((r) => r.data),
 };
 
 // Provider-specific appointment/service types (Workstream B, Oct 3 2026) —

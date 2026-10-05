@@ -13,6 +13,7 @@ import { FillCandidatesService } from './fill-candidates.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Appointment, AppointmentStatus, LocationType } from '../../database/entities/appointment.entity';
+import { ProviderStatus } from '../../database/entities/provider.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { ProviderBlock, BlockType } from '../../database/entities/provider-block.entity';
 import { RemindersService } from '../sms/reminders.service';
@@ -98,6 +99,8 @@ class UpdateProviderDto {
   // generation. Min 15 as a sanity floor, nothing enforced at the high end
   // (a 2-4hr block is a real, named use case elsewhere in this project).
   @IsOptional() @IsInt() @Min(15) defaultSlotDurationMin?: number;
+  // Charlene, Oct 5 2026 — Active/Deactivated provider lifecycle.
+  @IsOptional() @IsEnum(ProviderStatus) status?: ProviderStatus;
 }
 
 class CreateBlockDto {
@@ -283,11 +286,16 @@ export class ProvidersController {
 
   @Get(':id/fill-candidates')
   @Roles(...OFFICE_STAFF)
-  getFillCandidates(
+  async getFillCandidates(
     @Param('id') id: string,
     @Query('slotStartAt') slotStartAt: string,
     @Query('slotEndAt') slotEndAt: string,
   ) {
+    // Charlene, Oct 5 2026 — "Exclude from Smart Fill." The UI never
+    // offers a slot to Fill for a deactivated provider in the first place
+    // (their slots stop generating once the active-provider lists are
+    // correct), but this is the direct server-side enforcement.
+    await this.providersService.assertBookable(id);
     return this.fillCandidatesService.getCandidates(
       id,
       new Date(slotStartAt),
@@ -302,6 +310,7 @@ export class ProvidersController {
     @Body() dto: BookAppointmentDto,
     @CurrentUser() user: User,
   ) {
+    await this.providersService.assertBookable(providerId);
     const appt = this.appointmentRepo.create({
       providerId,
       patientId: dto.patientId,
@@ -404,6 +413,12 @@ export class ProvidersController {
   @Roles(...OFFICE_STAFF)
   getBlocksForAdmin(@Param('id') id: string, @CurrentUser() user: User) {
     return this.providersService.getBlocksForAdmin(id, user);
+  }
+
+  @Post(':id/blocks')
+  @Roles(...OFFICE_STAFF)
+  createBlockForProvider(@Param('id') id: string, @Body() dto: CreateBlockDto, @CurrentUser() user: User) {
+    return this.providersService.createBlock(id, dto, user);
   }
 
   // Workstream B (Oct 3 2026) — provider-specific appointment/service

@@ -310,7 +310,7 @@ export default function NewClientScreen() {
           label="Provider"
           placeholder={effectivePracticeId ? 'Select a provider' : 'Pick a practice first'}
           value={provider}
-          options={providers.map((p: any) => ({ id: p.id, label: `${p.firstName} ${p.lastName}`, sublabel: p.credentials }))}
+          options={providers.filter((p: any) => p.status === 'active').map((p: any) => ({ id: p.id, label: `${p.firstName} ${p.lastName}`, sublabel: p.credentials }))}
           onSelect={setProvider}
           disabled={!effectivePracticeId}
         />

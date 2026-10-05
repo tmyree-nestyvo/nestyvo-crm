@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Between } from 'typeorm';
 import { randomBytes } from 'crypto';
-import { Provider, ProviderStatus } from '../../database/entities/provider.entity';
+import { Provider, ProviderStatus, ACTIVE_PROVIDER_WHERE } from '../../database/entities/provider.entity';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
 import { AgentProviderAssignment } from '../../database/entities/agent-provider-assignment.entity';
 import { ProviderAvailability } from '../../database/entities/provider-availability.entity';
@@ -32,6 +32,8 @@ export interface CreateProviderInput {
   loginPassword?: string;
   /** Session length in minutes for open-slot generation. Defaults to 50 on the entity. */
   defaultSlotDurationMin?: number;
+  /** Charlene, Oct 5 2026 — Active/Deactivated lifecycle (update() only, never set on create). */
+  status?: ProviderStatus;
 }
 
 @Injectable()
@@ -119,10 +121,20 @@ export class ProvidersService {
       tempPassword = generated;
     }
 
+    // Charlene, Oct 5 2026 — Provider lifecycle. Deactivating also disables
+    // the linked login (reuses the same real-time isActive recheck already
+    // proven in RolesGuard — see the Oct 4 HIPAA review — rather than
+    // inventing a second mechanism), and reactivating restores it
+    // symmetrically. History (appointments, clients, audit rows) is never
+    // touched — this only ever changes status/isActive flags.
+    if (input.status !== undefined && input.status !== provider.status && provider.userId) {
+      await this.usersService.setActive(provider.userId, input.status === ProviderStatus.ACTIVE);
+    }
+
     for (const field of [
       'firstName', 'lastName', 'credentials', 'specialty',
       'phone', 'email', 'officeLocation', 'isVirtual', 'isInPerson',
-      'defaultSlotDurationMin',
+      'defaultSlotDurationMin', 'status',
     ] as const) {
       if (input[field] !== undefined) (provider as any)[field] = input[field];
     }
@@ -157,6 +169,19 @@ export class ProvidersService {
       throw new ForbiddenException('Not your practice');
     }
     return provider;
+  }
+
+  // Charlene, Oct 5 2026 — "Prevent new bookings" on a deactivated
+  // provider. The UI should never offer a slot for one in the first place
+  // (their slots never generate once the active-provider lists above are
+  // correct), but this is the actual server-side enforcement, not just an
+  // absence of a button.
+  async assertBookable(providerId: string): Promise<void> {
+    const provider = await this.providerRepo.findOne({ where: { id: providerId }, relations: { practice: true } });
+    if (!provider) throw new NotFoundException('Provider not found');
+    if (provider.status !== ProviderStatus.ACTIVE || !provider.practice.isActive) {
+      throw new BadRequestException('This provider is no longer active and cannot accept new bookings.');
+    }
   }
 
   async getAvailability(providerId: string, user: User) {
@@ -252,6 +277,28 @@ export class ProvidersService {
       where: { providerId },
       order: { startAt: 'ASC' },
     }).then((blocks) => blocks.filter((b) => b.endAt >= now && b.startAt <= sixMonthsOut));
+  }
+
+  // Charlene, Oct 5 2026 — "Allow blocks to be: One-time..." This didn't
+  // exist for staff at all before — only the provider's own self-service
+  // POST self/blocks could create a single block; admin/agent had only the
+  // recurring-series route, which always generates multiple occurrences
+  // even for a single afternoon off. Mirrors self/blocks' own logic.
+  async createBlock(
+    providerId: string,
+    input: { startAt: string; endAt: string; reason?: string },
+    user: User,
+  ) {
+    await this.assertCanManage(providerId, user);
+    const block = this.blockRepo.create({
+      providerId,
+      startAt: new Date(input.startAt),
+      endAt: new Date(input.endAt),
+      blockType: BlockType.OTHER,
+      reason: input.reason,
+      createdBy: user.id,
+    });
+    return this.blockRepo.save(block);
   }
 
   // Recurring blocks (extended Sep 5 2026 — Charlene wanted daily/weekly/
@@ -405,6 +452,16 @@ export class ProvidersService {
   }
 
   async listForUser(user: User, targetPracticeId?: string): Promise<Provider[]> {
+    // Charlene, Oct 5 2026 — deliberately NOT active-only here or in the
+    // practice_manager branch below: these two branches (a specific
+    // practiceId, or a practice_manager's own practice) are the admin-
+    // management surfaces (Partners screen's own provider list) — an admin
+    // needs to see a deactivated provider to reactivate them, not just
+    // active ones. The active-only filter belongs on the *operational*
+    // surfaces (calendar selectors, booking, Smart Fill), which all derive
+    // from the OTHER branch below, or from dashboard.service.ts's
+    // getScopedProviderIds — not from this management list.
+    //
     // Admins and agents work across every partner practice — let them scope the
     // list to a specific one (e.g. for a provider-assignment dropdown) on request.
     if (targetPracticeId && (user.role === UserRole.ADMINISTRATOR || user.role === UserRole.SCHEDULING_AGENT)) {
@@ -414,23 +471,12 @@ export class ProvidersService {
       });
     }
 
-    // Unfiltered "list everyone" case (no targetPracticeId) — until Oct 2
-    // 2026 this fell through to an assignment-scoped branch for
-    // SCHEDULING_AGENT below, predating the Aug 23 2026 decision that
-    // agents are cross-practice/unrestricted everywhere, same as admin.
-    // Confirmed live: Charlene's account only had AgentProviderAssignment
-    // rows for Westside's 2 original providers, so every partner onboarded
-    // since (Peace of Mind, Ortiz & Associates) was invisible to her here —
-    // same root cause just fixed in dashboard.service.ts's
-    // getScopedProviderIds.
+    // Unfiltered-by-practice "list everyone" case (no targetPracticeId) —
+    // used to resolve an already-known provider's practice (e.g. Fill
+    // Slot's new-client flow), not as a picker surface — active-only is
+    // correct and safe here.
     if (user.role === UserRole.ADMINISTRATOR || user.role === UserRole.SCHEDULING_AGENT) {
-      // Pre-existing bug, already documented (project_build_state memory):
-      // Provider has no `isActive` column at all, only `status`
-      // (ACTIVE/INACTIVE/VACATION) — this 500'd for admin too, silently,
-      // whenever GET /providers was called with no practiceId filter.
-      // Surfaced for real the moment SCHEDULING_AGENT started reaching this
-      // same branch (Oct 2 2026) — fixed properly now rather than inherited.
-      return this.providerRepo.find({ where: { status: ProviderStatus.ACTIVE }, order: { lastName: 'ASC' } });
+      return this.providerRepo.find({ where: ACTIVE_PROVIDER_WHERE, relations: { practice: true }, order: { lastName: 'ASC' } });
     }
 
     if (user.role === UserRole.PRACTICE_MANAGER) {
@@ -486,7 +532,7 @@ export class ProvidersService {
     const end = new Date(target);
     end.setHours(23, 59, 59, 999);
 
-    const [appointments, externalBlocks] = await Promise.all([
+    const [appointments, externalBlocks, ownBlocks] = await Promise.all([
       this.appointmentRepo.find({
         where: {
           providerId,
@@ -502,6 +548,13 @@ export class ProvidersService {
       // generic label the source platform gives it (e.g. "Rula - existing
       // client appointment"). See ExternalCalendarSyncService.
       this.externalBlockRepo.find({ where: { providerId, startAt: Between(start, end) } }),
+      // Charlene, Oct 5 2026 — "Admin/Agent calendar views need to clearly
+      // reflect what is affecting availability... Existing blocks." Blocks
+      // already correctly remove the time from Open Slots (computeSlotsByDate),
+      // but were otherwise invisible here — a blocked afternoon just looked
+      // like nothing was shown at all, same silent-gap problem external
+      // calendars had before Workstream C surfaced those.
+      this.blockRepo.find({ where: { providerId, startAt: Between(start, end) } }),
     ]);
 
     const nestyvoRows = appointments.map((a) => ({
@@ -535,7 +588,18 @@ export class ProvidersService {
       externalLocation: b.location,
     }));
 
-    return [...nestyvoRows, ...externalRows].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+    const blockRows = ownBlocks.map((b) => ({
+      id: b.id,
+      startAt: b.startAt,
+      endAt: b.endAt,
+      patient: null,
+      type: b.reason || 'Blocked',
+      status: null,
+      locationType: null,
+      source: 'block' as const,
+    }));
+
+    return [...nestyvoRows, ...externalRows, ...blockRows].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
   }
 
   // Phase 0 audit (Oct 2 2026) / Workstream A (Oct 3 2026) — the one thing

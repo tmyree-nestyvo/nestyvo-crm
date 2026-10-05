@@ -312,6 +312,25 @@ function ProviderRow({ provider, practiceId, canManage }: { provider: any; pract
     onError: (err: any) => Alert.alert('Could not reset password', err?.response?.data?.message || 'Please try again.'),
   });
 
+  // Charlene, Oct 5 2026 — Provider lifecycle. Deactivating removes the
+  // provider from every active-operations surface (calendar, dashboard,
+  // Smart Fill, new bookings, external sync) while keeping all history —
+  // see provider.entity.ts's ACTIVE_PROVIDER_WHERE for the backend side.
+  const isActive = provider.status === 'active';
+  const toggleActive = useMutation({
+    mutationFn: () => providersApi.update(provider.id, { status: isActive ? 'inactive' : 'active' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['practice-providers', practiceId] });
+      Alert.alert(
+        isActive ? 'Provider deactivated' : 'Provider reactivated',
+        isActive
+          ? `${provider.firstName} ${provider.lastName} is removed from calendars, availability, and Smart Fill. Their history is kept.`
+          : `${provider.firstName} ${provider.lastName} is back in active operations.`,
+      );
+    },
+    onError: (err: any) => Alert.alert('Could not update provider', err?.response?.data?.message || 'Please try again.'),
+  });
+
   return (
     <View className="bg-white rounded-2xl border border-gray-100 px-4 py-3.5 mb-2">
       <TouchableOpacity onPress={() => setEditing((v) => !v)} className="flex-row items-center gap-3">
@@ -332,6 +351,11 @@ function ProviderRow({ provider, practiceId, canManage }: { provider: any; pract
               {hasLogin ? 'Login active' : 'No login yet'}
             </Text>
             {provider.specialty ? <Text className="text-gray-400 text-xs">· {provider.specialty}</Text> : null}
+            {!isActive && (
+              <View className="bg-gray-100 rounded-full px-1.5 py-0.5">
+                <Text className="text-gray-500 text-xs font-medium">Deactivated</Text>
+              </View>
+            )}
           </View>
         </View>
         <Ionicons name={editing ? 'chevron-up' : 'chevron-down'} size={16} color="#9ca3af" />
@@ -407,6 +431,31 @@ function ProviderRow({ provider, practiceId, canManage }: { provider: any; pract
                 className={`rounded-xl py-3 items-center ${!firstName.trim() || !lastName.trim() ? 'bg-gray-300' : 'bg-primary-600'}`}
               >
                 {save.isPending ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-semibold text-sm">Save Provider</Text>}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() =>
+                  Alert.alert(
+                    isActive ? `Deactivate ${provider.firstName}?` : `Reactivate ${provider.firstName}?`,
+                    isActive
+                      ? 'They disappear from calendars, availability, and Smart Fill, and their login stops working. All history is kept, and this can be undone.'
+                      : 'They come back into active operations and their login works again.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: isActive ? 'Deactivate' : 'Reactivate', style: isActive ? 'destructive' : 'default', onPress: () => toggleActive.mutate() },
+                    ],
+                  )
+                }
+                disabled={toggleActive.isPending}
+                className="mt-2 py-2.5 items-center"
+              >
+                {toggleActive.isPending ? (
+                  <ActivityIndicator size="small" color="#9ca3af" />
+                ) : (
+                  <Text className={`text-xs font-medium ${isActive ? 'text-red-500' : 'text-green-600'}`}>
+                    {isActive ? 'Deactivate this provider' : 'Reactivate this provider'}
+                  </Text>
+                )}
               </TouchableOpacity>
             </>
           )}

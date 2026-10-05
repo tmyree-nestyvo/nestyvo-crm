@@ -23,6 +23,13 @@ export class UsersService {
     return user;
   }
 
+  // Charlene, Oct 5 2026 — Provider deactivation disables the linked login
+  // (and reactivation restores it) via this, reusing RolesGuard's existing
+  // real-time isActive recheck rather than a second revocation mechanism.
+  async setActive(userId: string, isActive: boolean): Promise<void> {
+    await this.userRepo.update({ id: userId }, { isActive });
+  }
+
   /**
    * The first ever admin-controlled path for creating a login — previously
    * the only way a User row came into existence was the seed script (or,

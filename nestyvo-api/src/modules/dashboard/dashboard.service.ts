@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Not, Between, MoreThanOrEqual } from 'typeorm';
 import { User, UserRole } from '../../database/entities/user.entity';
-import { Provider, ProviderStatus } from '../../database/entities/provider.entity';
+import { Provider, ACTIVE_PROVIDER_WHERE } from '../../database/entities/provider.entity';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
 import { FillOpportunity, FillOpportunityStatus } from '../../database/entities/fill-opportunity.entity';
 import { WaitlistEntry, WaitlistEntryStatus } from '../../database/entities/waitlist-entry.entity';
@@ -162,7 +162,7 @@ export class DashboardService {
     // Schedule is fetched out to 30 days so the day-strip UI can show
     // appointments further out than this week — utilization/available-slots
     // below stay scoped to the current 7-day window they were designed for.
-    const [schedule, externalSchedule, waitlistCount, weekCancellations, openRequestCount] = await Promise.all([
+    const [schedule, externalSchedule, ownBlocksForSchedule, waitlistCount, weekCancellations, openRequestCount] = await Promise.all([
       this.appointmentRepo.find({
         where: { providerId: provider.id, startAt: Between(startOfToday, thirtyDaysOut), status: AppointmentStatus.SCHEDULED },
         relations: { patient: true, appointmentType: true },
@@ -176,6 +176,10 @@ export class DashboardService {
       // keep this change contained; double-booking prevention itself is
       // already handled separately via computeSlotsByDate.
       this.externalBlockRepo.find({ where: { providerId: provider.id, startAt: Between(startOfToday, thirtyDaysOut) } }),
+      // Charlene, Oct 5 2026 — same "make blocks visible, not a silent
+      // gap" fix as providers.service.ts getSchedule, applied here too so
+      // the provider's own calendar/dashboard shows it identically.
+      this.blockRepo.find({ where: { providerId: provider.id, startAt: Between(startOfToday, thirtyDaysOut) } }),
       this.waitlistRepo.count({ where: { providerId: provider.id, status: WaitlistEntryStatus.ACTIVE } }),
       this.appointmentRepo.count({
         where: { providerId: provider.id, status: AppointmentStatus.CANCELLED, cancelledAt: Between(startOfWeek, new Date()) },
@@ -222,6 +226,12 @@ export class DashboardService {
           // Workstream C (Oct 3 2026) — see providers.service.ts getSchedule's
           // identical addition for the raw-feed evidence behind these two.
           telehealthLink: b.telehealthLink, managementLink: b.managementLink, externalLocation: b.location,
+        })),
+        ...ownBlocksForSchedule.map((b) => ({
+          id: b.id, startAt: b.startAt, endAt: b.endAt,
+          patientId: null, patient: null,
+          type: b.reason || 'Blocked', status: null, locationType: null,
+          source: 'block' as const,
         })),
       ].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()),
     };
@@ -379,12 +389,13 @@ export class DashboardService {
   // how listForUser (providers.service.ts) already correctly does it.
   private async getScopedProviderIds(user: User): Promise<string[]> {
     if (user.role === UserRole.ADMINISTRATOR || user.role === UserRole.SCHEDULING_AGENT) {
-      const allProviders = await this.providerRepo.find({ where: { status: ProviderStatus.ACTIVE } });
+      const allProviders = await this.providerRepo.find({ where: ACTIVE_PROVIDER_WHERE, relations: { practice: true } });
       return allProviders.map((p) => p.id);
     }
     if (user.role === UserRole.PRACTICE_MANAGER) {
       const practiceProviders = await this.providerRepo.find({
-        where: { practiceId: user.practiceId, status: ProviderStatus.ACTIVE },
+        where: { ...ACTIVE_PROVIDER_WHERE, practiceId: user.practiceId },
+        relations: { practice: true },
       });
       return practiceProviders.map((p) => p.id);
     }

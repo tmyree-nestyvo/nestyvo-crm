@@ -16,7 +16,9 @@ interface Appointment {
   // inspection AND the provider's own subscribed-calendar screenshots,
   // Oct 4 2026 — not an implementation gap), just the source's own event
   // title.
-  source?: 'nestyvo' | 'external';
+  // Charlene, Oct 5 2026 — 'block' makes a provider's own unavailable time
+  // visible on the calendar too, not just a silent gap in Open Slots.
+  source?: 'nestyvo' | 'external' | 'block';
   externalSource?: 'rula' | 'headway' | 'other';
   // Workstream C (Oct 3-4 2026) — real per-event fields pulled from the
   // raw feed: telehealth join link, a separate platform-management link
@@ -111,22 +113,24 @@ export function AppointmentCard({ appt, onPress }: { appt: Appointment; onPress?
   const [externalDetail, setExternalDetail] = useState(false);
   const time = new Date(appt.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const isExternal = appt.source === 'external';
-  const statusColor = isExternal ? '#6b7280' : STATUS_COLORS[appt.status ?? ''] ?? '#6b7280';
-  const badgeText = isExternal ? EXTERNAL_SOURCE_LABEL[appt.externalSource ?? 'other'] : appt.status;
+  const isBlock = appt.source === 'block';
+  const isDimmed = isExternal || isBlock;
+  const statusColor = isDimmed ? '#6b7280' : STATUS_COLORS[appt.status ?? ''] ?? '#6b7280';
+  const badgeText = isExternal ? EXTERNAL_SOURCE_LABEL[appt.externalSource ?? 'other'] : isBlock ? 'Blocked' : appt.status;
   const hasLinks = !!(appt.telehealthLink || appt.managementLink);
 
   return (
     <>
       <View
-        className={`rounded-xl border mb-2 ${isExternal ? 'bg-gray-50 border-gray-100 border-dashed' : 'bg-white border-gray-100'}`}
+        className={`rounded-xl border mb-2 ${isDimmed ? 'bg-gray-50 border-gray-100 border-dashed' : 'bg-white border-gray-100'}`}
       >
         <TouchableOpacity
           onPress={isExternal ? () => setExternalDetail(true) : onPress}
-          disabled={!isExternal && !onPress}
+          disabled={isBlock || (!isExternal && !onPress)}
           className="p-4 flex-row items-center gap-3"
         >
           <View className="items-center w-14">
-            <Text className={`font-bold text-sm ${isExternal ? 'text-gray-500' : 'text-primary-700'}`}>{time}</Text>
+            <Text className={`font-bold text-sm ${isDimmed ? 'text-gray-500' : 'text-primary-700'}`}>{time}</Text>
             <View
               className="mt-1 px-2 py-0.5 rounded-full"
               style={{ backgroundColor: `${statusColor}18` }}
@@ -140,14 +144,14 @@ export function AppointmentCard({ appt, onPress }: { appt: Appointment; onPress?
           <View className="w-px h-10 bg-gray-100" />
 
           <View className="flex-1">
-            <Text className={`font-semibold text-sm ${isExternal ? 'text-gray-500' : 'text-gray-900'}`}>
-              {isExternal ? appt.type ?? 'Busy' : appt.patient}
+            <Text className={`font-semibold text-sm ${isDimmed ? 'text-gray-500' : 'text-gray-900'}`}>
+              {isDimmed ? appt.type ?? 'Busy' : appt.patient}
             </Text>
             {isExternal ? (
               appt.externalLocation ? (
                 <Text className="text-gray-400 text-xs mt-0.5">{appt.externalLocation}</Text>
               ) : null
-            ) : (
+            ) : isBlock ? null : (
               <Text className="text-gray-500 text-xs mt-0.5">{appt.type ?? 'Appointment'}</Text>
             )}
           </View>

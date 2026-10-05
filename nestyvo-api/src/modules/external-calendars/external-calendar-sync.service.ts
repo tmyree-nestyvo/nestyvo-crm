@@ -5,6 +5,7 @@ import { IsNull, LessThan, Repository } from 'typeorm';
 import * as ical from 'node-ical';
 import { ExternalCalendarFeed, ExternalCalendarSource } from '../../database/entities/external-calendar-feed.entity';
 import { ExternalBusyBlock } from '../../database/entities/external-busy-block.entity';
+import { ACTIVE_PROVIDER_WHERE } from '../../database/entities/provider.entity';
 
 // Workstream C (Oct 3 2026) — extracted straight from inspecting both of
 // Gencia's real, live feeds directly (not guessed): Rula puts a unique
@@ -80,8 +81,17 @@ export class ExternalCalendarSyncService {
     // matching, so this crashed on every single run and no feed was ever
     // auto-refreshing — only the manual "sync now" button actually worked.
     // IsNull() is the correct way to match a SQL NULL here.
+    // Charlene, Oct 5 2026 — "Disable external calendar synchronization
+    // where appropriate" for a deactivated provider. ACTIVE_PROVIDER_WHERE
+    // applied as a nested relation filter rather than loading every due
+    // feed and checking after — stops wasted syncs (and the Rula/Headway
+    // requests behind them) for a provider who's no longer live.
     const due = await this.feedRepo.find({
-      where: [{ lastSyncedAt: LessThan(new Date(Date.now() - SYNC_INTERVAL_MS)) }, { lastSyncedAt: IsNull() }],
+      where: [
+        { lastSyncedAt: LessThan(new Date(Date.now() - SYNC_INTERVAL_MS)), provider: ACTIVE_PROVIDER_WHERE },
+        { lastSyncedAt: IsNull(), provider: ACTIVE_PROVIDER_WHERE },
+      ],
+      relations: { provider: { practice: true } },
       take: 100,
     });
     for (const feed of due) {

@@ -8,6 +8,26 @@ export enum ProviderStatus {
   VACATION = 'vacation',
 }
 
+// Charlene, Oct 5 2026 — "fix the underlying active-provider filtering
+// rather than only cleaning up test data." Confirmed the actual bug: a
+// provider deactivated (or removed by soft-deleting their whole practice,
+// Practice.isActive) kept appearing in calendar selectors and dashboard
+// availability, because every place that fetches "which providers matter
+// right now" filtered Provider.status alone, inconsistently, with no
+// single shared definition — one query had no status filter at all. This
+// is the one place "active" is defined; every query below reuses it
+// instead of re-deriving its own notion of active.
+//
+// Deliberately two states, not three ("Active / Deactivated / Archived"
+// per her wording) — INACTIVE already means exactly "hidden from active
+// operations, history fully preserved," which is what "archived" would
+// also mean here. A provider is never hard-deleted, so there's nothing a
+// third state would additionally represent.
+export const ACTIVE_PROVIDER_WHERE = {
+  status: ProviderStatus.ACTIVE,
+  practice: { isActive: true },
+} as const;
+
 @Entity('providers')
 export class Provider {
   @PrimaryGeneratedColumn('uuid')
