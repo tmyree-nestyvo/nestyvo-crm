@@ -155,6 +155,7 @@ export class ProvidersController {
     const providers = await this.providersService.listForUser(user, practiceId);
     return providers.map((p) => ({
       id: p.id,
+      practiceId: p.practiceId,
       firstName: p.firstName,
       lastName: p.lastName,
       credentials: p.credentials,
@@ -162,6 +163,20 @@ export class ProvidersController {
       status: p.status,
       isVirtual: p.isVirtual,
       isInPerson: p.isInPerson,
+      // Charlene, Oct 5 2026 — traced "profile edits not persisting" and
+      // "Gencia shows No login yet" to the same root cause: this response
+      // silently dropped every field below, even though the save itself
+      // was always correct (confirmed directly against the database).
+      // userId specifically is what `hasLogin` is computed from on the
+      // Partners screen — it was never present, so every provider always
+      // looked logo-in-less regardless of reality. calendarFeedToken is
+      // deliberately still excluded (see its own entity comment — stays
+      // out of every response except the provider's own feed-URL call).
+      userId: p.userId,
+      phone: p.phone,
+      email: p.email,
+      officeLocation: p.officeLocation,
+      defaultSlotDurationMin: p.defaultSlotDurationMin,
     }));
   }
 

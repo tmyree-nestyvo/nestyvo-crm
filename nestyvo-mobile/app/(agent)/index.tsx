@@ -218,7 +218,7 @@ export default function AgentDashboard() {
               className="flex-row items-center gap-1 bg-gray-100 px-3 py-1.5 rounded-xl mr-1"
             >
               <Ionicons name="briefcase-outline" size={14} color="#374151" />
-              <Text className="text-gray-700 text-xs font-medium">Partners</Text>
+              <Text className="text-gray-700 text-xs font-medium">Providers</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity

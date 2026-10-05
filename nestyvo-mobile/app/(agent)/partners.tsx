@@ -455,7 +455,7 @@ function PracticeDetail({ practiceId, onBack }: { practiceId: string; onBack: ()
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['practice', practiceId] });
       queryClient.invalidateQueries({ queryKey: ['practices-admin'] });
-      Alert.alert('Saved', 'Partner details updated.');
+      Alert.alert('Saved', 'Provider details updated.');
     },
     onError: (err: any) => Alert.alert('Could not save', err?.response?.data?.message || 'Please try again.'),
   });
@@ -466,15 +466,15 @@ function PracticeDetail({ practiceId, onBack }: { practiceId: string; onBack: ()
       queryClient.invalidateQueries({ queryKey: ['practices-admin'] });
       queryClient.invalidateQueries({ queryKey: ['practices'] });
       queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
-      Alert.alert('Partner removed', `${practice?.name ?? 'The partner'} no longer appears in Nestyvo.`);
+      Alert.alert('Provider removed', `${practice?.name ?? 'The provider'} no longer appears in Nestyvo.`);
       onBack();
     },
-    onError: (err: any) => Alert.alert('Could not remove partner', err?.response?.data?.message || 'Please try again.'),
+    onError: (err: any) => Alert.alert('Could not remove provider', err?.response?.data?.message || 'Please try again.'),
   });
 
   function confirmRemove() {
     Alert.alert(
-      `Remove ${practice?.name ?? 'this partner'}?`,
+      `Remove ${practice?.name ?? 'this provider'}?`,
       'They disappear from every list and picker. Their history is kept, so this can be undone if it was a mistake.',
       [
         { text: 'Cancel', style: 'cancel' },
@@ -495,7 +495,7 @@ function PracticeDetail({ practiceId, onBack }: { practiceId: string; onBack: ()
     <ScrollView className="flex-1" contentContainerClassName="px-5 pb-10">
       <TouchableOpacity onPress={onBack} className="flex-row items-center gap-1.5 mb-4 mt-1">
         <Ionicons name="chevron-back" size={18} color="#6b7280" />
-        <Text className="text-gray-500 text-sm">All Partners</Text>
+        <Text className="text-gray-500 text-sm">All Providers</Text>
       </TouchableOpacity>
 
       <Text className="text-xl font-bold text-gray-900 mb-4">{practice.name}</Text>
@@ -565,7 +565,7 @@ function PracticeDetail({ practiceId, onBack }: { practiceId: string; onBack: ()
             ) : (
               <>
                 <Ionicons name="trash-outline" size={15} color="#dc2626" />
-                <Text className="text-red-600 font-semibold text-sm">Remove this partner</Text>
+                <Text className="text-red-600 font-semibold text-sm">Remove this provider</Text>
               </>
             )}
           </TouchableOpacity>
@@ -607,9 +607,9 @@ export default function PartnersScreen() {
       // partner dropdown to infer it worked. Landing on the new partner's
       // detail screen (above) already showed it existed; this alert makes
       // that explicit instead of implicit.
-      Alert.alert('Partner added', `${created.name} was created. Add their providers below whenever you're ready.`);
+      Alert.alert('Provider added', `${created.name} was created. Add their providers below whenever you're ready.`);
     },
-    onError: (err: any) => Alert.alert('Could not create partner', err?.response?.data?.message || 'Please try again.'),
+    onError: (err: any) => Alert.alert('Could not create provider', err?.response?.data?.message || 'Please try again.'),
   });
 
   return (
@@ -618,14 +618,14 @@ export default function PartnersScreen() {
         <TouchableOpacity onPress={() => router.back()} className="p-1 -ml-1">
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
-        <Text className="text-xl font-bold text-gray-900 flex-1">Partners</Text>
+        <Text className="text-xl font-bold text-gray-900 flex-1">Providers</Text>
         {mode === 'list' && canManagePartners && (
           <TouchableOpacity
             onPress={() => setMode('create')}
             className="flex-row items-center gap-1.5 bg-primary-600 px-3.5 py-2 rounded-full"
           >
             <Ionicons name="add" size={16} color="#fff" />
-            <Text className="text-white text-xs font-semibold">New Partner</Text>
+            <Text className="text-white text-xs font-semibold">New Provider</Text>
           </TouchableOpacity>
         )}
         <HomeButton href="/(agent)" />
@@ -637,12 +637,12 @@ export default function PartnersScreen() {
         <ScrollView className="flex-1" contentContainerClassName="px-5 pb-10">
           <TouchableOpacity onPress={() => setMode('list')} className="flex-row items-center gap-1.5 mb-4 mt-1">
             <Ionicons name="chevron-back" size={18} color="#6b7280" />
-            <Text className="text-gray-500 text-sm">All Partners</Text>
+            <Text className="text-gray-500 text-sm">All Providers</Text>
           </TouchableOpacity>
           <Text className="text-xs text-gray-400 mb-4">
-            Add a new partner business. Once created, you'll add their providers and logins on the next screen.
+            Add a new provider business. Once created, you'll add their providers and logins on the next screen.
           </Text>
-          <PracticeForm onSubmit={(v) => createPractice.mutate(v)} submitting={createPractice.isPending} submitLabel="Create Partner" />
+          <PracticeForm onSubmit={(v) => createPractice.mutate(v)} submitting={createPractice.isPending} submitLabel="Create Provider" />
         </ScrollView>
       ) : (
         <ScrollView className="flex-1" contentContainerClassName="px-5 pb-10">
@@ -651,7 +651,7 @@ export default function PartnersScreen() {
           ) : practices.length === 0 ? (
             <View className="bg-white rounded-2xl border border-gray-100 p-8 items-center mt-4">
               <Ionicons name="briefcase-outline" size={36} color="#d1d5db" />
-              <Text className="text-gray-400 text-sm mt-3">No partners yet</Text>
+              <Text className="text-gray-400 text-sm mt-3">No providers yet</Text>
             </View>
           ) : (
             practices.map((p: any) => {

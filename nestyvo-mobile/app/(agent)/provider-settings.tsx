@@ -519,9 +519,15 @@ export default function ProviderSettingsScreen() {
       </View>
 
       <ScrollView className="flex-1" contentContainerClassName="px-5 pb-10">
+        {/* Charlene, Oct 5 2026 — "standardize to Provider throughout," but
+            this one screen genuinely needs two distinct labels (the
+            business, then the individual person within it) or the two
+            pickers below would both read "Provider" and be impossible to
+            tell apart. "Business" is the least overloaded option that
+            still drops "Partner" entirely. */}
         <PickerField
-          label="Partner"
-          placeholder="Select a partner practice"
+          label="Business"
+          placeholder="Select a business"
           value={practice}
           options={practiceOptions}
           onSelect={(opt) => { setPractice(opt); setProvider(null); }}
@@ -529,7 +535,7 @@ export default function ProviderSettingsScreen() {
 
         <PickerField
           label="Provider"
-          placeholder={practice ? 'Select a provider' : 'Select a partner first'}
+          placeholder={practice ? 'Select a provider' : 'Select a business first'}
           value={provider}
           options={providerOptions}
           onSelect={setProvider}
@@ -546,15 +552,15 @@ export default function ProviderSettingsScreen() {
             <Ionicons name="person-add-outline" size={26} color="#d1d5db" />
             <Text className="text-gray-500 text-sm text-center mt-2 mb-3">
               {practice.label} doesn't have any providers yet. Hours and recurring blocks are set per
-              provider, so add one first — the partner's own business info and subscription status can
-              still be edited from Partners without a provider.
+              provider, so add one first — the business's own info and subscription status can
+              still be edited from Providers without one.
             </Text>
             <TouchableOpacity
               onPress={() => router.push('/(agent)/partners')}
               className="flex-row items-center gap-1.5 bg-primary-600 px-4 py-2.5 rounded-full"
             >
               <Ionicons name="briefcase-outline" size={14} color="#fff" />
-              <Text className="text-white text-xs font-semibold">Go to Partners</Text>
+              <Text className="text-white text-xs font-semibold">Go to Providers</Text>
             </TouchableOpacity>
           </View>
         ) : null}
