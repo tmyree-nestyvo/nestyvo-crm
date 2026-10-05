@@ -568,6 +568,15 @@ export class ProvidersService {
       locationType: a.locationType,
       source: 'nestyvo' as const,
     }));
+    // Charlene, Oct 5 2026 — "Agent/Admin may see the scheduling
+    // information necessary to perform their work... but should NOT
+    // receive/retrieve: Telehealth/session URL, External platform
+    // management URL." Enforced here at the API level (not just a hidden
+    // UI button) — only the provider viewing their OWN schedule gets the
+    // real links back. assertScheduleAccess above already guarantees a
+    // PROVIDER-role caller can only ever reach their own providerId, so
+    // this check is sufficient without re-deriving ownership again.
+    const includeLinks = user?.role === UserRole.PROVIDER;
     const externalRows = externalBlocks.map((b) => ({
       id: b.id,
       startAt: b.startAt,
@@ -583,8 +592,8 @@ export class ProvidersService {
       // anywhere past the sync. No client name field here deliberately —
       // neither Rula's nor Headway's feed carries one (see the entity's
       // comment); this is everything the raw data actually supports.
-      telehealthLink: b.telehealthLink,
-      managementLink: b.managementLink,
+      telehealthLink: includeLinks ? b.telehealthLink : null,
+      managementLink: includeLinks ? b.managementLink : null,
       externalLocation: b.location,
     }));
 
