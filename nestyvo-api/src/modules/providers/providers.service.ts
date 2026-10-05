@@ -472,9 +472,16 @@ export class ProvidersService {
     //
     // Admins and agents work across every partner practice — let them scope the
     // list to a specific one (e.g. for a provider-assignment dropdown) on request.
+    // `relations: { user: true }` on the three admin-management branches
+    // below (Charlene, Phase 9 item 23, Oct 5 2026) — the Partners screen's
+    // login-status card needs the actual User row (createdAt, isActive,
+    // lastLoginAt, role), not just the userId presence check hasLogin
+    // already used. Not added to the provider-self branch at the bottom —
+    // a provider never sees this card for their own account.
     if (targetPracticeId && (user.role === UserRole.ADMINISTRATOR || user.role === UserRole.SCHEDULING_AGENT)) {
       return this.providerRepo.find({
         where: { practiceId: targetPracticeId } as any,
+        relations: { user: true },
         order: { lastName: 'ASC' },
       });
     }
@@ -484,12 +491,17 @@ export class ProvidersService {
     // Slot's new-client flow), not as a picker surface — active-only is
     // correct and safe here.
     if (user.role === UserRole.ADMINISTRATOR || user.role === UserRole.SCHEDULING_AGENT) {
-      return this.providerRepo.find({ where: ACTIVE_PROVIDER_WHERE, relations: { practice: true }, order: { lastName: 'ASC' } });
+      return this.providerRepo.find({
+        where: ACTIVE_PROVIDER_WHERE,
+        relations: { practice: true, user: true },
+        order: { lastName: 'ASC' },
+      });
     }
 
     if (user.role === UserRole.PRACTICE_MANAGER) {
       return this.providerRepo.find({
         where: { practiceId: user.practiceId } as any,
+        relations: { user: true },
         order: { lastName: 'ASC' },
       });
     }

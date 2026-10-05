@@ -31,6 +31,14 @@ import { hasRole, ADMIN_ONLY, PRACTICE_MANAGEMENT } from '../../lib/role-groups'
 //                        each provider row only offers "Hours, blocks &
 //                        calendars" — no edit form, no login/reset controls.
 
+// Charlene, Phase 9 item 23 (Oct 5 2026) — "I want accurate visibility
+// into: account created, account/login status, last successful login,
+// associated user/role." Used by the login-detail panel below.
+function fmtLoginDate(iso: string | null) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 type SubStatus = 'trial' | 'active' | 'past_due' | 'canceled';
 
 const STATUS_CONFIG: Record<SubStatus, { label: string; color: string; bg: string }> = {
@@ -345,10 +353,18 @@ function ProviderRow({ provider, practiceId, canManage }: { provider: any; pract
             <Ionicons
               name={hasLogin ? 'key' : 'key-outline'}
               size={11}
-              color={hasLogin ? '#16a34a' : '#d97706'}
+              color={hasLogin ? (provider.login?.mustChangePassword ? '#d97706' : '#16a34a') : '#d97706'}
             />
-            <Text className={`text-xs ${hasLogin ? 'text-green-700' : 'text-amber-700'}`}>
-              {hasLogin ? 'Login active' : 'No login yet'}
+            {/* Phase 9 item 23 — a created-but-never-used login previously
+                read identically to a long-active one ("Login active" either
+                way). Distinguish it, same data (mustChangePassword) already
+                drives the "invited" send flow elsewhere in this screen. */}
+            <Text
+              className={`text-xs ${
+                !hasLogin ? 'text-amber-700' : provider.login?.mustChangePassword ? 'text-amber-700' : 'text-green-700'
+              }`}
+            >
+              {!hasLogin ? 'No login yet' : provider.login?.mustChangePassword ? 'Invited, not yet signed in' : 'Login active'}
             </Text>
             {provider.specialty ? <Text className="text-gray-400 text-xs">· {provider.specialty}</Text> : null}
             {!isActive && (
@@ -385,9 +401,45 @@ function ProviderRow({ provider, practiceId, canManage }: { provider: any; pract
               <FormField label="Contact email" value={email} onChangeText={setEmail} keyboardType="email-address" />
 
               {hasLogin ? (
-                <View className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 mb-3 flex-row items-center justify-between gap-2">
+                <View className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 mb-3">
+                  {/* Charlene, Phase 9 item 23 — real detail, not just the
+                      yes/no badge. All 4 fields already existed on the User
+                      row; this is a display fix, not new tracking. */}
+                  {provider.login ? (
+                    <View className="mb-2.5">
+                      <View className="flex-row items-center justify-between mb-1">
+                        <Text className="text-gray-500 text-xs">Account</Text>
+                        <Text className="text-gray-800 text-xs font-medium">{provider.login.email}</Text>
+                      </View>
+                      <View className="flex-row items-center justify-between mb-1">
+                        <Text className="text-gray-500 text-xs">Role</Text>
+                        <Text className="text-gray-800 text-xs font-medium capitalize">
+                          {String(provider.login.role).replace('_', ' ')}
+                        </Text>
+                      </View>
+                      <View className="flex-row items-center justify-between mb-1">
+                        <Text className="text-gray-500 text-xs">Status</Text>
+                        <Text className={`text-xs font-medium ${provider.login.isActive ? 'text-green-700' : 'text-red-600'}`}>
+                          {provider.login.isActive ? 'Enabled' : 'Disabled'}
+                        </Text>
+                      </View>
+                      <View className="flex-row items-center justify-between mb-1">
+                        <Text className="text-gray-500 text-xs">Created</Text>
+                        <Text className="text-gray-800 text-xs font-medium">{fmtLoginDate(provider.login.createdAt)}</Text>
+                      </View>
+                      <View className="flex-row items-center justify-between">
+                        <Text className="text-gray-500 text-xs">Last login</Text>
+                        <Text className="text-gray-800 text-xs font-medium">
+                          {provider.login.mustChangePassword
+                            ? 'Invited, not yet signed in'
+                            : fmtLoginDate(provider.login.lastLoginAt) ?? 'Never'}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
+                  <View className="flex-row items-center justify-between gap-2 pt-2.5 border-t border-gray-100">
                   <Text className="text-gray-600 text-xs flex-1">
-                    Has an active sign-in. Resetting issues a new temporary password and invalidates the old one immediately.
+                    Resetting issues a new temporary password and invalidates the old one immediately.
                   </Text>
                   <TouchableOpacity
                     onPress={() =>
@@ -409,6 +461,7 @@ function ProviderRow({ provider, practiceId, canManage }: { provider: any; pract
                       <Text className="text-gray-700 text-xs font-semibold">Reset</Text>
                     )}
                   </TouchableOpacity>
+                  </View>
                 </View>
               ) : (
                 <>

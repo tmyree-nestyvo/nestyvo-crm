@@ -180,6 +180,24 @@ export class ProvidersController {
       email: p.email,
       officeLocation: p.officeLocation,
       defaultSlotDurationMin: p.defaultSlotDurationMin,
+      // Charlene, Phase 9 item 23 (Oct 5 2026) — "No login yet" itself was
+      // already fixed above (hasLogin reads userId, which now arrives),
+      // but that's only ever a yes/no signal. She asked for real
+      // visibility: account created, login status, last successful login,
+      // associated user/role. All four already exist on the User row
+      // (createdAt, isActive, lastLoginAt, role) — this is a display fix,
+      // not new tracking, so nothing else needed building. passwordHash
+      // etc. stay excluded (select: false on the entity, untouched here).
+      login: p.user
+        ? {
+            email: p.user.email,
+            role: p.user.role,
+            isActive: p.user.isActive,
+            createdAt: p.user.createdAt,
+            lastLoginAt: p.user.lastLoginAt,
+            mustChangePassword: p.user.mustChangePassword,
+          }
+        : null,
     }));
   }
 
