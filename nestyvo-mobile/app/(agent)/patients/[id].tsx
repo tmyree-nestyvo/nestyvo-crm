@@ -180,11 +180,19 @@ export default function PatientDetailScreen() {
   );
 }
 
-const TICKET_CATEGORIES = ['scheduling', 'billing', 'clinical', 'technical', 'other'];
+// Charlene, Phase 8 item 22 (Oct 5 2026) — selectable set is now exactly
+// these 4 (see the identical note in (provider)/tickets.tsx).
+const TICKET_CATEGORIES = ['outbound_call', 'reschedule_request', 'technical', 'other'];
+const CATEGORY_LABEL: Record<string, string> = {
+  outbound_call: 'Outbound Call',
+  reschedule_request: 'Reschedule Request',
+  technical: 'Technical',
+  other: 'Other',
+};
 const TICKET_PRIORITIES = ['low', 'normal', 'high'];
 
 function TicketModal({ visible, onClose, patientId }: { visible: boolean; onClose: () => void; patientId: string }) {
-  const [category, setCategory] = useState('scheduling');
+  const [category, setCategory] = useState('outbound_call');
   const [priority, setPriority] = useState('normal');
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
@@ -199,7 +207,7 @@ function TicketModal({ visible, onClose, patientId }: { visible: boolean; onClos
   });
 
   const reset = () => {
-    setCategory('scheduling');
+    setCategory('outbound_call');
     setPriority('normal');
     setSubject('');
     setDescription('');
@@ -233,7 +241,7 @@ function TicketModal({ visible, onClose, patientId }: { visible: boolean; onClos
                     onPress={() => setCategory(c)}
                     className={`px-3 py-1.5 rounded-full border ${category === c ? 'bg-primary-600 border-primary-600' : 'bg-gray-50 border-gray-200'}`}
                   >
-                    <Text className={`text-xs font-medium capitalize ${category === c ? 'text-white' : 'text-gray-600'}`}>{c}</Text>
+                    <Text className={`text-xs font-medium ${category === c ? 'text-white' : 'text-gray-600'}`}>{CATEGORY_LABEL[c]}</Text>
                   </TouchableOpacity>
                 ))}
               </View>

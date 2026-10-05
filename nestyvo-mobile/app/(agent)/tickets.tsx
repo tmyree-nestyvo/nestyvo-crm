@@ -17,6 +17,25 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   closed: { label: 'Closed', color: '#6b7280', bg: '#f9fafb' },
 };
 
+// Charlene, Phase 8 item 22 — see the identical note in (provider)/tickets.tsx.
+// The no-filter view returns Open + In Progress together, but the subtitle
+// and this filter's own chip were both separately hardcoded to 'Open' —
+// same literal label as the adjacent true-open-only chip right next to it.
+const DEFAULT_FILTER_LABEL = 'All Active';
+
+// Charlene, Phase 8 item 22 — selectable categories (see the create flow in
+// patients/[id].tsx) are now exactly these 4; legacy values stay valid for
+// historical tickets, hence the extra entries in this label map.
+const CATEGORY_LABEL: Record<string, string> = {
+  outbound_call: 'Outbound Call',
+  reschedule_request: 'Reschedule Request',
+  technical: 'Technical',
+  other: 'Other',
+  scheduling: 'Scheduling',
+  billing: 'Billing',
+  clinical: 'Clinical',
+};
+
 const PRIORITY_COLOR: Record<string, string> = { low: '#9ca3af', normal: '#6b7280', high: '#dc2626' };
 
 function daysAgo(iso: string) {
@@ -61,7 +80,7 @@ export default function TicketsScreen() {
         <View className="flex-1">
           <Text className="text-xl font-bold text-gray-900">Tickets</Text>
           <Text className="text-xs text-gray-400 mt-0.5">
-            {isOffice ? 'All tickets for your practice' : 'Tickets you filed'} · {data.length} ticket{data.length !== 1 ? 's' : ''} · {filter ? STATUS_CONFIG[filter]?.label : 'Open'}
+            {isOffice ? 'All tickets for your practice' : 'Tickets you filed'} · {data.length} ticket{data.length !== 1 ? 's' : ''} · {filter ? STATUS_CONFIG[filter]?.label : DEFAULT_FILTER_LABEL}
           </Text>
         </View>
         <HomeButton href="/(agent)" />
@@ -75,7 +94,7 @@ export default function TicketsScreen() {
             className={`px-3 py-1.5 rounded-full border ${filter === s ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`}
           >
             <Text className={`text-xs font-medium ${filter === s ? 'text-white' : 'text-gray-600'}`}>
-              {s ? STATUS_CONFIG[s].label : 'Open'}
+              {s ? STATUS_CONFIG[s].label : DEFAULT_FILTER_LABEL}
             </Text>
           </TouchableOpacity>
         ))}
@@ -120,7 +139,7 @@ export default function TicketsScreen() {
                 <Text className="text-gray-500 text-sm mt-2 leading-5" numberOfLines={2}>{t.description}</Text>
                 <View className="flex-row items-center gap-2 mt-2.5 pt-2.5 border-t border-gray-50">
                   <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: PRIORITY_COLOR[t.priority] }} />
-                  <Text className="text-gray-400 text-xs capitalize">{t.priority} · {t.category}</Text>
+                  <Text className="text-gray-400 text-xs capitalize">{t.priority}</Text><Text className="text-gray-400 text-xs"> · {CATEGORY_LABEL[t.category] ?? t.category}</Text>
                   <Text className="text-gray-300 text-xs ml-auto">
                     {t.createdByUser ? `${t.createdByUser.firstName} · ` : ''}{daysAgo(t.createdAt)}
                   </Text>
@@ -136,7 +155,9 @@ export default function TicketsScreen() {
           <View className="bg-white rounded-t-3xl px-5 pt-5 pb-10">
             <Text className="text-gray-400 text-xs font-semibold tracking-wide mb-1">#T-{active?.ticketNumber}</Text>
             <Text className="text-base font-bold text-gray-900 mb-1">{active?.subject}</Text>
-            <Text className="text-gray-400 text-sm mb-4 capitalize">{active?.priority} priority · {active?.category}</Text>
+            <Text className="text-gray-400 text-sm mb-4">
+              <Text className="capitalize">{active?.priority}</Text> priority · {CATEGORY_LABEL[active?.category] ?? active?.category}
+            </Text>
             <Text className="text-gray-600 text-sm leading-5 mb-4">{active?.description}</Text>
 
             <Text className="text-gray-500 text-xs font-medium mb-2">Resolution notes</Text>

@@ -14,7 +14,29 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   closed: { label: 'Closed', color: '#6b7280', bg: '#f9fafb' },
 };
 
-const TICKET_CATEGORIES = ['scheduling', 'billing', 'clinical', 'technical', 'other'];
+// Charlene, Phase 8 item 22 — "remove the duplicated Open status/display."
+// The no-filter view (status undefined) actually returns Open + In Progress
+// together (ticketsService.list's default), but both the header subtitle
+// and this same filter's own chip were separately hardcoded to the literal
+// string 'Open' — identical to the adjacent chip for the true open-only
+// filter, so the row visually read as two "Open" buttons side by side. One
+// label, used by both the subtitle and the chip, so they can't drift apart.
+const DEFAULT_FILTER_LABEL = 'All Active';
+
+// Charlene, Phase 8 item 22 (Oct 5 2026) — the selectable set is now
+// exactly these 4. Legacy values (scheduling/billing/clinical) stay in the
+// backend enum and this label map purely so existing historical tickets
+// still display correctly — nothing forces old tickets into a new category.
+const TICKET_CATEGORIES = ['outbound_call', 'reschedule_request', 'technical', 'other'];
+const CATEGORY_LABEL: Record<string, string> = {
+  outbound_call: 'Outbound Call',
+  reschedule_request: 'Reschedule Request',
+  technical: 'Technical',
+  other: 'Other',
+  scheduling: 'Scheduling',
+  billing: 'Billing',
+  clinical: 'Clinical',
+};
 
 function daysAgo(iso: string) {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
@@ -62,7 +84,7 @@ export default function ProviderTicketsScreen() {
         <View className="flex-1">
           <Text className="text-xl font-bold text-gray-900">Requests</Text>
           <Text className="text-xs text-gray-400 mt-0.5">
-            {data.length} ticket{data.length !== 1 ? 's' : ''} · {filter ? STATUS_CONFIG[filter]?.label : 'Open'}
+            {data.length} ticket{data.length !== 1 ? 's' : ''} · {filter ? STATUS_CONFIG[filter]?.label : DEFAULT_FILTER_LABEL}
           </Text>
         </View>
         <TouchableOpacity
@@ -83,7 +105,7 @@ export default function ProviderTicketsScreen() {
             className={`px-3 py-1.5 rounded-full border ${filter === s ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`}
           >
             <Text className={`text-xs font-medium ${filter === s ? 'text-white' : 'text-gray-600'}`}>
-              {s ? STATUS_CONFIG[s].label : 'Open'}
+              {s ? STATUS_CONFIG[s].label : DEFAULT_FILTER_LABEL}
             </Text>
           </TouchableOpacity>
         ))}
@@ -127,7 +149,7 @@ export default function ProviderTicketsScreen() {
                 </View>
                 <Text className="text-gray-500 text-sm mt-2 leading-5" numberOfLines={2}>{t.description}</Text>
                 <View className="flex-row items-center gap-2 mt-2.5 pt-2.5 border-t border-gray-50">
-                  <Text className="text-gray-400 text-xs capitalize">{t.category}</Text>
+                  <Text className="text-gray-400 text-xs">{CATEGORY_LABEL[t.category] ?? t.category}</Text>
                   <Text className="text-gray-300 text-xs ml-auto">
                     {t.createdByUser ? `${t.createdByUser.firstName} · ` : ''}{daysAgo(t.createdAt)}
                   </Text>
@@ -147,7 +169,7 @@ export default function ProviderTicketsScreen() {
             {active?.patient ? (
               <Text className="text-gray-400 text-sm mb-1">{active.patient.firstName} {active.patient.lastName}</Text>
             ) : null}
-            <Text className="text-gray-400 text-sm mb-4 capitalize">{active?.category}</Text>
+            <Text className="text-gray-400 text-sm mb-4">{CATEGORY_LABEL[active?.category] ?? active?.category}</Text>
             <Text className="text-gray-600 text-sm leading-5 mb-4">{active?.description}</Text>
 
             <Text className="text-gray-500 text-xs font-medium mb-2">Your reply / next action</Text>
@@ -193,7 +215,7 @@ export default function ProviderTicketsScreen() {
 
 function NewRequestModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const [patient, setPatient] = useState<{ id: string; name: string } | null>(null);
-  const [category, setCategory] = useState('scheduling');
+  const [category, setCategory] = useState('outbound_call');
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -204,7 +226,7 @@ function NewRequestModal({ visible, onClose }: { visible: boolean; onClose: () =
 
   const reset = () => {
     setPatient(null);
-    setCategory('scheduling');
+    setCategory('outbound_call');
     setSubject('');
     setDescription('');
     setPickerOpen(false);
@@ -248,7 +270,7 @@ function NewRequestModal({ visible, onClose }: { visible: boolean; onClose: () =
                 onPress={() => setCategory(c)}
                 className={`px-3 py-1.5 rounded-full border ${category === c ? 'bg-primary-600 border-primary-600' : 'bg-gray-50 border-gray-200'}`}
               >
-                <Text className={`text-xs font-medium capitalize ${category === c ? 'text-white' : 'text-gray-600'}`}>{c}</Text>
+                <Text className={`text-xs font-medium ${category === c ? 'text-white' : 'text-gray-600'}`}>{CATEGORY_LABEL[c]}</Text>
               </TouchableOpacity>
             ))}
           </View>

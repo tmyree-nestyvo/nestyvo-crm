@@ -4,11 +4,19 @@ import { Patient } from './patient.entity';
 import { User } from './user.entity';
 
 export enum TicketCategory {
+  // Charlene, Phase 8 item 22 (Oct 5 2026) — the Provider Request form's
+  // selectable set is now exactly OUTBOUND_CALL/RESCHEDULE_REQUEST/
+  // TECHNICAL/OTHER. The three legacy values below are kept (not removed —
+  // Postgres enum values can't be dropped without recreating the whole
+  // type, and real historical tickets already use them) purely so old
+  // tickets keep displaying correctly; nothing creates them going forward.
+  OUTBOUND_CALL = 'outbound_call',
+  RESCHEDULE_REQUEST = 'reschedule_request',
+  TECHNICAL = 'technical',
+  OTHER = 'other',
   SCHEDULING = 'scheduling',
   BILLING = 'billing',
   CLINICAL = 'clinical',
-  TECHNICAL = 'technical',
-  OTHER = 'other',
 }
 
 export enum TicketPriority {

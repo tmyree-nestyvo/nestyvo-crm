@@ -15,6 +15,19 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
 
 const PRIORITY_COLOR: Record<string, string> = { low: '#9ca3af', normal: '#6b7280', high: '#dc2626' };
 
+// Charlene, Phase 8 item 22 — see the identical note in (agent)/tickets.tsx.
+// Read-only history here, but legacy categories can still appear on older
+// tickets, so the fallback entries stay.
+const CATEGORY_LABEL: Record<string, string> = {
+  outbound_call: 'Outbound Call',
+  reschedule_request: 'Reschedule Request',
+  technical: 'Technical',
+  other: 'Other',
+  scheduling: 'Scheduling',
+  billing: 'Billing',
+  clinical: 'Clinical',
+};
+
 function daysAgo(iso: string) {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
   if (d === 0) return 'Today';
@@ -83,7 +96,9 @@ export default function ProviderClientDetailScreen() {
                 ) : null}
                 <View className="flex-row items-center gap-2 mt-2.5 pt-2.5 border-t border-gray-50">
                   <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: PRIORITY_COLOR[t.priority] }} />
-                  <Text className="text-gray-400 text-xs capitalize">{t.priority} · {t.category}</Text>
+                  <Text className="text-gray-400 text-xs">
+                    <Text className="capitalize">{t.priority}</Text> · {CATEGORY_LABEL[t.category] ?? t.category}
+                  </Text>
                   <Text className="text-gray-300 text-xs ml-auto">
                     {t.createdByUser ? `${t.createdByUser.firstName} · ` : ''}{daysAgo(t.createdAt)}
                   </Text>
