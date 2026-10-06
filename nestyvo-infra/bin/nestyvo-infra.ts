@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib/core';
 import { NetworkStack } from '../lib/network-stack';
+import { DatabaseStack } from '../lib/database-stack';
 
 const app = new cdk.App();
 
@@ -11,4 +12,6 @@ const app = new cdk.App();
 // region active can't accidentally stand up resources somewhere else.
 const env = { account: '454911205143', region: 'us-east-2' };
 
-new NetworkStack(app, 'NestyvoNetworkStack', { env });
+const network = new NetworkStack(app, 'NestyvoNetworkStack', { env });
+
+new DatabaseStack(app, 'NestyvoDatabaseStack', { env, vpc: network.vpc });
