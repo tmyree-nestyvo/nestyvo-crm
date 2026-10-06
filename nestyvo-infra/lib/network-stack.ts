@@ -49,6 +49,21 @@ export class NetworkStack extends cdk.Stack {
       service: ec2.GatewayVpcEndpointAwsService.S3,
     });
 
+    // Interface endpoint for Secrets Manager — NOT optional, discovered the
+    // hard way in Phase 4 (Oct 5 2026). This "new AWS experience" account
+    // carries an AWS-managed Resource Control Policy (confirmed via
+    // `iam simulate-principal-policy`, showing an org-level explicit deny
+    // with MatchedStatements: [] — the identity policy was correct and
+    // irrelevant) that blocks secretsmanager:GetSecretValue (and several
+    // other services) for calls that leave the VPC over the NAT Gateway to
+    // the public regional API endpoint. The Fargate execution role's IAM
+    // policy was correct the whole time; every secret fetch failed anyway
+    // until traffic had a private path. ~$7.30/mo + minor data processing.
+    this.vpc.addInterfaceEndpoint('SecretsManagerEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+    });
+
     // ECR repo for the API container image (Phase 4 pulls from this).
     // imageScanOnPush — free vulnerability scanning on every push, a real
     // security control worth having before this environment holds PHI.

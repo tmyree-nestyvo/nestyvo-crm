@@ -3,6 +3,7 @@ import * as cdk from 'aws-cdk-lib/core';
 import { NetworkStack } from '../lib/network-stack';
 import { DatabaseStack } from '../lib/database-stack';
 import { SecretsStack } from '../lib/secrets-stack';
+import { ComputeStack } from '../lib/compute-stack';
 
 const app = new cdk.App();
 
@@ -15,6 +16,17 @@ const env = { account: '454911205143', region: 'us-east-2' };
 
 const network = new NetworkStack(app, 'NestyvoNetworkStack', { env });
 
-new DatabaseStack(app, 'NestyvoDatabaseStack', { env, vpc: network.vpc });
+const database = new DatabaseStack(app, 'NestyvoDatabaseStack', { env, vpc: network.vpc });
 
-new SecretsStack(app, 'NestyvoSecretsStack', { env });
+const secrets = new SecretsStack(app, 'NestyvoSecretsStack', { env });
+
+new ComputeStack(app, 'NestyvoComputeStack', {
+  env,
+  vpc: network.vpc,
+  ecrRepo: network.ecrRepo,
+  dbSecurityGroup: database.dbSecurityGroup,
+  anthropicApiKey: secrets.anthropicApiKey,
+  jwtSecret: secrets.jwtSecret,
+  devLoginSecret: secrets.devLoginSecret,
+  databaseUrl: secrets.databaseUrl,
+});
