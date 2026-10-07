@@ -3,7 +3,7 @@ import { IsString, IsInt, IsOptional, IsBoolean, Min } from 'class-validator';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { OFFICE_STAFF, PRACTICE_MANAGEMENT } from '../../auth/role-groups';
+import { ALL_STAFF, OFFICE_STAFF, PRACTICE_MANAGEMENT } from '../../auth/role-groups';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { User } from '../../database/entities/user.entity';
 import { ClientTagsService } from './client-tags.service';
@@ -29,8 +29,13 @@ class UpdateTagDto {
 export class ClientTagsController {
   constructor(private tagsService: ClientTagsService) {}
 
+  // Charlene, Oct 6 2026 (Tax Refund 1040 pilot, item 7) — widened to
+  // ALL_STAFF (was OFFICE_STAFF, excluding PROVIDER). Write routes below
+  // stay OFFICE_STAFF-only — tag *definitions* stay staff-configured per
+  // item 12 ("providers select from configured tags, don't need
+  // permission to create new ones").
   @Get()
-  @Roles(...OFFICE_STAFF)
+  @Roles(...ALL_STAFF)
   list(@Query('practiceId') practiceId: string | undefined, @CurrentUser() user: User) {
     return this.tagsService.list(user, practiceId);
   }

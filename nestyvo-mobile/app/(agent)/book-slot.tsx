@@ -81,10 +81,24 @@ export default function BookSlotScreen() {
   const [typeModal, setTypeModal] = useState(false);
   const [selectedType, setSelectedType] = useState<ProviderAppointmentType | null>(null);
 
+  // Charlene, Oct 6 2026 (Tax Refund 1040 pilot) — the real bug behind
+  // "Business Tax Filing showed 45/50 min instead of 90": this field used
+  // to default to the RAW CLICKED SLOT's length (originalDurationMin,
+  // whatever the open-slot grid happened to generate) the moment this
+  // screen opened, before anyone touched the Appointment Type picker.
+  // Tapping the picker correctly overwrote it with the type's real
+  // duration — but nothing required that tap, so "Confirm Booking" would
+  // silently save the slot's raw length for anyone who skipped it. Now
+  // durationMin starts null (no fabricated default) when the provider has
+  // real types configured, and Confirm is disabled until a type is picked
+  // — matching her instruction that Appointment Type must be selected
+  // before completing the booking, not treated as optional. Providers
+  // with zero configured types (not this pilot, but don't break them)
+  // keep the old slot-length fallback — there's nothing else to select.
   const originalDurationMin = slotStartAt && slotEndAt
     ? Math.round((new Date(slotEndAt).getTime() - new Date(slotStartAt).getTime()) / 60000)
     : 50;
-  const [durationMin, setDurationMin] = useState(String(originalDurationMin));
+  const [durationMin, setDurationMin] = useState<string | null>(null);
 
   const { data: types = [] } = useQuery({
     queryKey: ['appointment-types', providerId],
@@ -92,13 +106,17 @@ export default function BookSlotScreen() {
     enabled: !!providerId,
   });
   const activeTypes = types.filter((t) => t.isActive);
+  const typeRequired = activeTypes.length > 0;
 
   const selectType = (t: ProviderAppointmentType) => {
     setSelectedType(t);
     setDurationMin(String(t.durationMin)); // auto-populate; agent can still edit below
   };
 
-  const effectiveDurationMin = Math.max(5, Number(durationMin) || originalDurationMin);
+  const effectiveDurationMin = durationMin !== null
+    ? Math.max(5, Number(durationMin) || originalDurationMin)
+    : originalDurationMin;
+  const canConfirm = !typeRequired || !!selectedType;
   const effectiveEndAt = slotStartAt
     ? new Date(new Date(slotStartAt).getTime() + effectiveDurationMin * 60000).toISOString()
     : slotEndAt;
@@ -164,34 +182,42 @@ export default function BookSlotScreen() {
               </Text>
             </View>
 
-            <Text className="text-gray-500 text-xs font-medium mb-2">Appointment Type</Text>
+            <Text className="text-gray-500 text-xs font-medium mb-2">
+              Appointment Type{typeRequired ? ' *' : ''}
+            </Text>
             <TouchableOpacity
               onPress={() => setTypeModal(true)}
-              className="flex-row items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 mb-4"
+              className={`flex-row items-center justify-between bg-gray-50 border rounded-xl px-3 py-3 mb-4 ${
+                typeRequired && !selectedType ? 'border-amber-300' : 'border-gray-200'
+              }`}
             >
               <Text className={selectedType ? 'text-gray-900 text-sm' : 'text-gray-400 text-sm'}>
-                {selectedType ? selectedType.name : 'None selected'}
+                {selectedType ? selectedType.name : 'Select an appointment type'}
               </Text>
               <Ionicons name="chevron-down" size={16} color="#9ca3af" />
             </TouchableOpacity>
 
             <Text className="text-gray-500 text-xs font-medium mb-2">Duration (minutes)</Text>
             <TextInput
-              value={durationMin}
+              value={durationMin ?? ''}
               onChangeText={setDurationMin}
               keyboardType="number-pad"
-              placeholder="50"
-              className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-900 mb-1"
+              placeholder={typeRequired ? 'Select a type first' : '50'}
+              editable={!!selectedType || !typeRequired}
+              className={`border rounded-xl px-3 py-3 text-sm mb-1 ${
+                selectedType || !typeRequired ? 'bg-gray-50 border-gray-200 text-gray-900' : 'bg-gray-100 border-gray-200 text-gray-400'
+              }`}
             />
             <Text className="text-gray-400 text-xs mb-5">
-              Ends {new Date(effectiveEndAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: TZ })}
-              {selectedType ? ` · default for ${selectedType.name} is ${selectedType.durationMin} min` : ''}
+              {selectedType || !typeRequired
+                ? `Ends ${new Date(effectiveEndAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: TZ })}${selectedType ? ` · default for ${selectedType.name} is ${selectedType.durationMin} min` : ''}`
+                : 'Pick an appointment type to set the default duration — you can still adjust it after.'}
             </Text>
 
             <TouchableOpacity
               onPress={() => bookAppointment.mutate()}
-              disabled={bookAppointment.isPending}
-              className="bg-primary-600 rounded-xl py-3 items-center"
+              disabled={bookAppointment.isPending || !canConfirm}
+              className={`rounded-xl py-3 items-center ${canConfirm ? 'bg-primary-600' : 'bg-gray-300'}`}
             >
               {bookAppointment.isPending ? (
                 <ActivityIndicator color="#fff" />

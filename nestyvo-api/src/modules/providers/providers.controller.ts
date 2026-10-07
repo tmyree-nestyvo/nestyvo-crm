@@ -334,13 +334,22 @@ export class ProvidersController {
     );
   }
 
+  // Charlene, Oct 6 2026 (Tax Refund 1040 pilot, item 2) — "Admin and
+  // Gloria's Provider login must both be able to... Schedule an
+  // appointment... Reschedule... Cancel." Widened from OFFICE_STAFF (which
+  // structurally excludes PROVIDER) to ALL_STAFF on these three routes,
+  // same pattern as Phase 5's appointment-types read widening —
+  // assertScheduleAccess (already used by getSchedule) adds the
+  // self-only check a Provider needs: can book/cancel/reschedule their
+  // own appointments, not anyone else's.
   @Post(':id/appointments')
-  @Roles(...OFFICE_STAFF)
+  @Roles(...ALL_STAFF)
   async bookAppointment(
     @Param('id') providerId: string,
     @Body() dto: BookAppointmentDto,
     @CurrentUser() user: User,
   ) {
+    await this.providersService.assertScheduleAccess(providerId, user);
     await this.providersService.assertBookable(providerId);
     const appt = this.appointmentRepo.create({
       providerId,
@@ -367,24 +376,28 @@ export class ProvidersController {
   }
 
   @Patch(':id/appointments/:appointmentId/cancel')
-  @Roles(...OFFICE_STAFF)
+  @Roles(...ALL_STAFF)
   async cancelAppointment(
+    @Param('id') providerId: string,
     @Param('appointmentId') appointmentId: string,
     @Body() dto: CancelAppointmentDto,
     @CurrentUser() user: User,
   ) {
+    await this.providersService.assertScheduleAccess(providerId, user);
     const result = await this.appointmentsService.cancel(appointmentId, { reason: dto.reason, user });
     if ((result as any).error) throw new NotFoundException((result as any).error);
     return result;
   }
 
   @Patch(':id/appointments/:appointmentId/reschedule')
-  @Roles(...OFFICE_STAFF)
+  @Roles(...ALL_STAFF)
   async rescheduleAppointment(
+    @Param('id') providerId: string,
     @Param('appointmentId') appointmentId: string,
     @Body() dto: RescheduleAppointmentDto,
     @CurrentUser() user: User,
   ) {
+    await this.providersService.assertScheduleAccess(providerId, user);
     const saved = await this.appointmentsService.reschedule(appointmentId, {
       newStartAt: new Date(dto.newStartAt),
       newEndAt: dto.newEndAt ? new Date(dto.newEndAt) : undefined,

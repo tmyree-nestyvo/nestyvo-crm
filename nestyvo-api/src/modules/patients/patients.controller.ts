@@ -3,7 +3,7 @@ import { IsOptional, IsString, IsEnum } from 'class-validator';
 import { JwtAuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { OFFICE_STAFF, ROSTER_ACCESS } from '../../auth/role-groups';
+import { ALL_STAFF, OFFICE_STAFF, ROSTER_ACCESS } from '../../auth/role-groups';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { User } from '../../database/entities/user.entity';
 import { PreferredContact } from '../../database/entities/patient.entity';
@@ -31,15 +31,22 @@ class CreatePatientDto {
 export class PatientsController {
   constructor(private patientsService: PatientsService) {}
 
+  // Charlene, Oct 6 2026 (Tax Refund 1040 pilot, item 2) — both widened
+  // from OFFICE_STAFF (excludes PROVIDER) to ALL_STAFF. `create` already
+  // worked for a provider's own practiceId (the caller supplies it
+  // explicitly — see providers/clients/new.tsx) but the route itself
+  // 403'd before ever reaching that code; `search` needed its own
+  // service-layer fix too (see patients.service.ts — PROVIDER's
+  // user.practiceId is always null).
   @Get()
-  @Roles(...OFFICE_STAFF)
+  @Roles(...ALL_STAFF)
   search(@Query('q') query: string, @CurrentUser() user: User) {
     if (!query || query.length < 2) return [];
     return this.patientsService.search(query, user);
   }
 
   @Post()
-  @Roles(...OFFICE_STAFF)
+  @Roles(...ALL_STAFF)
   create(@Body() dto: CreatePatientDto, @CurrentUser() user: User) {
     return this.patientsService.create(dto as any, user);
   }

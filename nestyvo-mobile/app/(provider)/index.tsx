@@ -70,16 +70,26 @@ export default function ProviderScheduleScreen() {
             </TouchableOpacity>
           )}
           <View>
-            <Text className="text-gray-500 text-sm">Provider View</Text>
+            {/* Charlene, Oct 6 2026 (Tax Refund 1040 pilot, item 13) —
+                "the business identity should consistently be Tax Refund
+                1040; Gloria is the provider/user." This header used to
+                lead with the provider's own name and nothing else — no
+                business name appeared here at all. Business now leads,
+                provider is the secondary line, matching every other
+                screen's convention (see partners.tsx, appointment
+                detail, etc.). */}
+            <Text className="text-gray-500 text-sm">
+              {data?.practiceName ?? 'Provider View'}
+            </Text>
             <Text className="text-xl font-bold text-gray-900">
               {noProviderAccount
                 ? 'No provider linked'
-                // Charlene, Phase 7 item 21 — no inferred "Dr." Show the
-                // configured name + credentials (e.g. "Gencia Williams,
-                // LMFT"); an honorific only ever appears if someone actually
-                // configures one, which doesn't exist as a field today, so
-                // none is shown. Falls back to the login's own name only
-                // while /dashboard/provider is still loading.
+                // Phase 7 item 21 — no inferred "Dr." Show the configured
+                // name + credentials (e.g. "Gencia Williams, LMFT"); an
+                // honorific only ever appears if someone actually
+                // configures one, which doesn't exist as a field today,
+                // so none is shown. Falls back to the login's own name
+                // only while /dashboard/provider is still loading.
                 : data?.firstName
                 ? `${data.firstName} ${data.lastName}${data.credentials ? `, ${data.credentials}` : ''}`
                 : name}

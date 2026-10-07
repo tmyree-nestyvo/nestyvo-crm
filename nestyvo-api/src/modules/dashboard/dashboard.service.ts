@@ -184,7 +184,12 @@ export class DashboardService {
   }
 
   async getProviderDashboard(user: User): Promise<any> {
-    const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
+    // relations: { practice: true } — Charlene, Oct 6 2026 (Tax Refund
+    // 1040 pilot, item 13): "the business identity should consistently be
+    // Tax Refund 1040; Gloria is the provider/user." The provider header
+    // only ever had the provider's own name to show, nothing else —
+    // literally no business-name field existed in this response before.
+    const provider = await this.providerRepo.findOne({ where: { userId: user.id }, relations: { practice: true } });
     if (!provider) return { availableSlots: 0, waitlistCount: 0, utilizationRate: 0, cancellationCount: 0, openRequestCount: 0, schedule: [] };
 
     const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
@@ -248,6 +253,7 @@ export class DashboardService {
       firstName: provider.firstName,
       lastName: provider.lastName,
       credentials: provider.credentials,
+      practiceName: provider.practice?.name ?? null,
       availableSlots,
       waitlistCount,
       utilizationRate: Math.min(utilizationRate, 100),

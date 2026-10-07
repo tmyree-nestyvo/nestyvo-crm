@@ -3,12 +3,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ClientTag } from '../../database/entities/client-tag.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
+import { Provider } from '../../database/entities/provider.entity';
 
 @Injectable()
 export class ClientTagsService {
-  constructor(@InjectRepository(ClientTag) private tagRepo: Repository<ClientTag>) {}
+  constructor(
+    @InjectRepository(ClientTag) private tagRepo: Repository<ClientTag>,
+    @InjectRepository(Provider) private providerRepo: Repository<Provider>,
+  ) {}
 
-  list(user: User, targetPracticeId?: string) {
+  async list(user: User, targetPracticeId?: string) {
     // GET /client-tags is OFFICE_STAFF (includes SCHEDULING_AGENT) — only
     // ADMINISTRATOR could actually use targetPracticeId though, so an agent
     // viewing/assigning tags for a patient outside their home practice
@@ -17,8 +21,25 @@ export class ClientTagsService {
     // create/update/remove stay PRACTICE_MANAGEMENT-only at the controller
     // level (Aug 21 2026 decision: tag *definitions* stay admin-controlled)
     // — this only widens read access, matching how assignment already works.
+    //
+    // Charlene, Oct 6 2026 (Tax Refund 1040 pilot, item 7 — "Nothing to
+    // pick from yet"): this never had a PROVIDER branch at all. A
+    // provider's own User row always has practiceId null (same gap
+    // documented since Aug 26 2026), so this fell straight to
+    // `user.practiceId` → null → zero rows, even though the frontend
+    // (clients/new.tsx) was already passing the right practiceId as
+    // targetPracticeId — isCrossPractice being false for PROVIDER meant
+    // that correct value was simply discarded.
     const isCrossPractice = user.role === UserRole.ADMINISTRATOR || user.role === UserRole.SCHEDULING_AGENT;
-    const practiceId = targetPracticeId && isCrossPractice ? targetPracticeId : user.practiceId;
+    let practiceId: string | undefined;
+    if (user.role === UserRole.PROVIDER) {
+      const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
+      if (!provider) return [];
+      practiceId = provider.practiceId;
+    } else {
+      practiceId = targetPracticeId && isCrossPractice ? targetPracticeId : user.practiceId;
+    }
+    if (!practiceId) return [];
     return this.tagRepo.find({
       where: { practiceId, isActive: true },
       order: { blockMinutes: 'ASC' },

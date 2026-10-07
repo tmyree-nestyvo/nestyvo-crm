@@ -81,8 +81,14 @@ export default function ProviderAvailableSlotsScreen() {
               </Text>
               <View className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                 {day.slots.map((slot: any, i: number) => (
-                  <View
+                  <TouchableOpacity
                     key={slot.startAt}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(provider)/book-appointment',
+                        params: { slotStartAt: slot.startAt, slotEndAt: slot.endAt },
+                      })
+                    }
                     className={`flex-row items-center px-4 py-3 gap-3 ${
                       i < day.slots.length - 1 ? 'border-b border-gray-50' : ''
                     }`}
@@ -94,7 +100,8 @@ export default function ProviderAvailableSlotsScreen() {
                       </Text>
                       <Text className="text-gray-400 text-xs mt-0.5">{slot.durationMin} min</Text>
                     </View>
-                  </View>
+                    <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
+                  </TouchableOpacity>
                 ))}
               </View>
             </View>

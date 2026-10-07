@@ -22,8 +22,24 @@ export class PatientsService {
     // Admins and scheduling agents work across every partner practice — agents are
     // Charlene's offshore team, not tied to one office, so they search everyone.
     // Practice managers and providers stay scoped to their own practice.
+    //
+    // Charlene, Oct 6 2026 (Tax Refund 1040 pilot) — the PROVIDER branch
+    // here was falling through to `{ practiceId: user.practiceId }`, but a
+    // provider's own User row always has practiceId null (it lives on
+    // their Provider row instead — the same gap documented since Aug 26
+    // 2026 in providers.service.ts). A provider calling this endpoint got
+    // either a TypeORM null-where crash or a silently empty result —
+    // meaning Gloria (or any provider) could never find an existing
+    // client by search at all. getRoster already has the correct pattern
+    // for this exact role; reused here.
     const isCrossPractice = user.role === UserRole.ADMINISTRATOR || user.role === UserRole.SCHEDULING_AGENT;
-    const baseWhere = isCrossPractice ? {} : { practiceId: user.practiceId };
+    let scopePracticeId: string | null = user.practiceId;
+    if (user.role === UserRole.PROVIDER) {
+      const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
+      if (!provider) return [];
+      scopePracticeId = provider.practiceId;
+    }
+    const baseWhere = isCrossPractice ? {} : { practiceId: scopePracticeId };
 
     const where: any[] = [
       { ...baseWhere, firstName: ILike(`%${query}%`) },

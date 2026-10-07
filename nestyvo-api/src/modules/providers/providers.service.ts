@@ -525,8 +525,12 @@ export class ProvidersService {
   // even their own schedule. Providers get a stricter, separate check here:
   // only their own schedule, not "same practice."
   // Shared by getSchedule and getAppointmentDetail — see the long comment
-  // above for why assertCanManage itself can't be reused here as-is.
-  private async assertScheduleAccess(providerId: string, user?: User): Promise<void> {
+  // above for why assertCanManage itself can't be reused here as-is. Not
+  // private anymore — Tax Refund 1040 pilot (Oct 6 2026, Charlene item 2)
+  // needed the exact same self-only check on the controller's book/
+  // cancel/reschedule routes once those widened to let a Provider manage
+  // their own appointments.
+  async assertScheduleAccess(providerId: string, user?: User): Promise<void> {
     if (!user) return;
     if (user.role === UserRole.PRACTICE_MANAGER) {
       const target = await this.providerRepo.findOne({ where: { id: providerId } });

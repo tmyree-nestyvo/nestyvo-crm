@@ -45,6 +45,7 @@ export default function ProviderLayout() {
       <Tabs.Screen name="clients/new" options={{ href: null }} />
       <Tabs.Screen name="cancellations" options={{ href: null }} />
       <Tabs.Screen name="available-slots" options={{ href: null }} />
+      <Tabs.Screen name="book-appointment" options={{ href: null }} />
       <Tabs.Screen name="calendar-export" options={{ href: null }} />
       <Tabs.Screen name="calendar" options={{ href: null }} />
     </Tabs>

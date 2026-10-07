@@ -4,9 +4,10 @@ import { ClientTagsService } from './client-tags.service';
 import { ClientTagsController } from './client-tags.controller';
 import { ClientTag } from '../../database/entities/client-tag.entity';
 import { User } from '../../database/entities/user.entity';
+import { Provider } from '../../database/entities/provider.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ClientTag, User])],
+  imports: [TypeOrmModule.forFeature([ClientTag, User, Provider])],
   providers: [ClientTagsService],
   controllers: [ClientTagsController],
   exports: [ClientTagsService],
