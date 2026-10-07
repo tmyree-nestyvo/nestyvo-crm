@@ -26,6 +26,12 @@ class CreatePatientDto {
   @IsOptional() @IsString() tagId?: string;
 }
 
+class ImportClientsDto {
+  @IsOptional() @IsString() practiceId?: string;
+  @IsOptional() @IsString() assignedProviderId?: string;
+  @IsString() csvText: string;
+}
+
 @Controller('patients')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PatientsController {
@@ -49,6 +55,16 @@ export class PatientsController {
   @Roles(...ALL_STAFF)
   create(@Body() dto: CreatePatientDto, @CurrentUser() user: User) {
     return this.patientsService.create(dto as any, user);
+  }
+
+  // Charlene, Oct 6 2026 (Tax Refund 1040 pilot, item 8) — admin
+  // onboarding action, not something a provider does for themselves,
+  // hence OFFICE_STAFF not ALL_STAFF (matches "Admin also needs a clear
+  // place to import" — her wording names Admin specifically).
+  @Post('import')
+  @Roles(...OFFICE_STAFF)
+  importClients(@Body() dto: ImportClientsDto, @CurrentUser() user: User) {
+    return this.patientsService.importClients(dto as any, user);
   }
 
   @Get('roster')

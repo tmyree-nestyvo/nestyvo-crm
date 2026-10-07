@@ -531,6 +531,23 @@ function ProviderRow({ provider, practiceId, canManage }: { provider: any; pract
             <Text className="text-gray-700 text-sm font-medium">Hours, blocks &amp; calendars</Text>
             <Ionicons name="chevron-forward" size={14} color="#9ca3af" />
           </TouchableOpacity>
+
+          {/* Charlene, Oct 6 2026 (Tax Refund 1040 pilot, item 8) — "Admin
+              also needs a clear place to import an existing client
+              directory into a provider/business during onboarding." */}
+          <TouchableOpacity
+            onPress={() =>
+              router.push({
+                pathname: '/(agent)/import-clients',
+                params: { presetPracticeId: practiceId, presetProviderId: provider.id, presetProviderName: `${provider.firstName} ${provider.lastName}` },
+              })
+            }
+            className="flex-row items-center justify-center gap-1.5 py-3 rounded-xl border border-gray-200 mt-2"
+          >
+            <Ionicons name="document-attach-outline" size={14} color="#374151" />
+            <Text className="text-gray-700 text-sm font-medium">Import clients</Text>
+            <Ionicons name="chevron-forward" size={14} color="#9ca3af" />
+          </TouchableOpacity>
         </View>
       )}
     </View>

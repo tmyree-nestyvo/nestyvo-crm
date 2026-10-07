@@ -283,6 +283,131 @@ export class PatientsService {
     return { id: saved.id, name: `${saved.firstName} ${saved.lastName}` };
   }
 
+  // Charlene, Oct 6 2026 (Tax Refund 1040 pilot, item 8) — "we should not
+  // have to manually recreate Gloria's existing client base one client at
+  // a time." Explicitly required for the pilot, not flagged-and-skipped
+  // like item 8 originally was when first investigated — the only prior
+  // capability was scripts/import-*-clients.ts, a standalone one-off CLI
+  // script per practice, not reachable from the app at all.
+  //
+  // CSV only, not real Excel (.xlsx) — no spreadsheet-parsing library is
+  // installed and adding one is a bigger dependency decision than this
+  // pass warrants; Admin exports/saves a CSV from Excel/Sheets first.
+  // Flagged honestly rather than silently claiming full Excel support.
+  //
+  // Column header matching is forgiving (name/client name, phone, email,
+  // tag — case/spacing insensitive) since real client directories won't
+  // all use Charlene's exact example headers.
+  //
+  // Per her doc's explicit if/then rule: "IF an imported tag is not
+  // recognized THEN it is surfaced for mapping/confirmation rather than
+  // silently lost or incorrectly merged." This pass doesn't build an
+  // interactive mapping UI (real new feature, flagged) — it imports the
+  // client either way but leaves the tag unset and reports exactly which
+  // rows/tag-strings didn't match an existing tag, so nothing is silently
+  // discarded or guessed at.
+  async importClients(
+    input: { practiceId: string; assignedProviderId?: string; csvText: string },
+    user: User,
+  ): Promise<{ imported: number; skipped: number; unmatchedTags: { row: string; tag: string }[] }> {
+    const practiceId = user.role === UserRole.PRACTICE_MANAGER ? user.practiceId : input.practiceId;
+    if (!practiceId) throw new BadRequestException('practiceId is required');
+
+    if (input.assignedProviderId) {
+      const provider = await this.providerRepo.findOne({ where: { id: input.assignedProviderId } });
+      if (!provider || provider.practiceId !== practiceId) {
+        throw new BadRequestException('Provider not found for this practice');
+      }
+    }
+
+    const rows = parseCsv(input.csvText);
+    if (rows.length === 0) return { imported: 0, skipped: 0, unmatchedTags: [] };
+
+    const header = rows[0].map((h) => h.trim().toLowerCase());
+    const col = (...names: string[]) => header.findIndex((h) => names.includes(h));
+    const nameCol = col('name', 'client name', 'full name');
+    const firstCol = col('first name', 'firstname');
+    const lastCol = col('last name', 'lastname');
+    const phoneCol = col('phone', 'phone number');
+    const emailCol = col('email', 'email address');
+    const tagCol = col('tag', 'client tag', 'tags');
+
+    const existingTags = await this.tagRepo.find({ where: { practiceId, isActive: true } });
+    const tagByName = new Map(existingTags.map((t) => [t.name.trim().toLowerCase(), t]));
+
+    const existingPatients = await this.patientRepo.find({ where: { practiceId } });
+    const existingPhones = new Set(existingPatients.map((p) => p.phone).filter(Boolean));
+    const existingEmails = new Set(existingPatients.map((p) => p.email?.toLowerCase()).filter(Boolean));
+
+    let imported = 0;
+    let skipped = 0;
+    const unmatchedTags: { row: string; tag: string }[] = [];
+
+    for (const cells of rows.slice(1)) {
+      if (cells.every((c) => !c.trim())) continue; // blank row
+
+      let firstName = '';
+      let lastName = '';
+      if (nameCol >= 0 && cells[nameCol]) {
+        const parts = cells[nameCol].trim().split(/\s+/);
+        firstName = parts[0] ?? '';
+        lastName = parts.slice(1).join(' ') || parts[0];
+      } else {
+        firstName = (firstCol >= 0 ? cells[firstCol] : '')?.trim() ?? '';
+        lastName = (lastCol >= 0 ? cells[lastCol] : '')?.trim() ?? '';
+      }
+      if (!firstName) { skipped++; continue; }
+
+      const phone = phoneCol >= 0 ? cells[phoneCol]?.trim() : undefined;
+      const email = emailCol >= 0 ? cells[emailCol]?.trim() : undefined;
+
+      // Idempotent re-import safety, same convention as the old CLI
+      // scripts — a row whose phone or email already exists in this
+      // practice is treated as already-imported, not duplicated.
+      if ((phone && existingPhones.has(phone)) || (email && existingEmails.has(email.toLowerCase()))) {
+        skipped++;
+        continue;
+      }
+
+      let tagId: string | undefined;
+      const tagRaw = tagCol >= 0 ? cells[tagCol]?.trim() : undefined;
+      if (tagRaw) {
+        const match = tagByName.get(tagRaw.toLowerCase());
+        if (match) tagId = match.id;
+        else unmatchedTags.push({ row: `${firstName} ${lastName}`.trim(), tag: tagRaw });
+      }
+
+      const saved = await this.patientRepo.save(
+        this.patientRepo.create({
+          practiceId,
+          firstName,
+          lastName: lastName || firstName,
+          phone: phone || undefined,
+          email: email || undefined,
+          preferredContact: phone ? PreferredContact.PHONE : PreferredContact.EMAIL,
+          assignedProviderId: input.assignedProviderId,
+          tagId,
+          createdBy: user.id,
+        }),
+      );
+      if (phone) existingPhones.add(phone);
+      if (email) existingEmails.add(email.toLowerCase());
+      imported++;
+
+      await this.auditRepo.save(
+        this.auditRepo.create({
+          userId: user.id,
+          action: 'patient.import',
+          resourceType: 'patient',
+          resourceId: saved.id,
+          newValues: saved as any,
+        }),
+      );
+    }
+
+    return { imported, skipped, unmatchedTags };
+  }
+
   async setTag(patientId: string, tagId: string | null, user: User) {
     const patient = await this.patientRepo.findOne({ where: { id: patientId } });
     if (!patient) throw new NotFoundException('Patient not found');
@@ -332,4 +457,32 @@ export class PatientsService {
         createdAt: l.createdAt,
       }));
   }
+}
+
+// Minimal CSV parser (not a full RFC4180 implementation) — handles quoted
+// fields containing commas ("Smith, Jr.") and escaped quotes (""), which a
+// real client directory exported from Excel/Sheets is likely to contain.
+// No library dependency added for this — see importClients' own comment.
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  const pushField = () => { row.push(field); field = ''; };
+  const pushRow = () => { pushField(); rows.push(row); row = []; };
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (c === '"') inQuotes = false;
+      else field += c;
+    } else if (c === '"') inQuotes = true;
+    else if (c === ',') pushField();
+    else if (c === '\n') pushRow();
+    else if (c === '\r') { /* skip, \n handles the row break */ }
+    else field += c;
+  }
+  if (field.length > 0 || row.length > 0) pushRow();
+  return rows.filter((r) => r.length > 0);
 }

@@ -91,6 +91,9 @@ export const patientsApi = {
     referralSource?: string;
     tagId?: string;
   }) => api.post('/patients', input).then((r) => r.data),
+  // Charlene, Oct 6 2026 (Tax Refund 1040 pilot, item 8).
+  import: (input: { practiceId: string; assignedProviderId?: string; csvText: string }) =>
+    api.post('/patients/import', input).then((r) => r.data),
 };
 
 // Providers

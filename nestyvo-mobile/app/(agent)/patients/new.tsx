@@ -224,6 +224,22 @@ export default function NewClientScreen() {
         >
           <Text className="text-gray-500 text-sm">View Profile Instead</Text>
         </TouchableOpacity>
+        {/* Charlene, Oct 6 2026 (Tax Refund 1040 pilot, item 9) — "Add New
+            Client → complete → move on → return to add another client...
+            the interface can remain stuck on the previously created
+            client/workflow." This screen had no way back to a blank form
+            at all — only "book" or "view profile." router.replace to the
+            bare route (no params) forces a genuinely fresh instance, not
+            just a local state reset — any preset provider/slot params
+            from how this screen was originally reached (e.g. from Fill
+            Slot) are dropped too, so they can't leak into the next,
+            unrelated client. */}
+        <TouchableOpacity
+          onPress={() => router.replace('/(agent)/patients/new')}
+          className="mt-1 py-2"
+        >
+          <Text className="text-primary-600 text-sm font-medium">Add Another Client</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
