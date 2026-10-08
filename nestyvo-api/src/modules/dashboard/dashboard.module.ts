@@ -13,6 +13,7 @@ import { User } from '../../database/entities/user.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { Ticket } from '../../database/entities/ticket.entity';
 import { ExternalBusyBlock } from '../../database/entities/external-busy-block.entity';
+import { ProviderAppointmentType } from '../../database/entities/provider-appointment-type.entity';
 import { ProvidersModule } from '../providers/providers.module';
 import { DashboardService } from './dashboard.service';
 import { DashboardController } from './dashboard.controller';
@@ -33,6 +34,7 @@ import { DashboardController } from './dashboard.controller';
       AuditLog,
       Ticket,
       ExternalBusyBlock,
+      ProviderAppointmentType,
     ]),
     ProvidersModule,
   ],

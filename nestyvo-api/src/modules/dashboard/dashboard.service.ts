@@ -14,6 +14,7 @@ import { Patient } from '../../database/entities/patient.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { Ticket, TicketStatus } from '../../database/entities/ticket.entity';
 import { ExternalBusyBlock } from '../../database/entities/external-busy-block.entity';
+import { ProviderAppointmentType } from '../../database/entities/provider-appointment-type.entity';
 import { FillCandidatesService } from '../providers/fill-candidates.service';
 
 @Injectable()
@@ -31,6 +32,7 @@ export class DashboardService {
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
     @InjectRepository(Ticket) private ticketRepo: Repository<Ticket>,
     @InjectRepository(ExternalBusyBlock) private externalBlockRepo: Repository<ExternalBusyBlock>,
+    @InjectRepository(ProviderAppointmentType) private appointmentTypeRepo: Repository<ProviderAppointmentType>,
     private fillCandidatesService: FillCandidatesService,
   ) {}
 
@@ -113,6 +115,22 @@ export class DashboardService {
       where: { providerId: In(providerIds), isActive: true },
     });
 
+    // Charlene, Oct 8 2026 (Tax Refund 1040 pilot, item 4's display half) —
+    // "it should not permanently divide the day into arbitrary length
+    // appointments that conflict with the provider's configured Appointment
+    // Types." The grid's step size used to always be defaultSlotDurationMin
+    // (an unconfigured entity default, 50) regardless of what the provider
+    // actually offers — Gloria's real types are 60/90, so every open slot
+    // looked like it conflicted with both. Not "just changing the 50 to
+    // another number" (explicitly told not to) — this derives the step from
+    // the provider's own real configured types, per provider, falling back
+    // to defaultSlotDurationMin only when no types exist yet to derive from.
+    // The booking itself was already correct (Phase 1 of this pilot fixed
+    // that) — this is purely the open-slot *display* catching up to match.
+    const allAppointmentTypes = await this.appointmentTypeRepo.find({
+      where: { providerId: In(providerIds), isActive: true },
+    });
+
     // Build per-provider slot data grouped by date
     const providerData = providers.map((provider) => {
       const availability = allAvailability.filter((a) => a.providerId === provider.id);
@@ -121,6 +139,10 @@ export class DashboardService {
         ...allBlocks.filter((b) => b.providerId === provider.id),
         ...allExternalBlocks.filter((b) => b.providerId === provider.id),
       ];
+      const types = allAppointmentTypes.filter((t) => t.providerId === provider.id);
+      const gridStepMin = types.length > 0
+        ? Math.min(...types.map((t) => t.durationMin))
+        : provider.defaultSlotDurationMin;
 
       const slotsByDate = computeSlotsByDate(
         provider.id,
@@ -130,7 +152,7 @@ export class DashboardService {
         availability,
         booked,
         blocks,
-        provider.defaultSlotDurationMin,
+        gridStepMin,
       );
 
       const totalSlots = slotsByDate.reduce((sum, d) => sum + d.slots.length, 0);
@@ -297,7 +319,7 @@ export class DashboardService {
     const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
     const daysOut = new Date(startOfToday); daysOut.setDate(daysOut.getDate() + days);
 
-    const [availability, booked, ownBlocks, externalBlocks] = await Promise.all([
+    const [availability, booked, ownBlocks, externalBlocks, activeTypes] = await Promise.all([
       this.availabilityRepo.find({ where: { providerId: provider.id, isActive: true } }),
       this.appointmentRepo.find({
         where: {
@@ -308,11 +330,18 @@ export class DashboardService {
       }),
       this.blockRepo.find({ where: { providerId: provider.id, startAt: Between(startOfToday, daysOut) } }),
       this.externalBlockRepo.find({ where: { providerId: provider.id, startAt: Between(startOfToday, daysOut) } }),
+      this.appointmentTypeRepo.find({ where: { providerId: provider.id, isActive: true } }),
     ]);
     const blocks = [...ownBlocks, ...externalBlocks];
+    // Same grid-step derivation as getAgentDashboard above — see that
+    // comment for the full reasoning. Keeps this provider's own "Available
+    // Slots" card consistent with what Admin sees for them.
+    const gridStepMin = activeTypes.length > 0
+      ? Math.min(...activeTypes.map((t) => t.durationMin))
+      : provider.defaultSlotDurationMin;
 
     const slotsByDate = computeSlotsByDate(
-      provider.id, startOfToday, daysOut, now, availability, booked, blocks, provider.defaultSlotDurationMin,
+      provider.id, startOfToday, daysOut, now, availability, booked, blocks, gridStepMin,
     );
     const totalSlots = slotsByDate.reduce((sum, d) => sum + d.slots.length, 0);
 
