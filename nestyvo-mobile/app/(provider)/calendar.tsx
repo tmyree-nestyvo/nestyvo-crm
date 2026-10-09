@@ -132,11 +132,11 @@ export default function ProviderCalendarScreen() {
           onSelectDay={goToDay}
         />
       ) : viewMode === 'week' ? (
-        <WeekView selectedDate={selectedDate} today={today} apptsByDate={apptsByDate} onSelectDay={setSelectedDate} />
+        <WeekView selectedDate={selectedDate} today={today} apptsByDate={apptsByDate} onSelectDay={setSelectedDate} providerId={data?.providerId} />
       ) : viewMode === 'day' ? (
-        <DayView selectedDate={selectedDate} today={today} appts={apptsByDate[selectedDate] ?? []} onChangeDate={setSelectedDate} />
+        <DayView selectedDate={selectedDate} today={today} appts={apptsByDate[selectedDate] ?? []} onChangeDate={setSelectedDate} providerId={data?.providerId} />
       ) : (
-        <JournalView apptsByDate={apptsByDate} isRefetching={isRefetching} onRefresh={refetch} />
+        <JournalView apptsByDate={apptsByDate} isRefetching={isRefetching} onRefresh={refetch} providerId={data?.providerId} />
       )}
     </SafeAreaView>
   );
@@ -214,8 +214,8 @@ function MonthView({
 }
 
 function WeekView({
-  selectedDate, today, apptsByDate, onSelectDay,
-}: { selectedDate: string; today: string; apptsByDate: Record<string, any[]>; onSelectDay: (iso: string) => void }) {
+  selectedDate, today, apptsByDate, onSelectDay, providerId,
+}: { selectedDate: string; today: string; apptsByDate: Record<string, any[]>; onSelectDay: (iso: string) => void; providerId?: string }) {
   const weekStart = startOfWeek(selectedDate);
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart);
@@ -255,7 +255,7 @@ function WeekView({
               {d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
             </Text>
             {appts.map((a) => (
-              <AppointmentCard key={a.id} appt={a} onPress={() => a.patientId && router.push(`/(provider)/clients/${a.patientId}`)} />
+              <AppointmentCard key={a.id} appt={a} onPress={() => a.patientId && router.push({ pathname: '/(provider)/appointments/[id]', params: { id: a.id, providerId } })} />
             ))}
           </View>
         );
@@ -265,8 +265,8 @@ function WeekView({
 }
 
 function DayView({
-  selectedDate, today, appts, onChangeDate,
-}: { selectedDate: string; today: string; appts: any[]; onChangeDate: (iso: string) => void }) {
+  selectedDate, today, appts, onChangeDate, providerId,
+}: { selectedDate: string; today: string; appts: any[]; onChangeDate: (iso: string) => void; providerId?: string }) {
   const shift = (delta: number) => {
     const d = new Date(selectedDate + 'T00:00:00');
     d.setDate(d.getDate() + delta);
@@ -291,7 +291,7 @@ function DayView({
         </View>
       ) : (
         appts.map((a) => (
-          <AppointmentCard key={a.id} appt={a} onPress={() => a.patientId && router.push(`/(provider)/clients/${a.patientId}`)} />
+          <AppointmentCard key={a.id} appt={a} onPress={() => a.patientId && router.push({ pathname: '/(provider)/appointments/[id]', params: { id: a.id, providerId } })} />
         ))
       )}
     </ScrollView>
@@ -299,8 +299,8 @@ function DayView({
 }
 
 function JournalView({
-  apptsByDate, isRefetching, onRefresh,
-}: { apptsByDate: Record<string, any[]>; isRefetching: boolean; onRefresh: () => void }) {
+  apptsByDate, isRefetching, onRefresh, providerId,
+}: { apptsByDate: Record<string, any[]>; isRefetching: boolean; onRefresh: () => void; providerId?: string }) {
   const dates = Object.keys(apptsByDate).sort();
 
   return (
@@ -324,7 +324,7 @@ function JournalView({
                 {d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
               </Text>
               {apptsByDate[iso].map((a) => (
-                <AppointmentCard key={a.id} appt={a} onPress={() => a.patientId && router.push(`/(provider)/clients/${a.patientId}`)} />
+                <AppointmentCard key={a.id} appt={a} onPress={() => a.patientId && router.push({ pathname: '/(provider)/appointments/[id]', params: { id: a.id, providerId } })} />
               ))}
             </View>
           );

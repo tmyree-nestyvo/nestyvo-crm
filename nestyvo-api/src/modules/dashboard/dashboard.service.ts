@@ -269,6 +269,10 @@ export class DashboardService {
       // provider's actual configured name/credentials at all, so the
       // frontend had nothing real to show instead. Added here — the
       // Provider row is already loaded above.
+      // Oct 9 2026 — added alongside the new provider appointment-detail
+      // screen (reschedule/cancel), which needs the provider's own id to
+      // build its route — this response never exposed it before.
+      providerId: provider.id,
       firstName: provider.firstName,
       lastName: provider.lastName,
       credentials: provider.credentials,
