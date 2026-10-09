@@ -115,21 +115,21 @@ export class DashboardService {
       where: { providerId: In(providerIds), isActive: true },
     });
 
-    // Charlene, Oct 8 2026 (Tax Refund 1040 pilot, item 4's display half) —
-    // "it should not permanently divide the day into arbitrary length
-    // appointments that conflict with the provider's configured Appointment
-    // Types." The grid's step size used to always be defaultSlotDurationMin
-    // (an unconfigured entity default, 50) regardless of what the provider
-    // actually offers — Gloria's real types are 60/90, so every open slot
-    // looked like it conflicted with both. Not "just changing the 50 to
-    // another number" (explicitly told not to) — this derives the step from
-    // the provider's own real configured types, per provider, falling back
-    // to defaultSlotDurationMin only when no types exist yet to derive from.
-    // The booking itself was already correct (Phase 1 of this pilot fixed
-    // that) — this is purely the open-slot *display* catching up to match.
-    const allAppointmentTypes = await this.appointmentTypeRepo.find({
-      where: { providerId: In(providerIds), isActive: true },
-    });
+    // Charlene, Oct 9 2026 (Tax Refund 1040 pilot, live-tested with Troy) —
+    // reverts the Oct 8 "derive the grid step from Math.min() of active
+    // appointment types" fix. That approach was fragile in exactly the way
+    // it looks: Charlene created one throwaway 25-min test type live during
+    // a walkthrough, and the ENTIRE grid for every client collapsed to
+    // 25-minute steps — any new type, including a test/leftover one nobody
+    // actually books against, silently corrupts the whole calendar. Her own
+    // stated expectation on the call: appointments should default to a
+    // stable, on-the-hour cadence ("every booking should be, like, twelve,
+    // one, two, three") that an individual booking's actual type/duration
+    // can locally override (already correct — a 90-min booking already
+    // occupies its own real 90-min span, confirmed), but that doesn't ever
+    // reshape the baseline grid for everyone else. Back to the provider's
+    // own configured defaultSlotDurationMin as the one source of truth for
+    // the grid step — simple, explicit, and nothing a test type can corrupt.
 
     // Build per-provider slot data grouped by date
     const providerData = providers.map((provider) => {
@@ -139,10 +139,7 @@ export class DashboardService {
         ...allBlocks.filter((b) => b.providerId === provider.id),
         ...allExternalBlocks.filter((b) => b.providerId === provider.id),
       ];
-      const types = allAppointmentTypes.filter((t) => t.providerId === provider.id);
-      const gridStepMin = types.length > 0
-        ? Math.min(...types.map((t) => t.durationMin))
-        : provider.defaultSlotDurationMin;
+      const gridStepMin = provider.defaultSlotDurationMin;
 
       const slotsByDate = computeSlotsByDate(
         provider.id,
@@ -319,7 +316,7 @@ export class DashboardService {
     const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
     const daysOut = new Date(startOfToday); daysOut.setDate(daysOut.getDate() + days);
 
-    const [availability, booked, ownBlocks, externalBlocks, activeTypes] = await Promise.all([
+    const [availability, booked, ownBlocks, externalBlocks] = await Promise.all([
       this.availabilityRepo.find({ where: { providerId: provider.id, isActive: true } }),
       this.appointmentRepo.find({
         where: {
@@ -330,15 +327,13 @@ export class DashboardService {
       }),
       this.blockRepo.find({ where: { providerId: provider.id, startAt: Between(startOfToday, daysOut) } }),
       this.externalBlockRepo.find({ where: { providerId: provider.id, startAt: Between(startOfToday, daysOut) } }),
-      this.appointmentTypeRepo.find({ where: { providerId: provider.id, isActive: true } }),
     ]);
     const blocks = [...ownBlocks, ...externalBlocks];
-    // Same grid-step derivation as getAgentDashboard above — see that
-    // comment for the full reasoning. Keeps this provider's own "Available
-    // Slots" card consistent with what Admin sees for them.
-    const gridStepMin = activeTypes.length > 0
-      ? Math.min(...activeTypes.map((t) => t.durationMin))
-      : provider.defaultSlotDurationMin;
+    // Same grid-step reasoning as getAgentDashboard above (Oct 9 2026 —
+    // reverted the type-derived Math.min() approach after it collapsed the
+    // whole grid from one throwaway test type). Keeps this provider's own
+    // "Available Slots" card consistent with what Admin sees for them.
+    const gridStepMin = provider.defaultSlotDurationMin;
 
     const slotsByDate = computeSlotsByDate(
       provider.id, startOfToday, daysOut, now, availability, booked, blocks, gridStepMin,
