@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function AgentLayout() {
@@ -51,6 +51,24 @@ export default function AgentLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
           ),
+        }}
+        // Oct 9 2026 — Charlene/Troy call: after a reschedule, returning to
+        // the Calendar tab kept showing "pick a new time" and wouldn't let
+        // go, even after Home and back. React Navigation's tab navigator
+        // restores each tab's last screen state by default — calendar.tsx's
+        // own reschedule mode is driven entirely by URL params
+        // (rescheduleAppointmentId etc.), so the restored instance still
+        // carried them even though the reschedule had already succeeded and
+        // navigated away. Reschedule's own success handler already
+        // navigates to a clean appointment-detail route — the gap was
+        // getting back to Calendar afterward. Forcing a clean, param-free
+        // replace on every tab press (not just the first) means the tab bar
+        // can never hand back a stale reschedule/booking state again.
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            router.replace('/(agent)/calendar');
+          },
         }}
       />
       <Tabs.Screen name="open-slots" options={{ href: null }} />

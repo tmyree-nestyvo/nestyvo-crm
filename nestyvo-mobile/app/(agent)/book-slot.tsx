@@ -168,6 +168,17 @@ export default function BookSlotScreen() {
             >
               <Text className="text-white font-semibold text-sm">View Profile</Text>
             </TouchableOpacity>
+            {/* Oct 9 2026 — Charlene's own flow on the call always books a
+                client's first appointment immediately after creating them,
+                landing here, not on patients/new.tsx's own success screen
+                (which already had this button, Pass 2 of the pilot) — this
+                screen was the one still missing it. */}
+            <TouchableOpacity
+              onPress={() => router.replace('/(agent)/patients/new')}
+              className="mt-3 py-2"
+            >
+              <Text className="text-primary-600 text-sm font-medium">Add Another Client</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <View className="bg-white rounded-2xl border border-gray-100 p-6 w-full max-w-sm">
