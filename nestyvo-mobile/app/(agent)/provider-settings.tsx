@@ -126,6 +126,63 @@ function timeAgo(iso: string | null) {
   return `Synced ${Math.floor(hrs / 24)}d ago`;
 }
 
+// Oct 9 2026 — Charlene/Troy call: Charlene came to this screen (where
+// Appointment Types/Hours/Blocks already live) looking for "session
+// length," but that field only existed on partners.tsx's separate Edit
+// Provider form. With nowhere to set it here, she typed "Change Business
+// Hours" / 60 into the Appointment Types "Add" form instead — which did
+// exactly what it's supposed to (created a new bookable type with that
+// name), just not what she meant. Root cause wasn't a bug in either form;
+// it was this screen missing the one field someone would naturally look
+// for here. Added alongside Appointment Types rather than only fixing it
+// in partners.tsx, so it's visible exactly where Charlene went looking.
+function DefaultDurationSection({ providerId, currentValue }: { providerId: string; currentValue: number }) {
+  const queryClient = useQueryClient();
+  const [value, setValue] = useState(String(currentValue));
+
+  useEffect(() => { setValue(String(currentValue)); }, [currentValue]);
+
+  const save = useMutation({
+    mutationFn: () => providersApi.update(providerId, { defaultSlotDurationMin: Number(value) || currentValue }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['providers'] });
+      Alert.alert('Saved', 'Default session length updated.');
+    },
+    onError: (err: any) => Alert.alert('Could not save', err?.response?.data?.message || 'Please try again.'),
+  });
+
+  const dirty = value.trim() !== String(currentValue);
+
+  return (
+    <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-5">
+      <Text className="text-base font-semibold text-gray-900 mb-1">Default Session Length</Text>
+      <Text className="text-gray-400 text-xs mb-3">
+        The calendar's baseline grid for this provider — e.g. 60 means appointments land on the hour by
+        default. This is separate from Appointment Types below: a type's own duration still governs what
+        actually gets booked and saved, this only sets the open-slot spacing shown on the calendar.
+      </Text>
+      <View className="flex-row items-center gap-2">
+        <TextInput
+          value={value}
+          onChangeText={setValue}
+          keyboardType="number-pad"
+          placeholder="60"
+          placeholderTextColor="#9ca3af"
+          className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-900"
+        />
+        <Text className="text-gray-400 text-sm">minutes</Text>
+        <TouchableOpacity
+          onPress={() => save.mutate()}
+          disabled={!dirty || save.isPending}
+          className={`rounded-xl px-4 py-3 items-center ${!dirty ? 'bg-gray-200' : 'bg-gray-900'}`}
+        >
+          {save.isPending ? <ActivityIndicator color="#fff" /> : <Text className={`font-semibold text-sm ${!dirty ? 'text-gray-400' : 'text-white'}`}>Save</Text>}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 // Workstream B (Oct 3 2026) — Charlene: "Each provider should have a
 // configurable list of appointment/service types that apply specifically
 // to that provider" — never a global list across providers. Lives here
@@ -391,6 +448,9 @@ export default function ProviderSettingsScreen() {
     queryFn: () => providersApi.list(practice!.id),
     enabled: !!practice,
   });
+  // `provider` (the picker's selection) is only {id, label} — need the full
+  // record from the list above for defaultSlotDurationMin.
+  const fullProvider = providers.find((p: any) => p.id === provider?.id);
 
   const { data: availability, isLoading: loadingAvailability } = useQuery({
     queryKey: ['provider-availability', provider?.id],
@@ -911,6 +971,13 @@ export default function ProviderSettingsScreen() {
                 </View>
               ) : null}
             </View>
+
+            {fullProvider && (
+              <DefaultDurationSection
+                providerId={provider.id}
+                currentValue={fullProvider.defaultSlotDurationMin ?? 50}
+              />
+            )}
 
             <AppointmentTypesSection providerId={provider.id} />
 
