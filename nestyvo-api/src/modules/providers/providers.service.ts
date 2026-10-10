@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, Between } from 'typeorm';
+import { Repository, In, Not, Between } from 'typeorm';
 import { randomBytes } from 'crypto';
 import { Provider, ProviderStatus, ACTIVE_PROVIDER_WHERE } from '../../database/entities/provider.entity';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
@@ -561,6 +561,18 @@ export class ProvidersService {
         where: {
           providerId,
           startAt: Between(start, end),
+          // Oct 9 2026 — Charlene's click-through: "after they're
+          // rescheduled, they don't need to show on the historical view
+          // here anymore... same for these cancelled." This endpoint
+          // returned every status with no filter at all, so a rescheduled/
+          // cancelled row kept showing as if it still occupied the slot on
+          // the Admin/Agent calendar — getProviderDashboard already filters
+          // to SCHEDULED only for the provider's own view, which is exactly
+          // why that side never showed the same ghost. Excluding by status
+          // (not an inclusion list) so NO_SHOW/COMPLETED — real things that
+          // happened that day — still show, only the two statuses that
+          // genuinely free the slot are dropped.
+          status: Not(In([AppointmentStatus.CANCELLED, AppointmentStatus.RESCHEDULED])),
         },
         relations: { patient: true, appointmentType: true },
         order: { startAt: 'ASC' },

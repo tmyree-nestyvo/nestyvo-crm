@@ -81,27 +81,44 @@ export default function ProviderAvailableSlotsScreen() {
               </Text>
               <View className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                 {day.slots.map((slot: any, i: number) => (
-                  <TouchableOpacity
+                  <View
                     key={slot.startAt}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(provider)/book-appointment',
-                        params: { slotStartAt: slot.startAt, slotEndAt: slot.endAt },
-                      })
-                    }
-                    className={`flex-row items-center px-4 py-3 gap-3 ${
+                    className={`flex-row items-center px-4 py-3 gap-2 ${
                       i < day.slots.length - 1 ? 'border-b border-gray-50' : ''
                     }`}
                   >
-                    <View className="w-2 h-2 rounded-full bg-green-400" />
-                    <View className="flex-1">
-                      <Text className="text-gray-900 font-semibold text-sm">
-                        {fmt(slot.startAt)} – {fmt(slot.endAt)}
-                      </Text>
-                      <Text className="text-gray-400 text-xs mt-0.5">{slot.durationMin} min</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() =>
+                        router.push({
+                          pathname: '/(provider)/book-appointment',
+                          params: { slotStartAt: slot.startAt, slotEndAt: slot.endAt },
+                        })
+                      }
+                      className="flex-1 flex-row items-center gap-3"
+                    >
+                      <View className="w-2 h-2 rounded-full bg-green-400" />
+                      <View className="flex-1">
+                        <Text className="text-gray-900 font-semibold text-sm">
+                          {fmt(slot.startAt)} – {fmt(slot.endAt)}
+                        </Text>
+                        <Text className="text-gray-400 text-xs mt-0.5">{slot.durationMin} min</Text>
+                      </View>
+                    </TouchableOpacity>
+                    {/* Oct 9 2026 — Smart Fill suggestions, separate tap
+                        target from the row itself (which still books
+                        directly, the already-working path). */}
+                    <TouchableOpacity
+                      onPress={() =>
+                        router.push({
+                          pathname: '/(provider)/fill-candidates',
+                          params: { slotStartAt: slot.startAt, slotEndAt: slot.endAt },
+                        })
+                      }
+                      className="p-2 -mr-2"
+                    >
+                      <Ionicons name="people-outline" size={18} color="#2563eb" />
+                    </TouchableOpacity>
+                  </View>
                 ))}
               </View>
             </View>

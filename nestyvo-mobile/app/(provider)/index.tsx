@@ -243,10 +243,17 @@ export default function ProviderScheduleScreen() {
                   <AppointmentCard
                     key={appt.id}
                     appt={appt}
+                    // Oct 9 2026 — this is "My Schedule," the first screen a
+                    // provider lands on, and had its own separate tap
+                    // handler that never got the appointments/[id] fix
+                    // applied to calendar.tsx the same day — Charlene's
+                    // click-through found reschedule/cancel still
+                    // unreachable from here specifically.
                     onPress={() =>
+                      appt.patientId &&
                       router.push({
-                        pathname: '/(provider)/clients/[id]',
-                        params: { id: appt.patientId, name: appt.patient },
+                        pathname: '/(provider)/appointments/[id]',
+                        params: { id: appt.id, providerId: data?.providerId },
                       })
                     }
                   />

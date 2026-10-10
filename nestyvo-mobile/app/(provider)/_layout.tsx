@@ -49,6 +49,7 @@ export default function ProviderLayout() {
       <Tabs.Screen name="calendar-export" options={{ href: null }} />
       <Tabs.Screen name="calendar" options={{ href: null }} />
       <Tabs.Screen name="appointments/[id]" options={{ href: null }} />
+      <Tabs.Screen name="fill-candidates" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -315,18 +315,29 @@ export class ProvidersController {
     return this.providersService.getAppointmentDetail(id, appointmentId, user);
   }
 
+  // Oct 9 2026 — Charlene's click-through: no waitlist/Smart Fill
+  // suggestions appeared anywhere a provider looked. Root cause: OFFICE_STAFF
+  // structurally excludes PROVIDER (same recurring gap as every other
+  // provider-role fix this pilot) — Gloria calling this for her own open
+  // slot got a 403, which the frontend's empty-state rendering made
+  // indistinguishable from "genuinely no candidates." Widened to ALL_STAFF
+  // + assertScheduleAccess (self-only — a provider sees candidates for
+  // their own slots, not another provider's), same pattern as
+  // bookAppointment/cancel/reschedule below.
   @Get(':id/fill-candidates')
-  @Roles(...OFFICE_STAFF)
+  @Roles(...ALL_STAFF)
   async getFillCandidates(
     @Param('id') id: string,
     @Query('slotStartAt') slotStartAt: string,
     @Query('slotEndAt') slotEndAt: string,
+    @CurrentUser() user: User,
   ) {
     // Charlene, Oct 5 2026 — "Exclude from Smart Fill." The UI never
     // offers a slot to Fill for a deactivated provider in the first place
     // (their slots stop generating once the active-provider lists are
     // correct), but this is the direct server-side enforcement.
     await this.providersService.assertBookable(id);
+    await this.providersService.assertScheduleAccess(id, user);
     return this.fillCandidatesService.getCandidates(
       id,
       new Date(slotStartAt),
