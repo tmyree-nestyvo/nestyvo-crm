@@ -981,6 +981,31 @@ export default function ProviderSettingsScreen() {
 
             <AppointmentTypesSection providerId={provider.id} />
 
+            {/* Oct 9 2026 — Charlene's click-through: client tags created
+                by Admin weren't showing up for the provider — tested the
+                real create/list API directly and it works correctly end to
+                end, so the actual gap was that Client Tags (a client
+                classification, e.g. W2/Business Owner — not a bookable
+                service, see AppointmentTypesSection just above) had no
+                entry point from here at all, only from deep inside an
+                existing client's own profile. Right next to Appointment
+                Types specifically because the two are easy to conflate — a
+                settings screen without a field for an existing feature is
+                exactly what caused yesterday's "Change Business Hours"
+                mix-up too. */}
+            <TouchableOpacity
+              onPress={() => practice && router.push({ pathname: '/(agent)/tags', params: { practiceId: practice.id } })}
+              className="bg-white rounded-2xl border border-gray-100 p-4 mb-5 flex-row items-center justify-between"
+            >
+              <View className="flex-1">
+                <Text className="text-base font-semibold text-gray-900">Client Tags</Text>
+                <Text className="text-gray-400 text-xs mt-0.5">
+                  Classify clients (W2, Business Owner, etc.) — separate from Appointment Types above.
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
+            </TouchableOpacity>
+
             <ExternalCalendarsSection providerId={provider.id} />
           </>
         ) : null}
