@@ -4,7 +4,7 @@ import { Alert } from '../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, patientsApi, providersApi } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
 
@@ -29,6 +29,7 @@ function fmt(iso: string) {
 export default function ProviderBookAppointmentScreen() {
   const { slotStartAt, slotEndAt } = useLocalSearchParams<{ slotStartAt: string; slotEndAt: string }>();
   const { data: self } = useQuery({ queryKey: ['provider-self'], queryFn: providersApi.getSelf });
+  const queryClient = useQueryClient();
 
   const [mode, setMode] = useState<'search' | 'new'>('search');
   const [query, setQuery] = useState('');
@@ -66,7 +67,16 @@ export default function ProviderBookAppointmentScreen() {
         preferredContact: phone.trim() ? 'phone' : 'email',
         assignedProviderId: self!.id,
       }),
-    onSuccess: (data) => goToBookSlot(data.id, `${firstName.trim()} ${lastName.trim()}`),
+    onSuccess: (data) => {
+      // Oct 9 2026 — Charlene's click-through: a client created from this
+      // screen (the booking flow's inline "new client" step, as opposed to
+      // clients/new.tsx's own dedicated screen, which already invalidated
+      // correctly) didn't show up in search or the roster without a manual
+      // refresh — this mutation never invalidated either cache at all.
+      queryClient.invalidateQueries({ queryKey: ['provider-roster'] });
+      queryClient.invalidateQueries({ queryKey: ['patients'] });
+      goToBookSlot(data.id, `${firstName.trim()} ${lastName.trim()}`);
+    },
     onError: (err: any) => Alert.alert("Couldn't create client", err?.response?.data?.message || 'Please try again.'),
   });
 

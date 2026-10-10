@@ -109,9 +109,23 @@ function ExternalEventDetail({ appt, visible, onClose }: { appt: Appointment; vi
   );
 }
 
-export function AppointmentCard({ appt, onPress }: { appt: Appointment; onPress?: () => void }) {
+// Oct 9 2026 — Charlene's click-through, on the client profile's Recent
+// Appointments list specifically: "there's no appointment date shown...
+// it doesn't show me when, I have to click into it and then I see a
+// date." This card only ever showed the time — fine on a calendar day
+// view (the date is already the section header above it), genuinely
+// confusing on a flat chronological list spanning many different dates,
+// which is exactly what Recent Appointments is. Opt-in via a prop rather
+// than always-on, so the calendar views (where a date here would be pure
+// redundant noise under every single row) stay as they are.
+export function AppointmentCard({
+  appt, onPress, showDate = false,
+}: { appt: Appointment; onPress?: () => void; showDate?: boolean }) {
   const [externalDetail, setExternalDetail] = useState(false);
   const time = new Date(appt.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dateLabel = showDate
+    ? new Date(appt.startAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: TZ })
+    : null;
   const isExternal = appt.source === 'external';
   const isBlock = appt.source === 'block';
   const isDimmed = isExternal || isBlock;
@@ -130,6 +144,9 @@ export function AppointmentCard({ appt, onPress }: { appt: Appointment; onPress?
           className="p-4 flex-row items-center gap-3"
         >
           <View className="items-center w-14">
+            {dateLabel && (
+              <Text className={`text-[10px] font-medium ${isDimmed ? 'text-gray-400' : 'text-gray-400'}`}>{dateLabel}</Text>
+            )}
             <Text className={`font-bold text-sm ${isDimmed ? 'text-gray-500' : 'text-primary-700'}`}>{time}</Text>
             <View
               className="mt-1 px-2 py-0.5 rounded-full"

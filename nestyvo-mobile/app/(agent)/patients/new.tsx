@@ -4,7 +4,7 @@ import { Alert } from '../../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { patientsApi, providersApi, practicesApi, clientTagsApi } from '../../../lib/api';
 import { useAuthStore } from '../../../lib/store';
 import { hasRole, ADMIN_AND_AGENT } from '../../../lib/role-groups';
@@ -81,6 +81,7 @@ const CONTACT_METHODS = ['phone', 'email', 'sms'];
 
 export default function NewClientScreen() {
   const { role, practiceId: myPracticeId } = useAuthStore();
+  const queryClient = useQueryClient();
   const isCrossPractice = hasRole(role, ADMIN_AND_AGENT);
 
   // Arriving from Fill Slot (an open appointment with no client to put in
@@ -169,6 +170,11 @@ export default function NewClientScreen() {
         tagId: tag?.id,
       }),
     onSuccess: (data) => {
+      // Oct 9 2026 — Charlene's click-through found the provider-side
+      // equivalent of this screen didn't invalidate either cache at all,
+      // so a just-created client wouldn't show up in search/roster
+      // without a manual refresh — same gap existed here, fixed alongside.
+      queryClient.invalidateQueries({ queryKey: ['patients'] });
       // Nothing to schedule against without a provider — go straight to the profile.
       if (!provider) {
         router.replace(`/(agent)/patients/${data.id}`);

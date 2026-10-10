@@ -161,6 +161,7 @@ export default function PatientDetailScreen() {
             <AppointmentCard
               key={appt.id}
               appt={appt}
+              showDate
               onPress={
                 appt.source !== 'external' && appt.providerId
                   ? () => router.push({ pathname: '/(agent)/appointments/[id]', params: { id: appt.id, providerId: appt.providerId } })
