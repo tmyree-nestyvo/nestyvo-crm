@@ -35,7 +35,13 @@ export default function ImportClientsScreen() {
   const [providerPickerOpen, setProviderPickerOpen] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [csvText, setCsvText] = useState<string | null>(null);
-  const [result, setResult] = useState<{ imported: number; skipped: number; unmatchedTags: { row: string; tag: string }[] } | null>(null);
+  const [result, setResult] = useState<{
+    imported: number;
+    skipped: number;
+    skippedNoName?: number;
+    skippedDuplicate?: number;
+    unmatchedTags: { row: string; tag: string }[];
+  } | null>(null);
 
   const effectivePracticeId = isCrossPractice ? (practice?.id ?? params.presetPracticeId) : myPracticeId ?? undefined;
 
@@ -94,8 +100,22 @@ export default function ImportClientsScreen() {
             <Text className="text-gray-900 font-bold text-base mt-3">Import complete</Text>
             <Text className="text-gray-500 text-sm mt-1 text-center">
               {result.imported} client{result.imported !== 1 ? 's' : ''} imported
-              {result.skipped > 0 ? ` · ${result.skipped} skipped (already in this practice)` : ''}
             </Text>
+            {/* Oct 9 2026 — this used to blame every skip on "already in
+                this practice" regardless of actual cause, which is exactly
+                what made a real header-matching failure (every row skipped
+                for having no detectable Name column) look identical to a
+                real duplicate-import. Shown separately now. */}
+            {!!result.skippedDuplicate && (
+              <Text className="text-gray-400 text-xs mt-1 text-center">
+                {result.skippedDuplicate} skipped — already in this practice
+              </Text>
+            )}
+            {!!result.skippedNoName && (
+              <Text className="text-amber-600 text-xs mt-1 text-center">
+                {result.skippedNoName} skipped — no name found for that row (check the Name/First Name column)
+              </Text>
+            )}
             {result.unmatchedTags.length > 0 && (
               <View className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mt-4 w-full">
                 <Text className="text-amber-800 text-xs font-semibold mb-1">

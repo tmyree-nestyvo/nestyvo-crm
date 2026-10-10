@@ -309,7 +309,13 @@ export class PatientsService {
   async importClients(
     input: { practiceId: string; assignedProviderId?: string; csvText: string },
     user: User,
-  ): Promise<{ imported: number; skipped: number; unmatchedTags: { row: string; tag: string }[] }> {
+  ): Promise<{
+    imported: number;
+    skipped: number;
+    skippedNoName: number;
+    skippedDuplicate: number;
+    unmatchedTags: { row: string; tag: string }[];
+  }> {
     const practiceId = user.role === UserRole.PRACTICE_MANAGER ? user.practiceId : input.practiceId;
     if (!practiceId) throw new BadRequestException('practiceId is required');
 
@@ -321,7 +327,9 @@ export class PatientsService {
     }
 
     const rows = parseCsv(input.csvText);
-    if (rows.length === 0) return { imported: 0, skipped: 0, unmatchedTags: [] };
+    if (rows.length === 0) {
+      return { imported: 0, skipped: 0, skippedNoName: 0, skippedDuplicate: 0, unmatchedTags: [] };
+    }
 
     const header = rows[0].map((h) => h.trim().toLowerCase());
     const col = (...names: string[]) => header.findIndex((h) => names.includes(h));
@@ -332,6 +340,22 @@ export class PatientsService {
     const emailCol = col('email', 'email address');
     const tagCol = col('tag', 'client tag', 'tags');
 
+    // Oct 9 2026 — Charlene's click-through: a fresh test CSV with
+    // verifiably-new names ("Lily Sanders") still came back "0 imported,
+    // 51 skipped, already in this practice." It wasn't a dedup bug — every
+    // row was silently skipped below for having no detectable name column
+    // at all (her header row used names like "Delete"/custom labels the
+    // matcher doesn't recognize), and the frontend hardcoded "already in
+    // this practice" as the skip reason regardless of actual cause. Fast,
+    // clear failure here instead of a silent 100% skip; skip reasons now
+    // tracked separately below so this can't be misreported again even for
+    // a partial failure.
+    if (nameCol < 0 && firstCol < 0) {
+      throw new BadRequestException(
+        'No name column found — the header row needs a "Name" (or "First Name") column.',
+      );
+    }
+
     const existingTags = await this.tagRepo.find({ where: { practiceId, isActive: true } });
     const tagByName = new Map(existingTags.map((t) => [t.name.trim().toLowerCase(), t]));
 
@@ -340,7 +364,8 @@ export class PatientsService {
     const existingEmails = new Set(existingPatients.map((p) => p.email?.toLowerCase()).filter(Boolean));
 
     let imported = 0;
-    let skipped = 0;
+    let skippedNoName = 0;
+    let skippedDuplicate = 0;
     const unmatchedTags: { row: string; tag: string }[] = [];
 
     for (const cells of rows.slice(1)) {
@@ -356,7 +381,7 @@ export class PatientsService {
         firstName = (firstCol >= 0 ? cells[firstCol] : '')?.trim() ?? '';
         lastName = (lastCol >= 0 ? cells[lastCol] : '')?.trim() ?? '';
       }
-      if (!firstName) { skipped++; continue; }
+      if (!firstName) { skippedNoName++; continue; }
 
       const phone = phoneCol >= 0 ? cells[phoneCol]?.trim() : undefined;
       const email = emailCol >= 0 ? cells[emailCol]?.trim() : undefined;
@@ -365,7 +390,7 @@ export class PatientsService {
       // scripts — a row whose phone or email already exists in this
       // practice is treated as already-imported, not duplicated.
       if ((phone && existingPhones.has(phone)) || (email && existingEmails.has(email.toLowerCase()))) {
-        skipped++;
+        skippedDuplicate++;
         continue;
       }
 
@@ -405,7 +430,13 @@ export class PatientsService {
       );
     }
 
-    return { imported, skipped, unmatchedTags };
+    return {
+      imported,
+      skipped: skippedNoName + skippedDuplicate,
+      skippedNoName,
+      skippedDuplicate,
+      unmatchedTags,
+    };
   }
 
   async setTag(patientId: string, tagId: string | null, user: User) {
