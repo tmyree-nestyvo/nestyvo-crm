@@ -234,6 +234,17 @@ export default function ProviderScheduleScreen() {
                   weekday: 'long', month: 'long', day: 'numeric',
                 })}
               </Text>
+              {/* Oct 10 2026 — "this home screen, we should be able to click
+                  on the date and then add a client appointment from here."
+                  Same entry point added to the calendar's Day view — this
+                  is the one Charlene actually tried it from first. */}
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: '/(provider)/book-appointment', params: { date: selectedDate } })}
+                className="flex-row items-center justify-center gap-2 bg-primary-600 rounded-xl py-3 mb-3"
+              >
+                <Ionicons name="add" size={18} color="#fff" />
+                <Text className="text-white font-semibold text-sm">Add Appointment</Text>
+              </TouchableOpacity>
               {isLoading ? (
                 <View className="bg-white rounded-xl p-6 items-center">
                   <Text className="text-gray-400 text-sm">Loading…</Text>

@@ -284,6 +284,20 @@ function DayView({
         <TouchableOpacity onPress={() => shift(1)} className="p-2"><Ionicons name="chevron-forward" size={20} color="#374151" /></TouchableOpacity>
       </View>
 
+      {/* Oct 10 2026 — Charlene's click-through: "there's no way for her to
+          just add an appointment anywhere from these screens... on any
+          date." Available Slots only ever offered pre-computed open
+          slots; this is the direct "I know the day, let me just book it"
+          path — the date here carries straight through, only the time
+          needs picking on the next screen. */}
+      <TouchableOpacity
+        onPress={() => router.push({ pathname: '/(provider)/book-appointment', params: { date: selectedDate } })}
+        className="flex-row items-center justify-center gap-2 bg-primary-600 rounded-xl py-3 mb-4"
+      >
+        <Ionicons name="add" size={18} color="#fff" />
+        <Text className="text-white font-semibold text-sm">Add Appointment</Text>
+      </TouchableOpacity>
+
       {appts.length === 0 ? (
         <View className="bg-white rounded-2xl border border-gray-100 p-8 items-center mt-4">
           <Ionicons name="calendar-outline" size={40} color="#d1d5db" />

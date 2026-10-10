@@ -26,10 +26,47 @@ function fmt(iso: string) {
 // the actual booking call all reuse the exact same (agent)/book-slot.tsx
 // every other booking path already goes through — one booking
 // implementation, not a second provider-only one.
+// Same simple HH:MM parse already used for provider blocks and reschedule
+// (see app/(provider)/appointments/[id].tsx) — kept local, no shared import.
+function normalizeTime(raw: string): string | null {
+  const v = raw.trim();
+  const m = v.match(/^(\d{1,2})\s*:?\s*(\d{2})?$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = m[2] === undefined ? 0 : Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
 export default function ProviderBookAppointmentScreen() {
-  const { slotStartAt, slotEndAt } = useLocalSearchParams<{ slotStartAt: string; slotEndAt: string }>();
+  const { slotStartAt: paramStartAt, slotEndAt: paramEndAt, date: presetDate } = useLocalSearchParams<{
+    slotStartAt?: string; slotEndAt?: string; date?: string;
+  }>();
   const { data: self } = useQuery({ queryKey: ['provider-self'], queryFn: providersApi.getSelf });
   const queryClient = useQueryClient();
+
+  // Oct 10 2026 — Charlene's click-through: "there's no way for her to
+  // just add an appointment anywhere from these screens... on any date."
+  // Available Slots only offers pre-computed open slots; this is the
+  // direct "I know what day and time I want" path, reached from the
+  // calendar's day view instead of a slot list. Default duration is 45
+  // min — same as every other manual-duration fallback in this app
+  // (book-slot.tsx's own originalDurationMin default) — and fully
+  // adjustable in book-slot.tsx once a type is picked, same as any other
+  // booking path.
+  const [customDate, setCustomDate] = useState(presetDate ?? '');
+  const [customTime, setCustomTime] = useState('');
+  const normalizedTime = normalizeTime(customTime);
+  const validCustomDate = /^\d{4}-\d{2}-\d{2}$/.test(customDate.trim());
+  const customSlotReady = validCustomDate && !!normalizedTime;
+
+  const slotStartAt = paramStartAt || (customSlotReady ? `${customDate.trim()}T${normalizedTime}:00` : undefined);
+  const slotEndAt = paramEndAt || (
+    customSlotReady
+      ? new Date(new Date(`${customDate.trim()}T${normalizedTime}:00`).getTime() + 45 * 60000).toISOString()
+      : undefined
+  );
+  const needsCustomTime = !paramStartAt;
 
   const [mode, setMode] = useState<'search' | 'new'>('search');
   const [query, setQuery] = useState('');
@@ -90,12 +127,35 @@ export default function ProviderBookAppointmentScreen() {
         <HomeButton href="/(provider)" />
       </View>
 
-      {slotStartAt ? (
+      {needsCustomTime ? (
+        <View className="mx-5 mt-3 bg-white rounded-2xl border border-gray-100 p-4">
+          <Text className="text-sm font-semibold text-gray-900 mb-1">Pick a date &amp; time</Text>
+          <Text className="text-gray-400 text-xs mb-3">Starts as a 45-minute appointment — adjust the exact length on the next step.</Text>
+          <Text className="text-gray-500 text-xs font-medium mb-1.5">Date</Text>
+          <TextInput
+            value={customDate}
+            onChangeText={setCustomDate}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor="#9ca3af"
+            className="bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-900 mb-3"
+          />
+          <Text className="text-gray-500 text-xs font-medium mb-1.5">Time</Text>
+          <TextInput
+            value={customTime}
+            onChangeText={setCustomTime}
+            placeholder="HH:MM (24-hour)"
+            placeholderTextColor="#9ca3af"
+            className="bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-900"
+          />
+        </View>
+      ) : slotStartAt ? (
         <View className="mx-5 mt-3 bg-primary-50 border border-primary-100 rounded-xl px-4 py-3">
           <Text className="text-primary-700 text-sm font-medium">{fmt(slotStartAt)}</Text>
         </View>
       ) : null}
 
+      {(!needsCustomTime || customSlotReady) && (
+      <>
       <View className="flex-row px-5 pt-4 gap-2">
         <TouchableOpacity
           onPress={() => setMode('search')}
@@ -170,6 +230,8 @@ export default function ProviderBookAppointmentScreen() {
             {createClient.isPending ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-semibold text-sm">Continue to Appointment Type</Text>}
           </TouchableOpacity>
         </ScrollView>
+      )}
+      </>
       )}
     </SafeAreaView>
   );
