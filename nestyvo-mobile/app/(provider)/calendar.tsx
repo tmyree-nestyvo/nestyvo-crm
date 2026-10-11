@@ -11,16 +11,20 @@ import { MonthCalendarGrid } from '../../components/MonthCalendarGrid';
 import { NoticeBanner } from '../../components/NoticeBanner';
 
 // Customizable month/week/day/journal calendar views (Sep 5 2026 ask —
-// "the same views you see in an iPhone calendar"). Data source is the same
-// 30-day-forward schedule the dashboard/day-strip already fetch, so this
-// view is forward-looking only, no history.
+// "the same views you see in an iPhone calendar"). Data source is the
+// provider dashboard's schedule, a year forward (was 30 days until Oct 11
+// 2026), so this view is forward-looking only, no history.
 
 const TZ = 'America/Los_Angeles';
+const SCHEDULE_DAYS = 365;
 
 function useProviderDashboard() {
   return useQuery({
-    queryKey: ['provider-dashboard'],
-    queryFn: () => api.get('/dashboard/provider').then((r) => r.data),
+    // A year ahead, so the calendar isn't blank past 30 days (Charlene,
+    // Oct 10 recording 40:52 — scheduling into December). Same key prefix,
+    // so every existing invalidateQueries(['provider-dashboard']) still hits it.
+    queryKey: ['provider-dashboard', SCHEDULE_DAYS],
+    queryFn: () => api.get('/dashboard/provider', { params: { scheduleDays: SCHEDULE_DAYS } }).then((r) => r.data),
   });
 }
 
@@ -91,7 +95,7 @@ export default function ProviderCalendarScreen() {
         </TouchableOpacity>
         <View className="flex-1">
           <Text className="text-xl font-bold text-gray-900">Calendar</Text>
-          <Text className="text-xs text-gray-400 mt-0.5">Your schedule, next 30 days</Text>
+          <Text className="text-xs text-gray-400 mt-0.5">Your schedule, the next 12 months</Text>
         </View>
         <HomeButton href="/(provider)" />
       </View>
@@ -244,7 +248,15 @@ function DayView({
 function JournalView({
   apptsByDate, isRefetching, onRefresh, providerId,
 }: { apptsByDate: Record<string, any[]>; isRefetching: boolean; onRefresh: () => void; providerId?: string }) {
-  const dates = Object.keys(apptsByDate).sort();
+  // Blocked time is left out of the running list — a daily recurring block
+  // over a year would bury every real appointment. Day/Week still show it.
+  const listed = Object.fromEntries(
+    Object.entries(apptsByDate)
+      .map(([iso, appts]) => [iso, appts.filter((a) => a.source !== 'block')] as const)
+      .filter(([, appts]) => appts.length > 0),
+  );
+  const dates = Object.keys(listed).sort();
+  const thisYear = new Date().getFullYear();
 
   return (
     <ScrollView
@@ -256,7 +268,7 @@ function JournalView({
         <View className="bg-white rounded-2xl border border-gray-100 p-8 items-center mt-4">
           <Ionicons name="calendar-outline" size={40} color="#d1d5db" />
           <Text className="text-gray-500 font-semibold mt-3">Nothing on the books</Text>
-          <Text className="text-gray-400 text-sm mt-1">Next 30 days are clear.</Text>
+          <Text className="text-gray-400 text-sm mt-1">Nothing booked in the next 12 months.</Text>
         </View>
       ) : (
         dates.map((iso) => {
@@ -264,9 +276,12 @@ function JournalView({
           return (
             <View key={iso} className="mb-4">
               <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                {d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                {d.toLocaleDateString('en-US', {
+                  weekday: 'long', month: 'short', day: 'numeric',
+                  ...(d.getFullYear() !== thisYear ? { year: 'numeric' } : {}),
+                })}
               </Text>
-              {apptsByDate[iso].map((a) => (
+              {listed[iso].map((a) => (
                 <AppointmentCard key={a.id} appt={a} onPress={() => a.patientId && router.push({ pathname: '/(provider)/appointments/[id]', params: { id: a.id, providerId, returnTo: '/(provider)/calendar' } })} />
               ))}
             </View>

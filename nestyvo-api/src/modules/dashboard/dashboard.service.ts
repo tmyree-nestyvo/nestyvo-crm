@@ -202,7 +202,7 @@ export class DashboardService {
     };
   }
 
-  async getProviderDashboard(user: User): Promise<any> {
+  async getProviderDashboard(user: User, scheduleDays = 30): Promise<any> {
     // relations: { practice: true } — Charlene, Oct 6 2026 (Tax Refund
     // 1040 pilot, item 13): "the business identity should consistently be
     // Tax Refund 1040; Gloria is the provider/user." The provider header
@@ -213,7 +213,13 @@ export class DashboardService {
 
     const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
     const sevenDaysOut = new Date(startOfToday); sevenDaysOut.setDate(sevenDaysOut.getDate() + 7);
-    const thirtyDaysOut = new Date(startOfToday); thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30);
+    // Charlene, Oct 10 recording (40:52) — "she wants to schedule in
+    // December… I don't end at just this row." The schedule window used to
+    // be a fixed 30 days, so the provider's calendar went blank past that.
+    // Callers can now ask for up to a year (default stays 30). The stats
+    // below only ever use the 7-day weekSchedule, so they're unaffected.
+    const windowDays = Number.isFinite(scheduleDays) ? Math.min(Math.max(scheduleDays, 1), 366) : 30;
+    const thirtyDaysOut = new Date(startOfToday); thirtyDaysOut.setDate(thirtyDaysOut.getDate() + windowDays);
     const startOfWeek = new Date(startOfToday); startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
 
     // Schedule is fetched out to 30 days so the day-strip UI can show
@@ -244,8 +250,13 @@ export class DashboardService {
       // Open Requests card (replaces Utilization, Sep 5 2026) — tickets tied
       // to this provider's own patients, same scoping TicketsService uses
       // for the provider role, minus resolved/closed.
+      // Also counts requests she sent without a client attached — matches
+      // TicketsService.list for providers (Oct 11 2026).
       this.ticketRepo.count({
-        where: { patient: { assignedProviderId: provider.id }, status: Not(In([TicketStatus.RESOLVED, TicketStatus.CLOSED])) },
+        where: [
+          { patient: { assignedProviderId: provider.id }, status: Not(In([TicketStatus.RESOLVED, TicketStatus.CLOSED])) },
+          { createdByUserId: user.id, status: Not(In([TicketStatus.RESOLVED, TicketStatus.CLOSED])) },
+        ],
       }),
     ]);
 

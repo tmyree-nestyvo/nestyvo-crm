@@ -14,11 +14,15 @@ import { NoticeBanner } from '../../components/NoticeBanner';
 import { signOut } from '../../lib/auth';
 
 const TZ = 'America/Los_Angeles';
+const SCHEDULE_DAYS = 365;
 
 function useProviderDashboard() {
   return useQuery({
-    queryKey: ['provider-dashboard'],
-    queryFn: () => api.get('/dashboard/provider').then((r) => r.data),
+    // A year ahead, so the calendar isn't blank past 30 days (Charlene,
+    // Oct 10 recording 40:52 — scheduling into December). Same key prefix,
+    // so every existing invalidateQueries(['provider-dashboard']) still hits it.
+    queryKey: ['provider-dashboard', SCHEDULE_DAYS],
+    queryFn: () => api.get('/dashboard/provider', { params: { scheduleDays: SCHEDULE_DAYS } }).then((r) => r.data),
     // A 403 here means this login has no Provider row of its own (e.g. an
     // admin using "switch to Provider view" with no linked provider
     // account) — that's not transient, retrying it can't ever succeed and

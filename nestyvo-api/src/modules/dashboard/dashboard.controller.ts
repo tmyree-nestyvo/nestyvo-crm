@@ -28,8 +28,8 @@ export class DashboardController {
 
   @Get('provider')
   @Roles(...PROVIDER_ONLY)
-  getProviderDashboard(@CurrentUser() user: User) {
-    return this.dashboardService.getProviderDashboard(user);
+  getProviderDashboard(@CurrentUser() user: User, @Query('scheduleDays') scheduleDays?: string) {
+    return this.dashboardService.getProviderDashboard(user, scheduleDays ? parseInt(scheduleDays, 10) : 30);
   }
 
   @Get('provider/available-slots')
