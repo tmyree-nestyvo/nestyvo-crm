@@ -67,7 +67,7 @@ function TypePicker({
 }
 
 export default function BookSlotScreen() {
-  const { providerId, providerName, slotStartAt, slotEndAt, patientId, patientName, callbackId } = useLocalSearchParams<{
+  const { providerId, providerName, slotStartAt, slotEndAt, patientId, patientName, callbackId, returnBase } = useLocalSearchParams<{
     providerId: string;
     providerName: string;
     slotStartAt: string;
@@ -75,7 +75,19 @@ export default function BookSlotScreen() {
     patientId: string;
     patientName: string;
     callbackId?: string;
+    // Oct 11 2026 — this screen is shared across both the agent and
+    // provider sides (book-appointment.tsx routes here too), but its
+    // post-booking actions always hardcoded agent-only routes
+    // (/(agent)/patients/...) — a provider session hitting "View Profile"
+    // landed on a route it can't actually use, which is exactly the blank
+    // screen Charlene's second recording caught. Optional and defaults to
+    // the agent path, so every existing agent-side caller (which never
+    // passes this) keeps its exact current behavior unchanged.
+    returnBase?: string;
   }>();
+  const profileBase = returnBase || '/(agent)/patients';
+  const isProviderContext = profileBase.startsWith('/(provider)');
+  const homeHref: '/(agent)' | '/(provider)' = isProviderContext ? '/(provider)' : '/(agent)';
   const queryClient = useQueryClient();
   const [booked, setBooked] = useState(false);
   const [typeModal, setTypeModal] = useState(false);
@@ -151,7 +163,7 @@ export default function BookSlotScreen() {
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
         <Text className="text-lg font-bold text-gray-900 flex-1">Book Appointment</Text>
-        <HomeButton href="/(agent)" />
+        <HomeButton href={homeHref} />
       </View>
 
       <View className="flex-1 items-center justify-center px-6">
@@ -163,7 +175,7 @@ export default function BookSlotScreen() {
               {patientName} is scheduled with {providerName}.
             </Text>
             <TouchableOpacity
-              onPress={() => router.replace(`/(agent)/patients/${patientId}`)}
+              onPress={() => router.replace(`${profileBase}/${patientId}` as any)}
               className="mt-6 bg-primary-600 rounded-xl px-6 py-3"
             >
               <Text className="text-white font-semibold text-sm">View Profile</Text>
@@ -172,9 +184,16 @@ export default function BookSlotScreen() {
                 client's first appointment immediately after creating them,
                 landing here, not on patients/new.tsx's own success screen
                 (which already had this button, Pass 2 of the pilot) — this
-                screen was the one still missing it. */}
+                screen was the one still missing it.
+                Oct 11 2026 — on the provider side there's no equivalent
+                "/new" screen to redirect to (new clients are created inline
+                within book-appointment.tsx's own New Client tab), so this
+                sends a provider back there instead — same affordance,
+                correct destination for that context. */}
             <TouchableOpacity
-              onPress={() => router.replace('/(agent)/patients/new')}
+              onPress={() =>
+                router.replace(isProviderContext ? '/(provider)/book-appointment' : '/(agent)/patients/new')
+              }
               className="mt-3 py-2"
             >
               <Text className="text-primary-600 text-sm font-medium">Add Another Client</Text>

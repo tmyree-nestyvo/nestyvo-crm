@@ -89,6 +89,11 @@ export default function ProviderBookAppointmentScreen() {
         providerName: self ? `${self.firstName} ${self.lastName}` : '',
         slotStartAt, slotEndAt,
         patientId, patientName,
+        // Oct 11 2026 — without this, book-slot.tsx's "View Profile" and
+        // Home button always sent a provider session into agent-only
+        // routes it can't render — the blank-screen bug from Charlene's
+        // second recording.
+        returnBase: '/(provider)/clients',
       },
     });
   };

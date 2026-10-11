@@ -546,6 +546,11 @@ export default function CalendarScreen() {
                         params: {
                           providerId: activeProviderId,
                           providerName: selectedProvider?.name ?? '',
+                          // Oct 11 2026 — the suggested call script inside
+                          // fill-slot.tsx had "Westside Mental Health"
+                          // hardcoded into it regardless of which practice
+                          // was actually being called on behalf of.
+                          practiceName: selectedProvider?.practiceName ?? '',
                           slotStartAt: slot.startAt,
                           slotEndAt: slot.endAt,
                         },

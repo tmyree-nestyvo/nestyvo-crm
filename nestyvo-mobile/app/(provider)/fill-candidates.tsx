@@ -51,6 +51,10 @@ export default function ProviderFillCandidatesScreen() {
         providerName: self ? `${self.firstName} ${self.lastName}` : '',
         slotStartAt, slotEndAt,
         patientId, patientName,
+        // Oct 11 2026 — same fix as book-appointment.tsx: without this,
+        // book-slot.tsx's View Profile/Home sent a provider session into
+        // agent-only routes it can't render.
+        returnBase: '/(provider)/clients',
       },
     });
   };

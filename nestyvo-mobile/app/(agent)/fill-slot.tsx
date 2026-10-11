@@ -9,6 +9,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api, patientsApi } from '../../lib/api';
+import { useAuthStore } from '../../lib/store';
 import { HomeButton } from '../../components/HomeButton';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -79,6 +80,8 @@ function CandidateCard({
   rank,
   providerId,
   providerName,
+  practiceName,
+  agentName,
   slotStartAt,
   slotEndAt,
 }: {
@@ -86,6 +89,8 @@ function CandidateCard({
   rank: number;
   providerId: string;
   providerName: string;
+  practiceName: string;
+  agentName: string;
   slotStartAt: string;
   slotEndAt: string;
 }) {
@@ -180,7 +185,34 @@ function CandidateCard({
             </View>
           </View>
 
-          {/* Call button */}
+          {/* Oct 11 2026 — Charlene's second click-through: "I cannot add
+              her... I would like to be able to click on Jane Doe and hit
+              fill or book this slot, but you can't do that here." The only
+              path to booking was Call → log an outcome → "scheduled"
+              routes into book-slot.tsx — exactly right for an agent
+              actually calling candidates, but there was no direct path for
+              anyone who already knows who they want to book. Purely
+              additive — same size/weight as Call, which keeps its exact
+              existing appearance and behavior for agents who still work
+              this screen the normal way. */}
+          {!callLogged && (
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: '/(agent)/book-slot',
+                  params: {
+                    providerId, providerName, slotStartAt, slotEndAt,
+                    patientId: candidate.patientId, patientName: candidate.name,
+                  },
+                })
+              }
+              className="flex-row items-center gap-1.5 bg-gray-900 px-3 py-2 rounded-full"
+            >
+              <Ionicons name="calendar" size={14} color="#fff" />
+              <Text className="text-white text-xs font-semibold">Book</Text>
+            </TouchableOpacity>
+          )}
+          {/* Call button — unchanged from before this round. */}
           {!callLogged && (
             <TouchableOpacity
               onPress={handleCall}
@@ -267,9 +299,15 @@ function CandidateCard({
             <View className="bg-gray-50 rounded-xl px-3 py-2.5">
               <Text className="text-gray-400 text-xs font-medium mb-1">Call script</Text>
               <Text className="text-gray-600 text-xs leading-5">
+                {/* Oct 11 2026 — "Westside Mental Health" and "Charlene"
+                    were hardcoded here regardless of which practice/agent
+                    was actually calling — confusing and wrong for every
+                    practice but the one this screen happened to be built
+                    against first. Both now come from the real logged-in
+                    agent and the provider's actual practice. */}
                 {candidate.source === 'cadence'
-                  ? `"Hi ${candidate.name.split(' ')[0]}, this is Charlene from Westside Mental Health. We have an opening today at ${fmt(slotStartAt)} with your provider — would you be able to come in?"`
-                  : `"Hi ${candidate.name.split(' ')[0]}, this is Charlene from Westside Mental Health. We have an opening today at ${fmt(slotStartAt)} — I wanted to reach out since you're on our waitlist. Would that time work for you?"`}
+                  ? `"Hi ${candidate.name.split(' ')[0]}, this is ${agentName || 'the scheduling team'}${practiceName ? ` from ${practiceName}` : ''}. We have an opening today at ${fmt(slotStartAt)} with your provider — would you be able to come in?"`
+                  : `"Hi ${candidate.name.split(' ')[0]}, this is ${agentName || 'the scheduling team'}${practiceName ? ` from ${practiceName}` : ''}. We have an opening today at ${fmt(slotStartAt)} — I wanted to reach out since you're on our waitlist. Would that time work for you?"`}
               </Text>
             </View>
 
@@ -441,12 +479,14 @@ function SearchClientModal({
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function FillSlotScreen() {
-  const { providerId, providerName, slotStartAt, slotEndAt } = useLocalSearchParams<{
+  const { providerId, providerName, practiceName, slotStartAt, slotEndAt } = useLocalSearchParams<{
     providerId: string;
     providerName: string;
+    practiceName?: string;
     slotStartAt: string;
     slotEndAt: string;
   }>();
+  const { name: agentName } = useAuthStore();
   const [searchModal, setSearchModal] = useState(false);
 
   const { data: candidates, isLoading } = useQuery({
@@ -548,6 +588,8 @@ export default function FillSlotScreen() {
               rank={i + 1}
               providerId={providerId}
               providerName={providerName}
+              practiceName={practiceName ?? ''}
+              agentName={agentName ?? ''}
               slotStartAt={slotStartAt}
               slotEndAt={slotEndAt}
             />
