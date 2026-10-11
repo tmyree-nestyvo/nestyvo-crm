@@ -52,12 +52,20 @@ function DayApptTime({ appts }: { appts: { startAt: string }[] }) {
 
 export function MonthCalendarGrid({
   year, month, today, selectedDate, apptsByDate, onPrevMonth, onNextMonth, onSelectDay, scroll = true,
+  compact = false, openDates,
 }: {
   year: number; month: number; today: string; selectedDate: string;
   apptsByDate: Record<string, { startAt: string }[]>;
   onPrevMonth: () => void; onNextMonth: () => void; onSelectDay: (iso: string) => void;
   /** Set false when the caller already wraps this in its own ScrollView (avoids nesting two vertical scrollers). */
   scroll?: boolean;
+  /** Fixed-height cells instead of squares — square cells on a wide desktop
+   * window are ~200px tall each, which pushed My Schedule's day panel (open
+   * times + appointments) below the fold (Charlene, Oct 10 recording 11:04:
+   * "this view needs to be a little more concise"). */
+  compact?: boolean;
+  /** Dates (YYYY-MM-DD) with at least one open slot — marked with a green dot. */
+  openDates?: Set<string>;
 }) {
   const numDays = daysInMonth(year, month);
   const leadingBlanks = firstDOW(year, month);
@@ -79,7 +87,7 @@ export function MonthCalendarGrid({
 
       <View className="flex-row flex-wrap">
         {cells.map((day, i) => {
-          if (day === null) return <View key={`b${i}`} style={{ width: `${100 / 7}%` }} className="aspect-square" />;
+          if (day === null) return <View key={`b${i}`} style={{ width: `${100 / 7}%` }} className={compact ? 'h-12' : 'aspect-square'} />;
           const iso = isoOf(year, month, day);
           const isToday = iso === today;
           const isSelected = iso === selectedDate;
@@ -89,14 +97,23 @@ export function MonthCalendarGrid({
               key={iso}
               onPress={() => onSelectDay(iso)}
               style={{ width: `${100 / 7}%` }}
-              className="aspect-square items-center justify-center"
+              className={compact ? 'h-12 items-center justify-center' : 'aspect-square items-center justify-center'}
             >
               <View className={`w-8 h-8 rounded-full items-center justify-center ${isSelected ? 'bg-primary-600' : isToday ? 'bg-primary-50' : ''}`}>
                 <Text className={`text-sm ${isSelected ? 'text-white font-bold' : isToday ? 'text-primary-700 font-bold' : 'text-gray-700'}`}>
                   {day}
                 </Text>
               </View>
-              <DayApptTime appts={appts} />
+              {compact ? (
+                // Compact cells have no room for a time label — dots instead:
+                // blue = something booked, green = open times available.
+                <View className="flex-row gap-0.5 mt-0.5 h-1.5">
+                  {appts.length > 0 && <View className="w-1.5 h-1.5 rounded-full bg-primary-500" />}
+                  {openDates?.has(iso) && <View className="w-1.5 h-1.5 rounded-full bg-green-500" />}
+                </View>
+              ) : (
+                <DayApptTime appts={appts} />
+              )}
             </TouchableOpacity>
           );
         })}

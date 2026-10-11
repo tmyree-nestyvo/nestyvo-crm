@@ -1,15 +1,16 @@
-import { useMemo, useState } from 'react';
-import { View, Text, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { View, Text, ScrollView, RefreshControl, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useAuthStore } from '../../lib/store';
 import { hasRole, ADMIN_ONLY } from '../../lib/role-groups';
 import { api } from '../../lib/api';
 import { AppointmentCard } from '../../components/dashboard/AppointmentCard';
 import { StatCard } from '../../components/dashboard/StatCard';
 import { MonthCalendarGrid } from '../../components/MonthCalendarGrid';
+import { NoticeBanner } from '../../components/NoticeBanner';
 import { signOut } from '../../lib/auth';
 
 const TZ = 'America/Los_Angeles';
@@ -65,11 +66,28 @@ export default function ProviderScheduleScreen() {
   // Swapped for the exact same real month-grid Calendar's own Month view
   // already uses (components/MonthCalendarGrid.tsx) — true prev/next month
   // navigation, not a bounded window.
-  const [year, setYear] = useState(() => new Date().getFullYear());
-  const [month, setMonth] = useState(() => new Date().getMonth());
-  const [selectedDate, setSelectedDate] = useState(today);
+  // ?date=YYYY-MM-DD opens on that day — "Back to Calendar" after a booking
+  // or reschedule lands on the day it happened, not today.
+  const { date: dateParam, notice } = useLocalSearchParams<{ date?: string; notice?: string }>();
+  const startDate = dateParam || today;
+  const [year, setYear] = useState(() => Number(startDate.slice(0, 4)));
+  const [month, setMonth] = useState(() => Number(startDate.slice(5, 7)) - 1);
+  const [selectedDate, setSelectedDate] = useState(startDate);
+  useEffect(() => {
+    if (!dateParam) return;
+    setSelectedDate(dateParam);
+    setYear(Number(dateParam.slice(0, 4)));
+    setMonth(Number(dateParam.slice(5, 7)) - 1);
+  }, [dateParam]);
   const { data, isLoading, isError, error, refetch, isRefetching } = useProviderDashboard();
-  const { data: slotsData } = useProviderAvailableSlots();
+  const { data: slotsData, isLoading: slotsLoading } = useProviderAvailableSlots();
+  const { width } = useWindowDimensions();
+  const wide = width >= 900;
+  const openDates = useMemo(
+    () => new Set<string>((slotsData?.slotsByDate ?? []).filter((d: any) => d.slots?.length).map((d: any) => d.date)),
+    [slotsData],
+  );
+  const windowEnd = isoDate(new Date(Date.now() + 90 * 86400000));
   const noProviderAccount = isError && (error as any)?.response?.status === 403;
 
   const daySlots: { startAt: string; endAt: string }[] =
@@ -90,6 +108,8 @@ export default function ProviderScheduleScreen() {
     clearAuth();
     router.replace('/(auth)/login');
   };
+
+  const beyondWindow = selectedDate > windowEnd;
 
   const dayAppts = data?.schedule?.filter(
     (a: any) => a.startAt && isoDate(new Date(a.startAt)) === selectedDate,
@@ -199,82 +219,90 @@ export default function ProviderScheduleScreen() {
           </View>
         ) : (
           <>
-            {/* Stats */}
-            <View className="flex-row gap-3 px-5 mb-4">
-              <StatCard
-                label="Available Slots"
-                value={data?.availableSlots ?? '—'}
-                icon="time-outline"
-                color="#16a34a"
-                onPress={() => router.push('/(provider)/available-slots')}
-              />
-              <StatCard
-                label="Waitlist"
-                value={data?.waitlistCount ?? '—'}
-                icon="list-outline"
-                color="#d97706"
-                onPress={() => router.push('/(provider)/waitlist')}
-              />
-            </View>
-            <View className="flex-row gap-3 px-5 mb-5">
-              <StatCard
-                label="Requests"
-                value={data?.openRequestCount ?? '—'}
-                icon="chatbubble-ellipses-outline"
-                color="#7c3aed"
-                badge={data?.openRequestCount}
-                onPress={() => router.push('/(provider)/tickets')}
-              />
-              <StatCard
-                label="Cancellations"
-                value={data?.cancellationCount ?? '—'}
-                icon="close-circle-outline"
-                color="#dc2626"
-                onPress={() => router.push('/(provider)/cancellations')}
-              />
-            </View>
-
-            {/* Month calendar — pick any date, any month */}
-            <View className="px-5 mb-2 bg-white rounded-2xl border border-gray-100 py-1">
-              <MonthCalendarGrid
-                year={year} month={month} today={today} selectedDate={selectedDate}
-                apptsByDate={apptsByDate}
-                onPrevMonth={() => setMonth((m) => { if (m === 0) { setYear((y) => y - 1); return 11; } return m - 1; })}
-                onNextMonth={() => setMonth((m) => { if (m === 11) { setYear((y) => y + 1); return 0; } return m + 1; })}
-                onSelectDay={setSelectedDate}
-                scroll={false}
-              />
+            <NoticeBanner message={notice} />
+            {/* Stats — one row of four on a wide screen, two rows on a phone */}
+            <View className={`px-5 mb-4 gap-3 ${wide ? 'flex-row' : ''}`}>
+              <View className={`flex-row gap-3 ${wide ? 'flex-1' : ''}`}>
+                <StatCard
+                  label="Available Slots"
+                  value={data?.availableSlots ?? '—'}
+                  icon="time-outline"
+                  color="#16a34a"
+                  onPress={() => router.push('/(provider)/available-slots')}
+                />
+                <StatCard
+                  label="Waitlist"
+                  value={data?.waitlistCount ?? '—'}
+                  icon="list-outline"
+                  color="#d97706"
+                  onPress={() => router.push('/(provider)/waitlist')}
+                />
+              </View>
+              <View className={`flex-row gap-3 ${wide ? 'flex-1' : ''}`}>
+                <StatCard
+                  label="Requests"
+                  value={data?.openRequestCount ?? '—'}
+                  icon="chatbubble-ellipses-outline"
+                  color="#7c3aed"
+                  badge={data?.openRequestCount}
+                  onPress={() => router.push('/(provider)/tickets')}
+                />
+                <StatCard
+                  label="Cancellations"
+                  value={data?.cancellationCount ?? '—'}
+                  icon="close-circle-outline"
+                  color="#dc2626"
+                  onPress={() => router.push('/(provider)/cancellations')}
+                />
+              </View>
             </View>
 
-            {/* Schedule for day */}
-            <View className="px-5">
-              <Text className="text-base font-semibold text-gray-900 mb-3">
-                {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', {
-                  weekday: 'long', month: 'long', day: 'numeric',
-                })}
-              </Text>
-              {/* Oct 10 2026 — "this home screen, we should be able to click
-                  on the date and then add a client appointment from here."
-                  Same entry point added to the calendar's Day view — this
-                  is the one Charlene actually tried it from first. */}
-              <TouchableOpacity
-                onPress={() => router.push({ pathname: '/(provider)/book-appointment', params: { date: selectedDate } })}
-                className="flex-row items-center justify-center gap-2 bg-primary-600 rounded-xl py-3 mb-3"
+            {/* Charlene, Oct 10 recording (11:04, 40:10) — "let me look at my
+                schedule, let me select a date and then let me see what's open
+                that date, not having to go through multiple screens." Compact
+                calendar beside the selected day's open times + appointments on
+                a wide screen (stacked on a phone), so picking a date shows
+                what's open right away with no scrolling. */}
+            <View className={`px-5 gap-4 ${wide ? 'flex-row items-start' : ''}`}>
+              <View
+                className="bg-white rounded-2xl border border-gray-100 px-3 py-1"
+                style={wide ? { width: 400 } : undefined}
               >
-                <Ionicons name="add" size={18} color="#fff" />
-                <Text className="text-white font-semibold text-sm">Add Appointment</Text>
-              </TouchableOpacity>
+                <MonthCalendarGrid
+                  year={year} month={month} today={today} selectedDate={selectedDate}
+                  apptsByDate={apptsByDate}
+                  openDates={openDates}
+                  compact
+                  onPrevMonth={() => setMonth((m) => { if (m === 0) { setYear((y) => y - 1); return 11; } return m - 1; })}
+                  onNextMonth={() => setMonth((m) => { if (m === 11) { setYear((y) => y + 1); return 0; } return m + 1; })}
+                  onSelectDay={setSelectedDate}
+                  scroll={false}
+                />
+                <View className="flex-row items-center justify-center gap-4 pb-2">
+                  <View className="flex-row items-center gap-1.5">
+                    <View className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                    <Text className="text-[11px] text-gray-500">Open times</Text>
+                  </View>
+                  <View className="flex-row items-center gap-1.5">
+                    <View className="w-1.5 h-1.5 rounded-full bg-primary-500" />
+                    <Text className="text-[11px] text-gray-500">Booked</Text>
+                  </View>
+                </View>
+              </View>
 
-              {/* Oct 11 2026 — "we should also see it just like the admin
-                  sees it where it has all the open times, so the provider
-                  can just select the time they want to add it to." Real
-                  open slots for this exact date, tap one to book straight
-                  into it — no extra date/time step, same as tapping a slot
-                  on the admin side's Available Slots screen. */}
-              {daySlots.length > 0 && (
-                <View className="mb-4">
-                  <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Open Times</Text>
-                  <View className="flex-row flex-wrap gap-2">
+              {/* Selected day */}
+              <View className={wide ? 'flex-1' : ''}>
+                <Text className="text-base font-semibold text-gray-900 mb-3">
+                  {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', {
+                    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+                  })}
+                </Text>
+
+                {/* Open times first — tap one to book straight into it, same
+                    as the admin's Available Slots. */}
+                <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Open Times</Text>
+                {daySlots.length > 0 ? (
+                  <View className="flex-row flex-wrap gap-2 mb-2">
                     {daySlots.map((slot) => (
                       <TouchableOpacity
                         key={slot.startAt}
@@ -290,40 +318,61 @@ export default function ProviderScheduleScreen() {
                       </TouchableOpacity>
                     ))}
                   </View>
-                </View>
-              )}
+                ) : (
+                  <Text className="text-gray-400 text-sm mb-2">
+                    {selectedDate < today
+                      ? 'This day has passed.'
+                      : slotsLoading
+                        ? 'Loading open times…'
+                        : beyondWindow
+                          ? 'Open times are shown up to 90 days out.'
+                          : 'No open times this day.'}
+                  </Text>
+                )}
+                {/* Charlene (40:28) — "instead of add appointment, we click on
+                    this date… then we have the list of available appointments."
+                    The open times above are the main path now; this stays as
+                    a small link for booking outside the regular open slots. */}
+                {selectedDate >= today && (
+                  <TouchableOpacity
+                    onPress={() => router.push({ pathname: '/(provider)/book-appointment', params: { date: selectedDate } })}
+                    className="self-start py-1.5 mb-4"
+                  >
+                    <Text className="text-primary-600 text-sm font-medium">+ Book a different time</Text>
+                  </TouchableOpacity>
+                )}
 
-              {daySlots.length > 0 && <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Appointments</Text>}
-              {isLoading ? (
-                <View className="bg-white rounded-xl p-6 items-center">
-                  <Text className="text-gray-400 text-sm">Loading…</Text>
-                </View>
-              ) : dayAppts.length ? (
-                dayAppts.map((appt: any) => (
-                  <AppointmentCard
-                    key={appt.id}
-                    appt={appt}
-                    // Oct 9 2026 — this is "My Schedule," the first screen a
-                    // provider lands on, and had its own separate tap
-                    // handler that never got the appointments/[id] fix
-                    // applied to calendar.tsx the same day — Charlene's
-                    // click-through found reschedule/cancel still
-                    // unreachable from here specifically.
-                    onPress={() =>
-                      appt.patientId &&
-                      router.push({
-                        pathname: '/(provider)/appointments/[id]',
-                        params: { id: appt.id, providerId: data?.providerId, returnTo: '/(provider)' },
-                      })
-                    }
-                  />
-                ))
-              ) : (
-                <View className="bg-white rounded-xl border border-gray-100 p-6 items-center">
-                  <Ionicons name="calendar-outline" size={32} color="#d1d5db" />
-                  <Text className="text-gray-400 text-sm mt-2">No appointments this day</Text>
-                </View>
-              )}
+                <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Appointments</Text>
+                {isLoading ? (
+                  <View className="bg-white rounded-xl p-6 items-center">
+                    <Text className="text-gray-400 text-sm">Loading…</Text>
+                  </View>
+                ) : dayAppts.length ? (
+                  dayAppts.map((appt: any) => (
+                    <AppointmentCard
+                      key={appt.id}
+                      appt={appt}
+                      // Oct 9 2026 — this is "My Schedule," the first screen a
+                      // provider lands on, and had its own separate tap
+                      // handler that never got the appointments/[id] fix
+                      // applied to calendar.tsx the same day — Charlene's
+                      // click-through found reschedule/cancel still
+                      // unreachable from here specifically.
+                      onPress={() =>
+                        appt.patientId &&
+                        router.push({
+                          pathname: '/(provider)/appointments/[id]',
+                          params: { id: appt.id, providerId: data?.providerId, returnTo: '/(provider)' },
+                        })
+                      }
+                    />
+                  ))
+                ) : (
+                  <View className="bg-white rounded-xl border border-gray-100 p-5 items-center">
+                    <Text className="text-gray-400 text-sm">No appointments this day</Text>
+                  </View>
+                )}
+              </View>
             </View>
           </>
         )}
