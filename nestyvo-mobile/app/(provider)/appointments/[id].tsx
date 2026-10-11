@@ -67,7 +67,18 @@ function normalizeTime(raw: string): string | null {
 }
 
 export default function ProviderAppointmentDetailScreen() {
-  const { id, providerId } = useLocalSearchParams<{ id: string; providerId: string }>();
+  // Oct 11 2026 — Charlene's second recording: "back" from here kept
+  // landing on the dashboard instead of wherever she'd actually come from
+  // (My Schedule or the full Calendar), repeatedly, across multiple
+  // sessions of testing. router.back() relies on Expo Router correctly
+  // reconstructing navigation history, which clearly isn't holding up
+  // reliably on web across every entry path into this screen — an
+  // explicit, caller-supplied destination is deterministic regardless of
+  // how the history stack actually got built. Both callers (My Schedule,
+  // Calendar's three views) now pass this; falls back to My Schedule if
+  // somehow absent rather than guessing.
+  const { id, providerId, returnTo } = useLocalSearchParams<{ id: string; providerId: string; returnTo?: string }>();
+  const backHref = (returnTo || '/(provider)') as any;
   const queryClient = useQueryClient();
   const [cancelModal, setCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -112,7 +123,7 @@ export default function ProviderAppointmentDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['provider-schedule'] });
       router.replace({
         pathname: '/(provider)/appointments/[id]',
-        params: { id: saved.id, providerId },
+        params: { id: saved.id, providerId, returnTo },
       });
     },
     onError: (err: any) => {
@@ -126,7 +137,7 @@ export default function ProviderAppointmentDetailScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
       <View className="px-5 pt-3 pb-4 flex-row items-center gap-3 bg-white border-b border-gray-100">
-        <TouchableOpacity onPress={() => router.back()} className="p-1">
+        <TouchableOpacity onPress={() => router.replace(backHref)} className="p-1">
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
         <Text className="text-lg font-bold text-gray-900 flex-1">Appointment</Text>

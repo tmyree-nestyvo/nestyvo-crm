@@ -264,7 +264,7 @@ export default function ProviderScheduleScreen() {
                       appt.patientId &&
                       router.push({
                         pathname: '/(provider)/appointments/[id]',
-                        params: { id: appt.id, providerId: data?.providerId },
+                        params: { id: appt.id, providerId: data?.providerId, returnTo: '/(provider)' },
                       })
                     }
                   />

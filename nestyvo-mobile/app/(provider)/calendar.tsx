@@ -94,7 +94,11 @@ export default function ProviderCalendarScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
       <View className="px-5 pt-4 pb-3 flex-row items-center gap-3">
-        <TouchableOpacity onPress={() => router.back()} className="p-1 -ml-1">
+        {/* Oct 11 2026 — this screen only ever has one caller (My Schedule's
+            "Calendar" button), so an explicit destination is both safe and
+            more reliable than router.back() — see appointments/[id].tsx's
+            matching fix for the full reasoning. */}
+        <TouchableOpacity onPress={() => router.replace('/(provider)')} className="p-1 -ml-1">
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
         <View className="flex-1">
@@ -255,7 +259,7 @@ function WeekView({
               {d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
             </Text>
             {appts.map((a) => (
-              <AppointmentCard key={a.id} appt={a} onPress={() => a.patientId && router.push({ pathname: '/(provider)/appointments/[id]', params: { id: a.id, providerId } })} />
+              <AppointmentCard key={a.id} appt={a} onPress={() => a.patientId && router.push({ pathname: '/(provider)/appointments/[id]', params: { id: a.id, providerId, returnTo: '/(provider)/calendar' } })} />
             ))}
           </View>
         );
@@ -305,7 +309,7 @@ function DayView({
         </View>
       ) : (
         appts.map((a) => (
-          <AppointmentCard key={a.id} appt={a} onPress={() => a.patientId && router.push({ pathname: '/(provider)/appointments/[id]', params: { id: a.id, providerId } })} />
+          <AppointmentCard key={a.id} appt={a} onPress={() => a.patientId && router.push({ pathname: '/(provider)/appointments/[id]', params: { id: a.id, providerId, returnTo: '/(provider)/calendar' } })} />
         ))
       )}
     </ScrollView>
@@ -338,7 +342,7 @@ function JournalView({
                 {d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
               </Text>
               {apptsByDate[iso].map((a) => (
-                <AppointmentCard key={a.id} appt={a} onPress={() => a.patientId && router.push({ pathname: '/(provider)/appointments/[id]', params: { id: a.id, providerId } })} />
+                <AppointmentCard key={a.id} appt={a} onPress={() => a.patientId && router.push({ pathname: '/(provider)/appointments/[id]', params: { id: a.id, providerId, returnTo: '/(provider)/calendar' } })} />
               ))}
             </View>
           );
