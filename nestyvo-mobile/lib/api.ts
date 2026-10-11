@@ -311,6 +311,6 @@ export const ticketsApi = {
   get: (id: string) => api.get(`/tickets/${id}`).then((r) => r.data),
   create: (input: { patientId?: string; category: string; priority?: string; subject: string; description: string }) =>
     api.post('/tickets', input).then((r) => r.data),
-  update: (id: string, updates: { status?: string; assignedToUserId?: string | null; resolutionNotes?: string }) =>
+  update: (id: string, updates: { status?: string; assignedToUserId?: string | null; resolutionNotes?: string; replyText?: string }) =>
     api.patch(`/tickets/${id}`, updates).then((r) => r.data),
 };

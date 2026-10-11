@@ -59,7 +59,7 @@ export default function TicketsScreen() {
   });
 
   const updateTicket = useMutation({
-    mutationFn: (updates: { status?: string; resolutionNotes?: string }) =>
+    mutationFn: (updates: { status?: string; replyText?: string }) =>
       ticketsApi.update(active.id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
@@ -121,7 +121,11 @@ export default function TicketsScreen() {
             return (
               <TouchableOpacity
                 key={t.id}
-                onPress={() => { setActive(t); setNotes(t.resolutionNotes ?? ''); }}
+                // Oct 11 2026 — see provider/tickets.tsx's identical fix:
+                // pre-filling with the existing history meant replying
+                // required deleting whatever the provider had already
+                // written. Starts empty now; full history shown read-only.
+                onPress={() => { setActive(t); setNotes(''); }}
                 className="bg-white rounded-2xl border border-gray-100 mb-3 px-4 py-3.5"
               >
                 <View className="flex-row items-start justify-between gap-2">
@@ -160,6 +164,18 @@ export default function TicketsScreen() {
             </Text>
             <Text className="text-gray-600 text-sm leading-5 mb-4">{active?.description}</Text>
 
+            {/* Oct 11 2026 — read-only conversation history, newest-last.
+                Every reply from either side is appended server-side, never
+                overwritten — see tickets.service.ts's replyText handling. */}
+            {active?.resolutionNotes ? (
+              <View className="mb-4">
+                <Text className="text-gray-500 text-xs font-medium mb-2">History</Text>
+                <ScrollView className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 max-h-40">
+                  <Text className="text-gray-700 text-sm leading-5">{active.resolutionNotes}</Text>
+                </ScrollView>
+              </View>
+            ) : null}
+
             <Text className="text-gray-500 text-xs font-medium mb-2">Resolution notes</Text>
             <TextInput
               value={notes}
@@ -173,13 +189,13 @@ export default function TicketsScreen() {
 
             <View className="flex-row gap-2">
               <TouchableOpacity
-                onPress={() => updateTicket.mutate({ status: 'in_progress', resolutionNotes: notes })}
+                onPress={() => updateTicket.mutate({ status: 'in_progress', replyText: notes })}
                 className="flex-1 bg-gray-100 rounded-xl py-2.5 items-center"
               >
                 <Text className="text-gray-700 text-sm font-medium">In Progress</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => updateTicket.mutate({ status: 'resolved', resolutionNotes: notes })}
+                onPress={() => updateTicket.mutate({ status: 'resolved', replyText: notes })}
                 className="flex-1 bg-primary-600 rounded-xl py-2.5 items-center"
               >
                 {updateTicket.isPending ? (

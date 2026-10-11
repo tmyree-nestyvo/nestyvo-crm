@@ -20,7 +20,14 @@ class CreateTicketDto {
 class UpdateTicketDto {
   @IsOptional() @IsEnum(TicketStatus) status?: TicketStatus;
   @IsOptional() @IsString() assignedToUserId?: string | null;
+  // Oct 11 2026 — Charlene's second click-through: a reply from one side
+  // overwrote the other side's existing note entirely ("she had to delete
+  // the verbiage from the agent... that should just be stored within that
+  // history"), because this always meant "replace the whole field." Kept
+  // for any caller that genuinely wants a direct overwrite (none currently
+  // do) — replyText below is what both tickets screens now actually send.
   @IsOptional() @IsString() resolutionNotes?: string;
+  @IsOptional() @IsString() replyText?: string;
 }
 
 @Controller('tickets')

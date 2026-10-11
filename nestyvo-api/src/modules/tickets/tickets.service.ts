@@ -118,7 +118,12 @@ export class TicketsService {
 
   async update(
     id: string,
-    updates: { status?: TicketStatus; assignedToUserId?: string | null; resolutionNotes?: string },
+    updates: {
+      status?: TicketStatus;
+      assignedToUserId?: string | null;
+      resolutionNotes?: string;
+      replyText?: string;
+    },
     user: User,
   ) {
     const isProvider = user.role === UserRole.PROVIDER;
@@ -150,7 +155,17 @@ export class TicketsService {
       }
     }
     if (updates.assignedToUserId !== undefined) ticket.assignedToUserId = updates.assignedToUserId;
+    // Direct overwrite — kept for any caller that genuinely wants it, but
+    // neither tickets screen uses this anymore (see replyText below).
     if (updates.resolutionNotes !== undefined) ticket.resolutionNotes = updates.resolutionNotes;
+    if (updates.replyText !== undefined && updates.replyText.trim()) {
+      const authorName = `${user.firstName} ${user.lastName}`.trim() || 'Unknown';
+      const timestamp = new Date().toLocaleString('en-US', {
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles',
+      });
+      const entry = `[${timestamp}] ${authorName}: ${updates.replyText.trim()}`;
+      ticket.resolutionNotes = ticket.resolutionNotes ? `${ticket.resolutionNotes}\n\n${entry}` : entry;
+    }
 
     return this.ticketRepo.save(ticket);
   }
