@@ -24,6 +24,10 @@ import { hashPassword } from '../src/auth/password.util';
 // no practice, same role as the real admin accounts) for the admin-side checkpoints.
 
 const SOURCE_PROVIDER_FIRST_NAME = 'Gloria';
+// There are two Gloria Ortiz providers — one in "Tax Refund 1040" (the one
+// Charlene tests with) and one in a near-duplicate "TaxRefund1040" practice.
+// Pin the practice so the copy always comes from the right one.
+const SOURCE_PRACTICE_NAME = 'Tax Refund 1040';
 const TEST_EMAIL = 'e2e-provider@nestyvo.test';
 const ADMIN_EMAIL = 'e2e-admin@nestyvo.test';
 const WITH_ADMIN = process.argv.includes('--with-admin');
@@ -52,8 +56,11 @@ async function main() {
   const hours = ds.getRepository(ProviderAvailability);
   const types = ds.getRepository(ProviderAppointmentType);
 
-  const source = await providers.findOne({ where: { firstName: SOURCE_PROVIDER_FIRST_NAME } });
-  if (!source) throw new Error(`No provider named ${SOURCE_PROVIDER_FIRST_NAME} found`);
+  const source = await providers.findOne({
+    where: { firstName: SOURCE_PROVIDER_FIRST_NAME, practice: { name: SOURCE_PRACTICE_NAME } },
+    relations: { practice: true },
+  });
+  if (!source) throw new Error(`No provider named ${SOURCE_PROVIDER_FIRST_NAME} in "${SOURCE_PRACTICE_NAME}"`);
 
   const password = randomBytes(12).toString('base64url');
   let user = await users.findOne({ where: { email: TEST_EMAIL } });
@@ -71,6 +78,7 @@ async function main() {
   user.passwordHash = await hashPassword(password);
   user.mustChangePassword = false;
   user.isActive = true;
+  user.practiceId = source.practiceId;
   user = await users.save(user);
 
   let provider = await providers.findOne({ where: { userId: user.id } });
@@ -87,17 +95,26 @@ async function main() {
       defaultSlotDurationMin: source.defaultSlotDurationMin,
       schedulingPreferences: source.schedulingPreferences,
     }));
-
-    const srcHours = await hours.find({ where: { providerId: source.id, isActive: true } });
-    await hours.save(srcHours.map(({ id, provider: _p, ...h }: any) => Object.assign(new ProviderAvailability(), h, { providerId: provider!.id })));
-
-    const srcTypes = await types.find({ where: { providerId: source.id, isActive: true } });
-    await types.save(srcTypes.map(({ id, provider: _p, createdAt, updatedAt, ...t }: any) =>
-      Object.assign(new ProviderAppointmentType(), t, { providerId: provider!.id })));
-    console.log(`Created provider ${TEST_FIRST} ${TEST_LAST}: copied ${srcHours.length} hour rows, ${srcTypes.length} appointment types from ${source.firstName}.`);
+    console.log(`Created provider ${TEST_FIRST} ${TEST_LAST}.`);
+  } else if (provider.practiceId !== source.practiceId) {
+    provider.practiceId = source.practiceId;
+    provider = await providers.save(provider);
+    console.log(`Moved provider ${TEST_FIRST} ${TEST_LAST} into "${SOURCE_PRACTICE_NAME}".`);
   } else {
     console.log(`Provider ${TEST_FIRST} ${TEST_LAST} already exists — password rotated.`);
   }
+
+  // Always re-sync hours + appointment types from the source provider, so a
+  // re-run picks up any changes to Gloria's setup (the test provider has no
+  // appointments of its own referencing these).
+  await hours.delete({ providerId: provider.id });
+  await types.delete({ providerId: provider.id });
+  const srcHours = await hours.find({ where: { providerId: source.id, isActive: true } });
+  await hours.save(srcHours.map(({ id, provider: _p, ...h }: any) => Object.assign(new ProviderAvailability(), h, { providerId: provider!.id })));
+  const srcTypes = await types.find({ where: { providerId: source.id, isActive: true } });
+  await types.save(srcTypes.map(({ id, provider: _p, createdAt, updatedAt, ...t }: any) =>
+    Object.assign(new ProviderAppointmentType(), t, { providerId: provider!.id })));
+  console.log(`Copied ${srcHours.length} hour rows, ${srcTypes.length} appointment types from ${source.firstName} ${source.lastName}.`);
 
   const practice = (await ds.query(`SELECT name FROM practices WHERE id = $1`, [source.practiceId]))[0];
   const gloriaCount = (await ds.query(`SELECT count(*)::int AS n FROM providers WHERE "firstName" = $1`, [SOURCE_PROVIDER_FIRST_NAME]))[0].n;
