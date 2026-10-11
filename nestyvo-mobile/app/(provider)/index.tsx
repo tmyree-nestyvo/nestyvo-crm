@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { hasRole, ADMIN_ONLY } from '../../lib/role-groups';
 import { api } from '../../lib/api';
 import { AppointmentCard } from '../../components/dashboard/AppointmentCard';
 import { StatCard } from '../../components/dashboard/StatCard';
+import { MonthCalendarGrid } from '../../components/MonthCalendarGrid';
 import { signOut } from '../../lib/auth';
 
 const TZ = 'America/Los_Angeles';
@@ -32,23 +33,32 @@ function isoDate(d: Date) {
   return d.toLocaleDateString('en-CA', { timeZone: TZ });
 }
 
-function buildDays() {
-  const today = new Date();
-  return Array.from({ length: 30 }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    return d;
-  });
-}
-
 export default function ProviderScheduleScreen() {
   const { name, role, clearAuth } = useAuthStore();
-  const days = buildDays();
-  const [selectedDate, setSelectedDate] = useState(isoDate(days[0]));
+  const today = isoDate(new Date());
+  // Charlene, across multiple rounds of testing — "this big string of
+  // numbers... what if I want to go beyond this string of numbers?
+  // Imagine a maybe an iPhone calendar here, where you can just see a
+  // block of the month and select what date you want." The old day-strip
+  // was a fixed 30-day horizontal scroll with no way to navigate past it.
+  // Swapped for the exact same real month-grid Calendar's own Month view
+  // already uses (components/MonthCalendarGrid.tsx) — true prev/next month
+  // navigation, not a bounded window.
+  const [year, setYear] = useState(() => new Date().getFullYear());
+  const [month, setMonth] = useState(() => new Date().getMonth());
+  const [selectedDate, setSelectedDate] = useState(today);
   const { data, isLoading, isError, error, refetch, isRefetching } = useProviderDashboard();
   const noProviderAccount = isError && (error as any)?.response?.status === 403;
 
-  const datesWithAppts = new Set((data?.schedule ?? []).map((a: any) => isoDate(new Date(a.startAt))));
+  const apptsByDate = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    for (const a of data?.schedule ?? []) {
+      if (!a.startAt) continue;
+      const key = isoDate(new Date(a.startAt));
+      (map[key] ??= []).push(a);
+    }
+    return map;
+  }, [data?.schedule]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -199,33 +209,17 @@ export default function ProviderScheduleScreen() {
               />
             </View>
 
-            {/* Day strip — next 30 days */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-4 mb-4">
-              {days.map((d) => {
-                const iso = isoDate(d);
-                const active = iso === selectedDate;
-                const hasAppts = datesWithAppts.has(iso);
-                return (
-                  <TouchableOpacity
-                    key={iso}
-                    onPress={() => setSelectedDate(iso)}
-                    className={`mx-1 w-14 h-16 rounded-xl items-center justify-center ${
-                      active ? 'bg-primary-600' : 'bg-white border border-gray-100'
-                    }`}
-                  >
-                    <Text className={`text-xs font-medium ${active ? 'text-white/70' : 'text-gray-400'}`}>
-                      {d.toLocaleDateString('en-US', { weekday: 'short' })}
-                    </Text>
-                    <Text className={`text-lg font-bold mt-0.5 ${active ? 'text-white' : 'text-gray-900'}`}>
-                      {d.getDate()}
-                    </Text>
-                    {hasAppts && !active ? (
-                      <View className="w-1 h-1 rounded-full bg-primary-500 mt-0.5" />
-                    ) : null}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+            {/* Month calendar — pick any date, any month */}
+            <View className="px-5 mb-2 bg-white rounded-2xl border border-gray-100 py-1">
+              <MonthCalendarGrid
+                year={year} month={month} today={today} selectedDate={selectedDate}
+                apptsByDate={apptsByDate}
+                onPrevMonth={() => setMonth((m) => { if (m === 0) { setYear((y) => y - 1); return 11; } return m - 1; })}
+                onNextMonth={() => setMonth((m) => { if (m === 11) { setYear((y) => y + 1); return 0; } return m + 1; })}
+                onSelectDay={setSelectedDate}
+                scroll={false}
+              />
+            </View>
 
             {/* Schedule for day */}
             <View className="px-5">

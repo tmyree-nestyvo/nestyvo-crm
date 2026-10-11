@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { AppointmentCard } from '../../components/dashboard/AppointmentCard';
 import { HomeButton } from '../../components/HomeButton';
+import { MonthCalendarGrid } from '../../components/MonthCalendarGrid';
 
 // Customizable month/week/day/journal calendar views (Sep 5 2026 ask —
 // "the same views you see in an iPhone calendar"). Data source is the same
@@ -31,26 +32,6 @@ function todayPT() {
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: TZ });
 }
-// Compact form for the tight month-grid cells, e.g. "10a" / "2:30p" — no
-// room there for fmtTime's full "10:00 AM".
-function fmtTimeCompact(iso: string) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric', minute: 'numeric', hour12: true, timeZone: TZ,
-  }).formatToParts(new Date(iso));
-  const hour = parts.find((p) => p.type === 'hour')?.value ?? '';
-  const minute = parts.find((p) => p.type === 'minute')?.value ?? '00';
-  const ampm = parts.find((p) => p.type === 'dayPeriod')?.value?.charAt(0).toLowerCase() ?? '';
-  return minute === '00' ? `${hour}${ampm}` : `${hour}:${minute}${ampm}`;
-}
-function daysInMonth(year: number, month: number) {
-  return new Date(year, month + 1, 0).getDate();
-}
-function firstDOW(year: number, month: number) {
-  return new Date(year, month, 1).getDay();
-}
-function isoOf(year: number, month: number, day: number) {
-  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
 function startOfWeek(iso: string) {
   const [y, m, d] = iso.split('-').map(Number);
   const date = new Date(y, m - 1, d);
@@ -58,10 +39,6 @@ function startOfWeek(iso: string) {
   return date;
 }
 
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const VIEW_MODES = ['month', 'week', 'day', 'journal'] as const;
 type ViewMode = (typeof VIEW_MODES)[number];
@@ -128,7 +105,7 @@ export default function ProviderCalendarScreen() {
           <Text className="text-gray-400">Loading…</Text>
         </View>
       ) : viewMode === 'month' ? (
-        <MonthView
+        <MonthCalendarGrid
           year={year} month={month} today={today} selectedDate={selectedDate}
           apptsByDate={apptsByDate}
           onPrevMonth={() => setMonth((m) => { if (m === 0) { setYear((y) => y - 1); return 11; } return m - 1; })}
@@ -151,71 +128,6 @@ function DayDot({ count }: { count: number }) {
   return <View className="w-1.5 h-1.5 rounded-full bg-primary-500 mt-0.5" />;
 }
 
-// Month view: Charlene asked for "a bigger distinction" than a dot — the
-// earliest appointment's start time, plus a "+N" for any additional ones
-// that day.
-function DayApptTime({ appts }: { appts: any[] }) {
-  if (!appts.length) return null;
-  const label = fmtTimeCompact(appts[0].startAt);
-  return (
-    <Text className="text-[9px] font-bold text-primary-600 mt-0.5" numberOfLines={1}>
-      {label}{appts.length > 1 ? ` +${appts.length - 1}` : ''}
-    </Text>
-  );
-}
-
-function MonthView({
-  year, month, today, selectedDate, apptsByDate, onPrevMonth, onNextMonth, onSelectDay,
-}: {
-  year: number; month: number; today: string; selectedDate: string;
-  apptsByDate: Record<string, any[]>;
-  onPrevMonth: () => void; onNextMonth: () => void; onSelectDay: (iso: string) => void;
-}) {
-  const numDays = daysInMonth(year, month);
-  const leadingBlanks = firstDOW(year, month);
-  const cells: (number | null)[] = [...Array(leadingBlanks).fill(null), ...Array.from({ length: numDays }, (_, i) => i + 1)];
-
-  return (
-    <ScrollView className="flex-1" contentContainerClassName="px-5 pb-8">
-      <View className="flex-row items-center justify-between mb-3 mt-1">
-        <TouchableOpacity onPress={onPrevMonth} className="p-2"><Ionicons name="chevron-back" size={20} color="#374151" /></TouchableOpacity>
-        <Text className="text-base font-bold text-gray-900">{MONTH_NAMES[month]} {year}</Text>
-        <TouchableOpacity onPress={onNextMonth} className="p-2"><Ionicons name="chevron-forward" size={20} color="#374151" /></TouchableOpacity>
-      </View>
-
-      <View className="flex-row mb-1">
-        {DOW.map((d) => (
-          <Text key={d} className="flex-1 text-center text-xs font-semibold text-gray-400">{d}</Text>
-        ))}
-      </View>
-
-      <View className="flex-row flex-wrap">
-        {cells.map((day, i) => {
-          if (day === null) return <View key={`b${i}`} style={{ width: `${100 / 7}%` }} className="aspect-square" />;
-          const iso = isoOf(year, month, day);
-          const isToday = iso === today;
-          const isSelected = iso === selectedDate;
-          const appts = apptsByDate[iso] ?? [];
-          return (
-            <TouchableOpacity
-              key={iso}
-              onPress={() => onSelectDay(iso)}
-              style={{ width: `${100 / 7}%` }}
-              className="aspect-square items-center justify-center"
-            >
-              <View className={`w-8 h-8 rounded-full items-center justify-center ${isSelected ? 'bg-primary-600' : isToday ? 'bg-primary-50' : ''}`}>
-                <Text className={`text-sm ${isSelected ? 'text-white font-bold' : isToday ? 'text-primary-700 font-bold' : 'text-gray-700'}`}>
-                  {day}
-                </Text>
-              </View>
-              <DayApptTime appts={appts} />
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    </ScrollView>
-  );
-}
 
 function WeekView({
   selectedDate, today, apptsByDate, onSelectDay, providerId,
