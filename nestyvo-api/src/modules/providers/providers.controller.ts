@@ -362,11 +362,18 @@ export class ProvidersController {
   ) {
     await this.providersService.assertScheduleAccess(providerId, user);
     await this.providersService.assertBookable(providerId);
+    const newStartAt = new Date(dto.startAt);
+    const newEndAt = new Date(dto.endAt);
+    // Oct 11 2026 — see AppointmentsService.assertNoConflict's own comment.
+    // This is the direct booking path (not reschedule) — a provider's
+    // manual date/time entry had nothing stopping it from double-booking a
+    // slot that already had someone in it.
+    await this.appointmentsService.assertNoConflict(providerId, newStartAt, newEndAt);
     const appt = this.appointmentRepo.create({
       providerId,
       patientId: dto.patientId,
-      startAt: new Date(dto.startAt),
-      endAt: new Date(dto.endAt),
+      startAt: newStartAt,
+      endAt: newEndAt,
       appointmentTypeId: dto.appointmentTypeId,
       locationType: dto.locationType,
       status: AppointmentStatus.SCHEDULED,

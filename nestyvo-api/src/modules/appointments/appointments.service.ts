@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
@@ -22,6 +22,41 @@ export class AppointmentsService {
     // remindersService were separate injections there too), not this
     // service's.
   ) {}
+
+  // Oct 11 2026 — Charlene's second click-through: "I selected any time or
+  // date as a provider and I double booked somebody." Neither booking nor
+  // reschedule ever checked for an existing appointment in the new time
+  // range — the manual date/time form a provider uses has no visibility
+  // into what's already booked, so nothing stopped it from silently
+  // succeeding. This is a real data-safety gap, not just that screen's UX
+  // — shared here so both bookAppointment (providers.controller.ts) and
+  // reschedule (below) enforce it the same way, regardless of which
+  // screen or role is doing the booking. excludeAppointmentId lets
+  // reschedule check against everything EXCEPT the appointment currently
+  // being moved (which still has SCHEDULED status at the moment of the
+  // check, about to be superseded).
+  async assertNoConflict(
+    providerId: string,
+    startAt: Date,
+    endAt: Date,
+    excludeAppointmentId?: string,
+  ): Promise<void> {
+    const qb = this.appointmentRepo
+      .createQueryBuilder('a')
+      .where('a.providerId = :providerId', { providerId })
+      .andWhere('a.status IN (:...statuses)', {
+        statuses: [AppointmentStatus.SCHEDULED, AppointmentStatus.COMPLETED],
+      })
+      .andWhere('a.startAt < :endAt', { endAt })
+      .andWhere('a.endAt > :startAt', { startAt });
+    if (excludeAppointmentId) {
+      qb.andWhere('a.id != :excludeId', { excludeId: excludeAppointmentId });
+    }
+    const conflict = await qb.getOne();
+    if (conflict) {
+      throw new ConflictException('That time overlaps an existing appointment for this provider.');
+    }
+  }
 
   // Workstream B (Oct 3 2026) — resultStatus defaults to CANCELLED (every
   // existing caller: the public self-cancel link, the copilot's
@@ -85,6 +120,8 @@ export class AppointmentsService {
     // adjust duration at the same time as the slot.
     const durationMs = appt.endAt.getTime() - appt.startAt.getTime();
     const newEndAt = options.newEndAt ?? new Date(options.newStartAt.getTime() + durationMs);
+
+    await this.assertNoConflict(appt.providerId, options.newStartAt, newEndAt, appt.id);
 
     await this.cancel(appt.id, {
       reason: options.reason || 'Rescheduled',
