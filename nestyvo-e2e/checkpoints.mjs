@@ -287,9 +287,13 @@ export const CHECKPOINTS = [
     expect: 'Provider Calendar shows only her own schedule — no "Select Provider".',
     async run(h) {
       await PROVIDER_HOME(h);
-      await h.page.goto(new URL('/calendar', h.cfg.url).toString(), { waitUntil: 'networkidle' });
+      // The URL /calendar resolves to the ADMIN calendar (both groups have
+      // one), so go in the way a provider does: the calendar icon at the top
+      // of My Schedule, just left of the download icon.
+      await h.page.mouse.click(1217, 40);
       await h.page.waitForTimeout(1500);
-      h.check('No "Select Provider" control', !(await h.has('Select Provider')));
+      h.check('Opened the provider Calendar', await h.has('Your schedule'));
+      h.check('No provider picker', !(await h.has(/select a provider/i)));
     },
   },
   {
