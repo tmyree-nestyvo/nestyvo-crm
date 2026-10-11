@@ -26,6 +26,27 @@ function useProviderDashboard() {
   });
 }
 
+// Charlene, same recording — "this view here, right at the bottom, when
+// you click on the date, you can see your appointments here, right? But
+// we should also see it just like the admin sees it where it has all the
+// open times, so the provider can just select the time they want to add."
+// The day panel below the calendar only ever showed booked appointments —
+// getting to an actual open time meant Add Appointment → a date/time
+// picker on a second screen. Same data source as that picker
+// (GET /dashboard/provider/available-slots), fetched here so the open
+// times for the selected date render directly inline, same as the
+// admin's Available Slots screen.
+function useProviderAvailableSlots() {
+  return useQuery({
+    queryKey: ['provider-available-slots', 90],
+    queryFn: () => api.get('/dashboard/provider/available-slots', { params: { days: 90 } }).then((r) => r.data),
+    staleTime: 60_000,
+  });
+}
+function fmtSlotTime(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: TZ });
+}
+
 function isoDate(d: Date) {
   // toISOString() converts to UTC first, which can roll the date to the
   // next/previous day depending on local offset — use the Pacific-time
@@ -48,7 +69,11 @@ export default function ProviderScheduleScreen() {
   const [month, setMonth] = useState(() => new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState(today);
   const { data, isLoading, isError, error, refetch, isRefetching } = useProviderDashboard();
+  const { data: slotsData } = useProviderAvailableSlots();
   const noProviderAccount = isError && (error as any)?.response?.status === 403;
+
+  const daySlots: { startAt: string; endAt: string }[] =
+    slotsData?.slotsByDate?.find((d: any) => d.date === selectedDate)?.slots ?? [];
 
   const apptsByDate = useMemo(() => {
     const map: Record<string, any[]> = {};
@@ -239,6 +264,36 @@ export default function ProviderScheduleScreen() {
                 <Ionicons name="add" size={18} color="#fff" />
                 <Text className="text-white font-semibold text-sm">Add Appointment</Text>
               </TouchableOpacity>
+
+              {/* Oct 11 2026 — "we should also see it just like the admin
+                  sees it where it has all the open times, so the provider
+                  can just select the time they want to add it to." Real
+                  open slots for this exact date, tap one to book straight
+                  into it — no extra date/time step, same as tapping a slot
+                  on the admin side's Available Slots screen. */}
+              {daySlots.length > 0 && (
+                <View className="mb-4">
+                  <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Open Times</Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    {daySlots.map((slot) => (
+                      <TouchableOpacity
+                        key={slot.startAt}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/(provider)/book-appointment',
+                            params: { slotStartAt: slot.startAt, slotEndAt: slot.endAt },
+                          })
+                        }
+                        className="px-3.5 py-2.5 rounded-xl border border-primary-100 bg-primary-50"
+                      >
+                        <Text className="text-primary-700 text-sm font-medium">{fmtSlotTime(slot.startAt)}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {daySlots.length > 0 && <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Appointments</Text>}
               {isLoading ? (
                 <View className="bg-white rounded-xl p-6 items-center">
                   <Text className="text-gray-400 text-sm">Loading…</Text>
