@@ -1,13 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { AppointmentCard } from '../../components/dashboard/AppointmentCard';
 import { HomeButton } from '../../components/HomeButton';
 import { MonthCalendarGrid } from '../../components/MonthCalendarGrid';
+import { NoticeBanner } from '../../components/NoticeBanner';
 
 // Customizable month/week/day/journal calendar views (Sep 5 2026 ask —
 // "the same views you see in an iPhone calendar"). Data source is the same
@@ -49,6 +50,16 @@ export default function ProviderCalendarScreen() {
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState(today);
+  // ?date=YYYY-MM-DD&notice=… — after a reschedule, open that day with a
+  // confirmation (see appointments/[id].tsx).
+  const { date: dateParam, notice } = useLocalSearchParams<{ date?: string; notice?: string }>();
+  useEffect(() => {
+    if (!dateParam) return;
+    setSelectedDate(dateParam);
+    setYear(Number(dateParam.slice(0, 4)));
+    setMonth(Number(dateParam.slice(5, 7)) - 1);
+    setViewMode('day');
+  }, [dateParam]);
 
   const { data, isLoading, refetch, isRefetching } = useProviderDashboard();
   const schedule: any[] = data?.schedule ?? [];
@@ -84,6 +95,8 @@ export default function ProviderCalendarScreen() {
         </View>
         <HomeButton href="/(provider)" />
       </View>
+
+      <NoticeBanner message={notice} />
 
       {/* View toggle */}
       <View className="px-5 pb-3 flex-row bg-gray-100 mx-5 rounded-xl p-1">

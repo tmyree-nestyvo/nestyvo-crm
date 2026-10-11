@@ -150,6 +150,13 @@ export default function BookSlotScreen() {
       setBooked(true);
       queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['provider-schedule'] });
+      // Provider side + client profile — without these the provider's My
+      // Schedule and open-slot chips kept showing the just-booked time as
+      // open until a manual refresh.
+      queryClient.invalidateQueries({ queryKey: ['provider-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['provider-available-slots'] });
+      queryClient.invalidateQueries({ queryKey: ['provider-available-slots-picker'] });
+      queryClient.invalidateQueries({ queryKey: ['patient', patientId] });
     },
     onError: (err: any) => {
       Alert.alert('Couldn\'t book appointment', err?.response?.data?.message || 'Please try again.');
@@ -174,29 +181,32 @@ export default function BookSlotScreen() {
             <Text className="text-gray-500 text-sm mt-1 text-center">
               {patientName} is scheduled with {providerName}.
             </Text>
+            {slotStartAt ? (
+              <Text className="text-gray-700 text-sm font-medium mt-1 text-center">{fmt(slotStartAt)}</Text>
+            ) : null}
+            {/* Charlene, Oct 10 recording (18:04, 22:48, 27:56, 35:40, 38:48) —
+                "I don't think we need add another client on that page… it
+                should just be back to the calendar view… we don't really need
+                to see your profile after that." View Profile and Add Another
+                Client replaced by one action that lands on the calendar, on
+                the day just booked. */}
             <TouchableOpacity
-              onPress={() => router.replace(`${profileBase}/${patientId}` as any)}
+              onPress={() => {
+                const day = slotStartAt
+                  ? new Date(slotStartAt).toLocaleDateString('en-CA', { timeZone: TZ })
+                  : undefined;
+                if (isProviderContext) {
+                  router.replace({ pathname: '/(provider)', params: day ? { date: day } : {} });
+                } else {
+                  router.replace({
+                    pathname: '/(agent)/calendar',
+                    params: { initialProviderId: providerId, ...(day ? { initialDate: day } : {}) },
+                  });
+                }
+              }}
               className="mt-6 bg-primary-600 rounded-xl px-6 py-3"
             >
-              <Text className="text-white font-semibold text-sm">View Profile</Text>
-            </TouchableOpacity>
-            {/* Oct 9 2026 — Charlene's own flow on the call always books a
-                client's first appointment immediately after creating them,
-                landing here, not on patients/new.tsx's own success screen
-                (which already had this button, Pass 2 of the pilot) — this
-                screen was the one still missing it.
-                Oct 11 2026 — on the provider side there's no equivalent
-                "/new" screen to redirect to (new clients are created inline
-                within book-appointment.tsx's own New Client tab), so this
-                sends a provider back there instead — same affordance,
-                correct destination for that context. */}
-            <TouchableOpacity
-              onPress={() =>
-                router.replace(isProviderContext ? '/(provider)/book-appointment' : '/(agent)/patients/new')
-              }
-              className="mt-3 py-2"
-            >
-              <Text className="text-primary-600 text-sm font-medium">Add Another Client</Text>
+              <Text className="text-white font-semibold text-sm">Back to Calendar</Text>
             </TouchableOpacity>
           </View>
         ) : (

@@ -49,7 +49,14 @@ function InfoRow({ icon, label, value, onPress }: { icon: any; label: string; va
 }
 
 export default function AppointmentDetailScreen() {
-  const { id, providerId } = useLocalSearchParams<{ id: string; providerId: string }>();
+  // Charlene, Oct 10 recording (06:20, 07:30, 34:16) — back from an
+  // appointment kept landing on the Dashboard instead of where she came
+  // from (the Calendar, or the client she was looking at). router.back()
+  // isn't reliable on this web build (same finding as the provider side,
+  // Oct 11), so every caller passes an explicit returnTo; the Calendar is
+  // the fallback since that's where appointments are opened from most.
+  const { id, providerId, returnTo } = useLocalSearchParams<{ id: string; providerId: string; returnTo?: string }>();
+  const backHref = (returnTo || '/(agent)/calendar') as any;
   const queryClient = useQueryClient();
   const [cancelModal, setCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -67,6 +74,9 @@ export default function AppointmentDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['appointment-detail', providerId, id] });
       queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['provider-schedule'] });
+      // The client's own page lists this appointment too (Oct 10 recording
+      // 34:24 — had to refresh to see "cancelled" there).
+      queryClient.invalidateQueries({ queryKey: ['patient'] });
     },
     onError: (err: any) => {
       Alert.alert("Couldn't cancel", err?.response?.data?.message || 'Please try again.');
@@ -79,7 +89,7 @@ export default function AppointmentDetailScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
       <View className="px-5 pt-3 pb-4 flex-row items-center gap-3 bg-white border-b border-gray-100">
-        <TouchableOpacity onPress={() => router.back()} className="p-1">
+        <TouchableOpacity onPress={() => router.replace(backHref)} className="p-1">
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
         <Text className="text-lg font-bold text-gray-900 flex-1">Appointment</Text>
@@ -113,7 +123,7 @@ export default function AppointmentDetailScreen() {
               icon="person-outline"
               label="Client"
               value={appt.patient.name}
-              onPress={() => router.push(`/(agent)/patients/${appt.patient.id}`)}
+              onPress={() => router.push({ pathname: '/(agent)/patients/[id]', params: { id: appt.patient.id } })}
             />
             <InfoRow icon="medkit-outline" label="Provider" value={appt.provider.name} />
             <InfoRow icon="business-outline" label="Practice" value={appt.practice.name} />

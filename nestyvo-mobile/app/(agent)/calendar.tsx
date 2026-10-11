@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { Alert } from '../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { api, providersApi } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
 import { AppointmentCard } from '../../components/dashboard/AppointmentCard';
+import { NoticeBanner, rescheduledNotice, dayOf } from '../../components/NoticeBanner';
 
 // ── Data ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,14 @@ function fmt(iso: string) {
 function todayPT() {
   return new Date().toLocaleDateString('en-CA', { timeZone: TZ }); // 'en-CA' → YYYY-MM-DD
 }
+
+// Charlene, Oct 10 recording (34:44) — "we have the wrong provider again
+// here." The Calendar tab always re-opens with a clean, param-free route
+// (see (agent)/_layout.tsx's tabPress handler), which also dropped which
+// provider she was looking at, so it fell back to the first provider every
+// time. Remembered for the session here instead of in the URL, so the
+// stale-reschedule-state fix that relies on the clean route still holds.
+let lastSelectedProviderId = '';
 
 // Days in a month
 function daysInMonth(year: number, month: number) {
@@ -152,10 +161,14 @@ function ProviderPickerModal({
 
 export default function CalendarScreen() {
   const {
-    initialProviderId, bookingPatientId, bookingPatientName, callbackId,
+    initialProviderId, initialDate, notice, bookingPatientId, bookingPatientName, callbackId,
     rescheduleAppointmentId, rescheduleProviderId, reschedulePatientName,
   } = useLocalSearchParams<{
     initialProviderId?: string;
+    /** YYYY-MM-DD — open on this day (e.g. the day just booked/rescheduled). */
+    initialDate?: string;
+    /** One-line confirmation shown at the top (e.g. after a reschedule). */
+    notice?: string;
     bookingPatientId?: string;
     bookingPatientName?: string;
     callbackId?: string;
@@ -170,10 +183,30 @@ export default function CalendarScreen() {
   }>();
   const isRescheduling = !!rescheduleAppointmentId;
   const today = todayPT();
-  const [year, setYear] = useState(() => new Date().getFullYear());
-  const [month, setMonth] = useState(() => new Date().getMonth());
-  const [selectedDate, setSelectedDate] = useState(today);
-  const [selectedProviderId, setSelectedProviderId] = useState(initialProviderId ?? rescheduleProviderId ?? '');
+  const startDate = initialDate || today;
+  const [year, setYear] = useState(() => Number(startDate.slice(0, 4)));
+  const [month, setMonth] = useState(() => Number(startDate.slice(5, 7)) - 1);
+  const [selectedDate, setSelectedDate] = useState(startDate);
+  const [selectedProviderId, setSelectedProviderIdState] = useState(
+    initialProviderId ?? rescheduleProviderId ?? lastSelectedProviderId,
+  );
+  const setSelectedProviderId = (id: string) => {
+    lastSelectedProviderId = id;
+    setSelectedProviderIdState(id);
+  };
+  // The tab navigator keeps this screen mounted, so a router.replace() here
+  // with new params (e.g. "Back to Calendar" after a booking) doesn't re-run
+  // the useState initializers above — sync them explicitly.
+  useEffect(() => {
+    if (initialDate) {
+      setSelectedDate(initialDate);
+      setYear(Number(initialDate.slice(0, 4)));
+      setMonth(Number(initialDate.slice(5, 7)) - 1);
+    }
+  }, [initialDate]);
+  useEffect(() => {
+    if (initialProviderId) setSelectedProviderId(initialProviderId);
+  }, [initialProviderId]);
   const [providerPickerOpen, setProviderPickerOpen] = useState(false);
   const queryClient = useQueryClient();
   const scrollRef = useRef<ScrollView>(null);
@@ -185,9 +218,16 @@ export default function CalendarScreen() {
     onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ['agent-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['provider-schedule'] });
+      // Oct 10 recording (07:20) — wrap up on the calendar, on the new day,
+      // with a clear confirmation, instead of an appointment screen that
+      // still offers Reschedule/Cancel and whose back button went Home.
       router.replace({
-        pathname: '/(agent)/appointments/[id]',
-        params: { id: saved.id, providerId: rescheduleProviderId! },
+        pathname: '/(agent)/calendar',
+        params: {
+          initialProviderId: rescheduleProviderId!,
+          initialDate: dayOf(saved.startAt),
+          notice: rescheduledNotice(reschedulePatientName, saved.startAt),
+        },
       });
     },
     onError: (err: any) => {
@@ -262,6 +302,7 @@ export default function CalendarScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
       <ScrollView ref={scrollRef} className="flex-1" contentContainerClassName="pb-10">
+        <NoticeBanner message={notice} />
         {/* Header */}
         <View className="px-5 pt-4 pb-2 flex-row items-center gap-3">
           <Text className="text-xl font-bold text-gray-900 flex-1">Calendar</Text>
@@ -468,7 +509,11 @@ export default function CalendarScreen() {
                       ? () =>
                           router.push({
                             pathname: '/(agent)/appointments/[id]',
-                            params: { id: a.id, providerId: activeProviderId },
+                            params: {
+                              id: a.id,
+                              providerId: activeProviderId,
+                              returnTo: `/(agent)/calendar?initialProviderId=${activeProviderId}&initialDate=${selectedDate}`,
+                            },
                           })
                       : undefined
                   }

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { providersApi } from '../../../lib/api';
 import { HomeButton } from '../../../components/HomeButton';
+import { rescheduledNotice, dayOf } from '../../../components/NoticeBanner';
 import { DateTimeSlotPicker } from '../../../components/DateTimeSlotPicker';
 
 // Oct 9 2026 — Charlene/Troy call: "the provider login cannot edit,
@@ -111,9 +112,14 @@ export default function ProviderAppointmentDetailScreen() {
     onSuccess: (saved: any) => {
       queryClient.invalidateQueries({ queryKey: ['provider-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['provider-schedule'] });
+      // Oct 10 recording (14:00) — "this screen should wrap up and go back
+      // to our calendar view so that it's very clear that was a
+      // rescheduled appointment." Lands on whichever calendar she came from,
+      // on the new day, with a confirmation banner.
+      const params = { date: dayOf(saved.startAt), notice: rescheduledNotice(appt?.patient?.name, saved.startAt) };
       router.replace({
-        pathname: '/(provider)/appointments/[id]',
-        params: { id: saved.id, providerId, returnTo },
+        pathname: returnTo === '/(provider)/calendar' ? '/(provider)/calendar' : '/(provider)',
+        params,
       });
     },
     onError: (err: any) => {
