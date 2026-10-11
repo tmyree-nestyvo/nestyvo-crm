@@ -1,0 +1,674 @@
+00:00:04 (Charlene Armendariz) Okay, let's do another screen
+00:00:08 (Charlene Armendariz) recording. Let me get my share screen ready
+00:00:12 (Charlene Armendariz) here. See
+00:00:20 (Charlene Armendariz) here.
+00:00:24 (Charlene Armendariz) Okay, we're going to go through the test script
+00:00:28 (Charlene Armendariz) that Troy sent back on October
+00:00:36 (Charlene Armendariz) 9th. All right.
+00:00:40 (Charlene Armendariz) So, we're going to start here on step one
+00:00:44 (Charlene Armendariz) here. All right. So, it says everything
+00:00:48 (Charlene Armendariz) below is now live. This is the real thing. Click through it for real. the
+00:00:52 (Charlene Armendariz) way you did in the recording. Okay.
+00:00:56 (Charlene Armendariz) Site. We're going to use our admin
+00:01:00 (Charlene Armendariz) login and provider login. All right. Calendar grid
+00:01:04 (Charlene Armendariz) stays on the hour no matter what. This is the big one.
+00:01:08 (Charlene Armendariz) A test tag used to collapse the whole calendar to its own length.
+00:01:12 (Charlene Armendariz) As admin, open Gloria's provider settings. Confirm. Default se
+00:01:16 (Charlene Armendariz) session is 60 minutes where you were last
+00:01:20 (Charlene Armendariz) time. It's there now. how this used to not exist at all. All right, so
+00:01:24 (Charlene Armendariz) admin, let's go in
+00:01:28 (Charlene Armendariz) here. Get logged
+00:01:32 (Charlene Armendariz) in. And
+00:01:36 (Charlene Armendariz) you know, one thing, let me go back here. I think that from the home
+00:01:40 (Charlene Armendariz) screen, we should remove the HIPPA
+00:01:44 (Charlene Armendariz) compliant message right here that I'm highlighting at the bottom because we are not
+00:01:48 (Charlene Armendariz) technically HIPPA compliant yet. So, I'm just
+00:01:52 (Charlene Armendariz) calling that out. Okay. So, let's log
+00:01:56 (Charlene Armendariz) into admin
+00:02:00 (Charlene Armendariz) here. All right. So, it says provider
+00:02:04 (Charlene Armendariz) settings here. Let's go to Gloria tax
+00:02:08 (Charlene Armendariz) refund. And it says confirm. The default session length is
+00:02:12 (Charlene Armendariz) now set to 60 minutes. New field where you were
+00:02:16 (Charlene Armendariz) look went looking for it last time. It's there now.
+00:02:20 (Charlene Armendariz) Uh, let's see. Here we go.
+00:02:24 (Charlene Armendariz) Session length. Okay. 60 minutes. Looks like it's there. That's
+00:02:28 (Charlene Armendariz) good. Step two. Add a brand new throwaway appointment. Type
+00:02:32 (Charlene Armendariz) at 20 minutes. The exact thing that broke it last time.
+00:02:36 (Charlene Armendariz) Go check an open slot on Gloria's calendar. Slaw on the
+00:02:40 (Charlene Armendariz) hour. And it shouldn't touch it. Okay. So, let's go
+00:02:44 (Charlene Armendariz) back. We're going to go to
+00:02:48 (Charlene Armendariz) calendar. Select glorious. All right, let's
+00:02:52 (Charlene Armendariz) do let's pick the 20th
+00:02:56 (Charlene Armendariz) 1020. Let's see. They all show one hour. That's
+00:03:00 (Charlene Armendariz) great. Let's add a
+00:03:04 (Charlene Armendariz) 9:00. Okay. And we
+00:03:08 (Charlene Armendariz) have uh what's happening
+00:03:16 (Charlene Armendariz) here? Okay. So, we have Oh, this is a smart fill. I see this is
+00:03:20 (Charlene Armendariz) different. Now, in the
+00:03:24 (Charlene Armendariz) smart fill, I see that it's making
+00:03:28 (Charlene Armendariz) suggestions here to add these folks that are on the wait
+00:03:32 (Charlene Armendariz) list, which is good.
+00:03:36 (Charlene Armendariz) However, you can't actually add any of these guys
+00:03:40 (Charlene Armendariz) to that appointment. So, see how
+00:03:44 (Charlene Armendariz) it, for example, suggest Jane
+00:03:48 (Charlene Armendariz) Doe. So if I wanted to add Jane Doe from this
+00:03:52 (Charlene Armendariz) weight list here, there's an option suggesting
+00:03:56 (Charlene Armendariz) her, but I cannot add her. So that would be one
+00:04:00 (Charlene Armendariz) thing that we would want to correct. And it also we would only want to add weight
+00:04:04 (Charlene Armendariz) list for the same practice, not for any other
+00:04:08 (Charlene Armendariz) practices. So it would only be clients of Gloria's
+00:04:12 (Charlene Armendariz) should be showing in the smart fill, which it might be actually. I
+00:04:16 (Charlene Armendariz) just see this little verbiage right here that says Westside Mental, which
+00:04:20 (Charlene Armendariz) doesn't align. So, okay. So, let's go
+00:04:24 (Charlene Armendariz) to let's go to new client. We're going to
+00:04:28 (Charlene Armendariz) add rainbow Oops. Let's go ahead
+00:04:32 (Charlene Armendariz) and add rainbow green to
+00:04:36 (Charlene Armendariz) the docket. Today we're
+00:04:40 (Charlene Armendariz) going to add her tag as Okay, we might have some tags missing,
+00:04:44 (Charlene Armendariz) but let's go with consult.
+00:04:48 (Charlene Armendariz) Okay, right here we can remove the headway
+00:04:52 (Charlene Armendariz) verbiage. Hit client create. Okay, Rainbow Green has
+00:04:56 (Charlene Armendariz) been added. Want to get their first appointment on the books. Let's go ahead and book this
+00:05:00 (Charlene Armendariz) slot. All right, we're going to do a H. Okay, now we see a different list
+00:05:04 (Charlene Armendariz) of tags. Let's call it a W2
+00:05:08 (Charlene Armendariz) filing. So, that might be redundant. Uh maybe the
+00:05:12 (Charlene Armendariz) tags are when you add the appointment type or
+00:05:16 (Charlene Armendariz) the customer profile, but that they should match. Oh, wait. I
+00:05:20 (Charlene Armendariz) see this is appointment type. Never mind. Disregard
+00:05:24 (Charlene Armendariz) that. Let's go ahead and add a 20 minute for this
+00:05:28 (Charlene Armendariz) just like the script says. Hit confirm.
+00:05:32 (Charlene Armendariz) Okay. Appointment booked. Rainbow green is scheduled to glory. All
+00:05:36 (Charlene Armendariz) right. Now, add another client. It takes
+00:05:40 (Charlene Armendariz) me back to this screen. Looks like it gets stuck on add
+00:05:44 (Charlene Armendariz) another client. So that is
+00:05:48 (Charlene Armendariz) a page we want to redirect
+00:05:52 (Charlene Armendariz) to actually add another client
+00:05:56 (Charlene Armendariz) or we should be able to go back to the calendar.
+00:06:00 (Charlene Armendariz) Okay. So, here. All right. Good. It looks like we added a date.
+00:06:04 (Charlene Armendariz) We said on October 20th at 9:00 a.m. her
+00:06:08 (Charlene Armendariz) appointment. Let me go back to the calendar and look.
+00:06:12 (Charlene Armendariz) October 20th at 9:00 a.m.
+00:06:16 (Charlene Armendariz) Perfect. All right. Okay. See how I went
+00:06:20 (Charlene Armendariz) back from that calendar view? I want to click on Rainbow Green's
+00:06:24 (Charlene Armendariz) appointment. I see that she has this. And then when I go back to appointments, it takes me to this
+00:06:28 (Charlene Armendariz) main dashboard since we had just come from that calendar
+00:06:32 (Charlene Armendariz) view. Presumptively, when I go
+00:06:36 (Charlene Armendariz) back, it should take me back to that calendar
+00:06:40 (Charlene Armendariz) view so that I can look at other scheduling options. Okay, but that's good news. That
+00:06:44 (Charlene Armendariz) looks like it passed. Uh, it did not throw off the
+00:06:48 (Charlene Armendariz) blocks. Okay, deactivate
+00:06:52 (Charlene Armendariz) that test type when you're done in the same screen. keeps the real type
+00:06:56 (Charlene Armendariz) list
+00:07:00 (Charlene Armendariz) clean. Deactivate that test type the same
+00:07:04 (Charlene Armendariz) screen. So, let's see. Oh, I see. So, let's see. Cancel it or
+00:07:08 (Charlene Armendariz) let's reschedu it to
+00:07:12 (Charlene Armendariz) 10 here. All right. So, it looks
+00:07:16 (Charlene Armendariz) like it rescheduled her till 10:00
+00:07:20 (Charlene Armendariz) a.m. This screen should just be a
+00:07:24 (Charlene Armendariz) completion screen because now I cannot leave this screen
+00:07:28 (Charlene Armendariz) without resetting this. So, if I now go back to appointment, see
+00:07:32 (Charlene Armendariz) how it takes me to the home screen, it should take me back to the
+00:07:36 (Charlene Armendariz) calendar and okay, well, it did update. So, we fixed most of the
+00:07:40 (Charlene Armendariz) problem that was happening last time. So, we have
+00:07:44 (Charlene Armendariz) reschedu. Hello. Should be able to go back to the
+00:07:48 (Charlene Armendariz) calendar. There we're at 10:00 a.m. and it did release the 9:00 a.m. That's
+00:07:52 (Charlene Armendariz) great. Okay, that's good news. All
+00:07:56 (Charlene Armendariz) right, so then go check Gloria's open slot grade
+00:08:00 (Charlene Armendariz) calendar. Still in the hour. The new one doesn't touch it. So, let's check from the home the
+00:08:04 (Charlene Armendariz) dashboard. Open slots,
+00:08:08 (Charlene Armendariz) Gloria. Awesome. It didn't adjust it. That's good news.
+00:08:12 (Charlene Armendariz) Okay, let's go to number two
+00:08:16 (Charlene Armendariz) on their test script here. Gloria can reschedule and cancel her own
+00:08:20 (Charlene Armendariz) appointments. This always worked on the back end. The screen just wasn't wired up. Now it is in both places
+00:08:24 (Charlene Armendariz) you'd actually have an appointment. Login is Gloria. Okay, so
+00:08:28 (Charlene Armendariz) let's go home. Log
+00:08:32 (Charlene Armendariz) out again. We should remove this HIPPA compliant right
+00:08:36 (Charlene Armendariz) here. All right, Gloria, let's log in
+00:08:40 (Charlene Armendariz) here. sign in.
+00:08:44 (Charlene Armendariz) Okay. All right. First thing to highlight, this
+00:08:48 (Charlene Armendariz) screen needs a little more
+00:08:52 (Charlene Armendariz) of a
+00:08:56 (Charlene Armendariz) functionality view. So, let me see if I can get a Let's
+00:09:00 (Charlene Armendariz) see.
+00:09:04 (Charlene Armendariz) Here. Hang on one second
+00:09:12 (Charlene Armendariz) here. Let's
+00:09:20 (Charlene Armendariz) see. Doesn't look like there's a way for me to draw on the
+00:09:24 (Charlene Armendariz) screen. picture.
+00:09:32 (Charlene Armendariz) No. Okay. Well, I was
+00:09:36 (Charlene Armendariz) trying
+00:09:40 (Charlene Armendariz) to trying to find a little tool to maybe
+00:09:44 (Charlene Armendariz) draw. It doesn't look like there's one
+00:09:48 (Charlene Armendariz) available for this recording. What I want
+00:09:52 (Charlene Armendariz) to highlight is this. this big string
+00:09:56 (Charlene Armendariz) of numbers right here for the calendar
+00:10:00 (Charlene Armendariz) view. This
+00:10:04 (Charlene Armendariz) just needs to be more functional from a calendar side.
+00:10:08 (Charlene Armendariz) So imagine a maybe an
+00:10:12 (Charlene Armendariz) iPhone calendar here the way that that looks and you
+00:10:16 (Charlene Armendariz) can maybe just see a block of you know the
+00:10:20 (Charlene Armendariz) month and you can select
+00:10:24 (Charlene Armendariz) what date you want to choose from. The
+00:10:28 (Charlene Armendariz) issue with this string of numbers is I don't have a
+00:10:32 (Charlene Armendariz) way to adjust. What if I want to go beyond this string
+00:10:36 (Charlene Armendariz) of numbers, right? And then this view here, right here
+00:10:40 (Charlene Armendariz) at the bottom, when you click on the
+00:10:44 (Charlene Armendariz) date, you can see your appointments here,
+00:10:48 (Charlene Armendariz) right? But we should also see it just like the admin sees it where it has all
+00:10:52 (Charlene Armendariz) the open times so that the provider can just select the time
+00:10:56 (Charlene Armendariz) that they want to add to it too, just like the admin setting. That way
+00:11:00 (Charlene Armendariz) it makes it really easy for the user function.
+00:11:04 (Charlene Armendariz) So let's go back to the test. But I think
+00:11:08 (Charlene Armendariz) this view needs to be a little more concise. So from a
+00:11:12 (Charlene Armendariz) user experience, it's easy to say, let me look at my
+00:11:16 (Charlene Armendariz) schedule. Let me select a date and then let me see what's open that
+00:11:20 (Charlene Armendariz) date. Not
+00:11:24 (Charlene Armendariz) necessarily having to go through multiple screens to do it. Okay? Because it felt like
+00:11:28 (Charlene Armendariz) the admin setting was kind of dead on there.
+00:11:32 (Charlene Armendariz) And we should mirror that on the provider
+00:11:36 (Charlene Armendariz) settings. All right. So, login as Gloria on my schedule the home screen. Tap
+00:11:40 (Charlene Armendariz) any booked appointment day appointment for today.
+00:11:44 (Charlene Armendariz) So, let's go here. Rainbow green on Tuesday the 20th
+00:11:48 (Charlene Armendariz) and let's click on her. Okay, good. So, now we can see
+00:11:52 (Charlene Armendariz) her and we can reschedu her. Now, this
+00:11:56 (Charlene Armendariz) right here is not user friendly. So, move to a new
+00:12:00 (Charlene Armendariz) time. So, this is where it should look just like the
+00:12:04 (Charlene Armendariz) admin options where you can select a date and time off of
+00:12:08 (Charlene Armendariz) the calendar, not having to manually enter a date and time
+00:12:12 (Charlene Armendariz) here. That's going to create problems for
+00:12:16 (Charlene Armendariz) the user experience. And then how these appointments
+00:12:20 (Charlene Armendariz) flow. So, let's go
+00:12:24 (Charlene Armendariz) back. And it takes us back to this home view.
+00:12:28 (Charlene Armendariz) Okay. Um, let's see. Add
+00:12:32 (Charlene Armendariz) appointment. Pick a date and time. Again,
+00:12:36 (Charlene Armendariz) this is not the experience we want. We wanted to mirror how we're picking
+00:12:40 (Charlene Armendariz) dates and times on the admin screens in the provider
+00:12:44 (Charlene Armendariz) screens. That way, it makes it easier for the
+00:12:48 (Charlene Armendariz) provider to just click on the day and click on a time that's
+00:12:52 (Charlene Armendariz) available, not manually entering information here.
+00:12:56 (Charlene Armendariz) But that's an improvement that we got this option here to add
+00:13:00 (Charlene Armendariz) the appointment. So let's play with
+00:13:04 (Charlene Armendariz) rainbows. Let's see if I have to if I want to pick a date and
+00:13:08 (Charlene Armendariz) time 26. And the format is not in a
+00:13:12 (Charlene Armendariz) standard US format
+00:13:16 (Charlene Armendariz) either. Let's say 21
+00:13:20 (Charlene Armendariz) I think. And then our hours, we
+00:13:24 (Charlene Armendariz) always probably want to have it
+00:13:28 (Charlene Armendariz) in 12hour, not 24 hours, so it's easier for
+00:13:32 (Charlene Armendariz) somebody to enter without calculating. I don't even know because I can't see as a
+00:13:36 (Charlene Armendariz) provider what times are available this day, which is also why we want the
+00:13:40 (Charlene Armendariz) other screen that is also shown
+00:13:44 (Charlene Armendariz) in the admin settings where it allows me to see what's available and
+00:13:48 (Charlene Armendariz) slide them right into that slot. Okay? Okay, because I could accidentally now
+00:13:52 (Charlene Armendariz) pick a time that's already accounted
+00:13:56 (Charlene Armendariz) for here. Right, I hit confirm. It says scheduled,
+00:14:00 (Charlene Armendariz) but this stays at cancel or confirm.
+00:14:04 (Charlene Armendariz) This screen should wrap up and go back to our calendar
+00:14:08 (Charlene Armendariz) view at this point. So that it's very clear that that was a rescheduled
+00:14:12 (Charlene Armendariz) appointment. When I hit back to appointments, it
+00:14:16 (Charlene Armendariz) takes me back to the dashboard instead of the calendar. So, we want to address that,
+00:14:20 (Charlene Armendariz) too. Okay, moving on to
+00:14:24 (Charlene Armendariz) three. So, let's see. N. Okay, so it did move her. So, that's
+00:14:28 (Charlene Armendariz) good. Oh, see, and this is a great example. I didn't know there was a
+00:14:32 (Charlene Armendariz) 10:00 a.m. on the previous screen that I was rescheduling Rainbow Green. So, I selected
+00:14:36 (Charlene Armendariz) any time or date as a provider and I double booked somebody because Brandon
+00:14:40 (Charlene Armendariz) Purple was already here. So, this is exactly what I was talking
+00:14:44 (Charlene Armendariz) about. So any rescheduling and appointment
+00:14:48 (Charlene Armendariz) filling, we'd want to just mirror how it looks on the admin side where you
+00:14:52 (Charlene Armendariz) see available, you see what's not booked and
+00:14:56 (Charlene Armendariz) booked and the provider can easily move people around in
+00:15:00 (Charlene Armendariz) that sort and that will also update think
+00:15:04 (Charlene Armendariz) give some visibility improvements here on how the schedule
+00:15:08 (Charlene Armendariz) looks from the provider
+00:15:12 (Charlene Armendariz) side. Okay, so let's see a
+00:15:16 (Charlene Armendariz) calendar. Pick any day even with nothing on it. Okay,
+00:15:20 (Charlene Armendariz) so let's see. Uh let's pick Friday the 23rd. Let's add
+00:15:24 (Charlene Armendariz) an appointment. Pick a date and time. starts
+00:15:28 (Charlene Armendariz) as a 45minute appointment. Adjust the length on the next step.
+00:15:32 (Charlene Armendariz) Okay. So again, the date, we'd want it easy to read date just like
+00:15:36 (Charlene Armendariz) month, day, year, but we'd also want to be able to just select it from a calendar just
+00:15:40 (Charlene Armendariz) like we would from the admin setting. And same thing from the
+00:15:44 (Charlene Armendariz) time. Let's go, I guess,
+00:15:48 (Charlene Armendariz) uh I don't know, let's go 10:00 a.m.
+00:15:52 (Charlene Armendariz) because 24hour time is a little confusing. So again, this screen should
+00:15:56 (Charlene Armendariz) show a calendar to select the date and then it
+00:16:00 (Charlene Armendariz) should show what times are booked versus what times are available.
+00:16:04 (Charlene Armendariz) Okay, let's go ahead and hit new client. Let's
+00:16:08 (Charlene Armendariz) pick um
+00:16:12 (Charlene Armendariz) brown uh
+00:16:16 (Charlene Armendariz) bear. We're going to go ahead and hit continue.
+00:16:20 (Charlene Armendariz) Okay, let's book Brown Bear on October 20th at 10 a.m.
+00:16:24 (Charlene Armendariz) for a business tax filing. Let's go ahead and add him 90
+00:16:28 (Charlene Armendariz) minutes. That's great. Okay, hit confirm.
+00:16:32 (Charlene Armendariz) Okay, now this screen shows
+00:16:36 (Charlene Armendariz) booked, which is good. We can hit review
+00:16:40 (Charlene Armendariz) profile. Let's see what it takes us to. It takes us to a blank
+00:16:44 (Charlene Armendariz) screen. So, I don't know what I'm looking at here, but if I hit
+00:16:48 (Charlene Armendariz) view profile, my guess is it should be showing us the profile of Brown Bear
+00:16:52 (Charlene Armendariz) at this point. So, let's go back a screen.
+00:16:56 (Charlene Armendariz) Oh, now it looks like it broke something because
+00:17:00 (Charlene Armendariz) everything is blank here on the
+00:17:04 (Charlene Armendariz) homepage. So, that looks like something we need to fix. Why is that
+00:17:08 (Charlene Armendariz) bug there? Let's refresh. Okay, now I refreshed. It updated the
+00:17:12 (Charlene Armendariz) screen. Okay, I'm going to check
+00:17:16 (Charlene Armendariz) October 20th. Looks like Brownberry did save. So, that's good
+00:17:20 (Charlene Armendariz) news. Let's reschedu him until again, we want to
+00:17:24 (Charlene Armendariz) have a better view here of what date and times are available. Let
+00:17:28 (Charlene Armendariz) me hit cancel. I'm going to go back to my
+00:17:32 (Charlene Armendariz) appointment. Let's add one more for the 23rd. I'm going to add an
+00:17:36 (Charlene Armendariz) appointment. Let's go ahead and schedule a 10 a.m.
+00:17:40 (Charlene Armendariz) Again, let's put a new client.
+00:17:44 (Charlene Armendariz) Okay. And let's make up another name. So, let's go
+00:17:48 (Charlene Armendariz) Pink Berry. Okay. Okay.
+00:17:52 (Charlene Armendariz) And we're going to continue it.
+00:17:56 (Charlene Armendariz) Uh screen recording at 45 minutes for 10 a.m. on
+00:18:00 (Charlene Armendariz) Friday. All right. What happens when we click add another client? Click add another
+00:18:04 (Charlene Armendariz) client. So I don't think we need to add another client on that page. I think
+00:18:08 (Charlene Armendariz) it should just be back to the appointment or the calendar view at that
+00:18:12 (Charlene Armendariz) point. Okay. So when I hit back, it seems to
+00:18:16 (Charlene Armendariz) break it every time I hit back from those screens. So you can see again right
+00:18:20 (Charlene Armendariz) here now it's left everything blank.
+00:18:24 (Charlene Armendariz) So let me click calendar again. So
+00:18:28 (Charlene Armendariz) when I click calendar I'm in the provider view. So I should not be able to select
+00:18:32 (Charlene Armendariz) any provider. I should only have my view as a
+00:18:36 (Charlene Armendariz) provider without having to
+00:18:40 (Charlene Armendariz) do any searching here. Oh, and that's not
+00:18:44 (Charlene Armendariz) working. So we uncovered something else here. So let's go back to our dashboard. Let me do a
+00:18:48 (Charlene Armendariz) refresh. Let's check that one more
+00:18:52 (Charlene Armendariz) time. Calendar. Okay. And now it
+00:18:56 (Charlene Armendariz) shows me just a big monthly
+00:19:00 (Charlene Armendariz) view. Okay. But I cannot see any
+00:19:04 (Charlene Armendariz) appointments here. And then I hit back. It takes me all the way back to the dashboard. See, it doesn't take me
+00:19:08 (Charlene Armendariz) back to the calendar. Let me try again. Calendar. I want to look at my month.
+00:19:12 (Charlene Armendariz) And I know that I have appointments scheduled 20th. Okay, there we
+00:19:16 (Charlene Armendariz) go. What happens if I'm looking by week? Okay,
+00:19:20 (Charlene Armendariz) there. Reschedu. Oh, see how every
+00:19:24 (Charlene Armendariz) time it takes me, it doesn't take me to the back of where we were working
+00:19:28 (Charlene Armendariz) in day
+00:19:32 (Charlene Armendariz) journal. So, this screen, let's see, let's go ahead and cancel
+00:19:36 (Charlene Armendariz) Olivia. Cancellation. Okay, cancelled. So,
+00:19:40 (Charlene Armendariz) this this calendar view
+00:19:44 (Charlene Armendariz) just needs to have a little better visibility. Let's
+00:19:48 (Charlene Armendariz) see. Week. Okay. Okay. Well, this one's okay.
+00:19:52 (Charlene Armendariz) I think the bigger piece here is that when you're here on
+00:19:56 (Charlene Armendariz) your home screen that you can search a larger period of
+00:20:00 (Charlene Armendariz) dates uh and be able to see what's available and what's
+00:20:04 (Charlene Armendariz) not available just like the admin setting shows which
+00:20:08 (Charlene Armendariz) is let's see let me log into an admin to be very clear here let
+00:20:12 (Charlene Armendariz) me log out let's
+00:20:16 (Charlene Armendariz) see so see when I click on
+00:20:20 (Charlene Armendariz) refund tax for see how it shows me the availables. I would envision
+00:20:24 (Charlene Armendariz) that from a provider screen they can select a date
+00:20:28 (Charlene Armendariz) maybe from like a dropown and then they could see what's available and then when they want to
+00:20:32 (Charlene Armendariz) go book a slot they see this this view right
+00:20:36 (Charlene Armendariz) here right um here
+00:20:40 (Charlene Armendariz) Gloria so pick a date and then be able to toggle just like
+00:20:44 (Charlene Armendariz) we were from week journal view for example a
+00:20:48 (Charlene Armendariz) day and then you can see what's available then they can fill that
+00:20:52 (Charlene Armendariz) spot with a client. That way, they're not guessing as to times that are
+00:20:56 (Charlene Armendariz) available and dates. should be clear what they do have available and what's
+00:21:00 (Charlene Armendariz) booked on the provider side. Okay, so let's go
+00:21:04 (Charlene Armendariz) back here to our provider again. Let me log
+00:21:12 (Charlene Armendariz) out. Okay.
+00:21:16 (Charlene Armendariz) Okay, so now smart fill step number four.
+00:21:20 (Charlene Armendariz) The backend was silently rejected. Gloria's own requests. Fixed plus the
+00:21:24 (Charlene Armendariz) screen to see them never existed on her site at all. Okay. Add a new add a client to Gloria's
+00:21:28 (Charlene Armendariz) weight list as admin or
+00:21:32 (Charlene Armendariz) as on the wait list. Let's
+00:21:36 (Charlene Armendariz) add somebody here. Let's add
+00:21:40 (Charlene Armendariz) brown bear to the weight list. He needs to be seen
+00:21:44 (Charlene Armendariz) as a new patient. So, we should change the patient verbiage here. And
+00:21:48 (Charlene Armendariz) it should just say new new
+00:21:52 (Charlene Armendariz) client. Then we can say business tax filing. and we're going to add him to the wait
+00:21:56 (Charlene Armendariz) list. Okay. All right. So now, as Gloria, go to the
+00:22:00 (Charlene Armendariz) available slots. Tap the small people icon next to any open slot. All
+00:22:04 (Charlene Armendariz) right. So, as Gloria, we're going to go to available slots,
+00:22:08 (Charlene Armendariz) right? And we're going to go to let's
+00:22:12 (Charlene Armendariz) pick October 21. And we're going
+00:22:16 (Charlene Armendariz) to tap the people. Okay. Oh, this is a good
+00:22:20 (Charlene Armendariz) view. All right. So, then we're going to say urgy. It says urgent.
+00:22:24 (Charlene Armendariz) It says, uh, show a rank list of weight list and overdue
+00:22:28 (Charlene Armendariz) clients for that exact slot with the one tap book button. This icon didn't exist before. It
+00:22:32 (Charlene Armendariz) sure didn't. Okay, so Brown Bear, we want to book
+00:22:36 (Charlene Armendariz) him for
+00:22:40 (Charlene Armendariz) another screen recording. We're going to hit confirm on Wednesday, October
+00:22:44 (Charlene Armendariz) 21. Okay, so here it says booked. And then we should
+00:22:48 (Charlene Armendariz) have a view calendar at this point. right
+00:22:52 (Charlene Armendariz) here. We don't need to add another. So, let's go
+00:22:56 (Charlene Armendariz) here. Gonna refresh
+00:23:00 (Charlene Armendariz) it. Whose dashboard are we in?
+00:23:04 (Charlene Armendariz) Hers, right? Yeah.
+00:23:08 (Charlene Armendariz) Okay. Uh, did you see that screen? It had a
+00:23:12 (Charlene Armendariz) calendar. It was almost like it took on the admin. That was weird.
+00:23:16 (Charlene Armendariz) Okay. My schedule. We said October
+00:23:24 (Charlene Armendariz) 21 and it looks like we have Brown Bear in there. So that's good. Okay, that's
+00:23:28 (Charlene Armendariz) an improvement. Brown Bear is now
+00:23:32 (Charlene Armendariz) scheduled. Okay. All
+00:23:36 (Charlene Armendariz) right. Number five. Admin calendar no longer shows ghost
+00:23:40 (Charlene Armendariz) appointments. Reschedule or cancel any appointment either side.
+00:23:44 (Charlene Armendariz) go back to the admin calendar and check the old time
+00:23:48 (Charlene Armendariz) slot. Okay, so let's
+00:23:52 (Charlene Armendariz) let's go click on brown bear. I don't want to cancel his. I'm going to go
+00:23:56 (Charlene Armendariz) back to the calendar. Let's go for Brandon purple. But we're going to count. Brandon
+00:24:00 (Charlene Armendariz) who was at 21 at 10. I'm going to
+00:24:04 (Charlene Armendariz) cancel here. I'm going to click appointment
+00:24:08 (Charlene Armendariz) and I'm going to see here. Okay, he's
+00:24:12 (Charlene Armendariz) been cancelled. Let's log into the
+00:24:16 (Charlene Armendariz) admin. Click
+00:24:20 (Charlene Armendariz) this. I want to look at the calendar of
+00:24:24 (Charlene Armendariz) refund tax 40 on October
+00:24:28 (Charlene Armendariz) 21 and he was also cancelled.
+00:24:32 (Charlene Armendariz) Yep. Perfect. Okay, good. Okay. And see this view
+00:24:36 (Charlene Armendariz) here? This is the same view we'd want to see on the provider settings so that it's easy for
+00:24:40 (Charlene Armendariz) the provider to just add her appointments for days that are available when she clicks on the
+00:24:44 (Charlene Armendariz) dates and times. See? And then
+00:24:48 (Charlene Armendariz) fill. Okay. Okay, client tags has its own home. Now, this is step
+00:24:52 (Charlene Armendariz) number six. As admin, open glorious
+00:24:56 (Charlene Armendariz) provider settings. Look right below appointment types. Okay, so we are in
+00:25:00 (Charlene Armendariz) admin. I'm going to go home. Provider settings
+00:25:04 (Charlene Armendariz) here. Okay, as admin open glorious provider settings, look
+00:25:08 (Charlene Armendariz) below appointment types. Okay, so where's her appointment types?
+00:25:12 (Charlene Armendariz) Here.
+00:25:16 (Charlene Armendariz) And
+00:25:20 (Charlene Armendariz) Let's see. Hours, blocks, and calendars. I think
+00:25:24 (Charlene Armendariz) maybe it's in here. Appointment types. Here
+00:25:28 (Charlene Armendariz) we go. Okay. You know, one thing to note is we probably don't need to
+00:25:32 (Charlene Armendariz) list every single date that has a block because it looks like this is a recurring
+00:25:36 (Charlene Armendariz) block. Maybe it's just a clean list so it's not so
+00:25:40 (Charlene Armendariz) lengthy. And it just shows block. What is
+00:25:44 (Charlene Armendariz) this? So this looks like Sunday through Saturday from this
+00:25:48 (Charlene Armendariz) time. End date is whatever. And then we know it's a
+00:25:52 (Charlene Armendariz) daily block. So it's not every single day. Otherwise, this list could
+00:25:56 (Charlene Armendariz) be very lengthy over time. All right. So appointment
+00:26:00 (Charlene Armendariz) types is admin. Look at her appointment types. Expect a new
+00:26:04 (Charlene Armendariz) client tags card clearly labeled. Here we go. Client
+00:26:08 (Charlene Armendariz) tags. Okay. Clearly labeled. And then it
+00:26:12 (Charlene Armendariz) says, "Tap it. Add a tag.
+00:26:16 (Charlene Armendariz) Confirm. It shows up for Gloria right away." All right. Okay. So, let's see. New
+00:26:20 (Charlene Armendariz) tag. Let's go with uh
+00:26:24 (Charlene Armendariz) Saturday test
+00:26:28 (Charlene Armendariz) tag.
+00:26:32 (Charlene Armendariz) Oops. All right. and we're going to select
+00:26:40 (Charlene Armendariz) uh 30 minutes here.
+00:26:44 (Charlene Armendariz) Okay. Actually, let's do a new one because it was we'll do
+00:26:48 (Charlene Armendariz) 45 minutes. Tag. Okay. Then it says
+00:26:52 (Charlene Armendariz) um tap it. Add a tag. Confirm. It shows up for
+00:26:56 (Charlene Armendariz) Gloria right away. Okay. So now.
+00:27:00 (Charlene Armendariz) Let's just say we're going let's add a new
+00:27:04 (Charlene Armendariz) client client and we're going to
+00:27:08 (Charlene Armendariz) select magenta lady.
+00:27:12 (Charlene Armendariz) Running out of test names here to think of. We're going to select
+00:27:16 (Charlene Armendariz) 1040 Gloria Saturday
+00:27:20 (Charlene Armendariz) test tag. There it is. Create client. Okay. Okay,
+00:27:24 (Charlene Armendariz) now let's schedule Magenta Lady's first
+00:27:28 (Charlene Armendariz) appointment here. Let's go to put her on the
+00:27:32 (Charlene Armendariz) 16th and let's schedule her
+00:27:36 (Charlene Armendariz) for 9:00 a.m. Whose appointment is this? Yep. Okay. 9:00
+00:27:40 (Charlene Armendariz) a.m. on the 6. What do we say?
+00:27:44 (Charlene Armendariz) 16th. 9:00
+00:27:48 (Charlene Armendariz) a.m. Okay. We're going to put her as a screen recording tag. Confirm
+00:27:52 (Charlene Armendariz) booking. Okay. Now, here we should just be
+00:27:56 (Charlene Armendariz) able to go back to calendar view. Just say appointment
+00:28:00 (Charlene Armendariz) booked. Back to calendar. So, here. Okay. Because we don't
+00:28:04 (Charlene Armendariz) really need to see your profile after that. All right. So, let's check the calendar
+00:28:08 (Charlene Armendariz) on the 16th. Oops, that's 23. We got
+00:28:12 (Charlene Armendariz) Magenta Lady. Okay. Now, let's say I want to
+00:28:16 (Charlene Armendariz) search her. And you know what? We put her
+00:28:20 (Charlene Armendariz) as the wrong test tag. Let's adjust it to a console to see
+00:28:24 (Charlene Armendariz) if that changes it. I don't see a way to confirm it's
+00:28:28 (Charlene Armendariz) saved, but I'm assuming it did. Let's
+00:28:32 (Charlene Armendariz) check client magenta lady. There we go. It did save. Okay. So, maybe we
+00:28:36 (Charlene Armendariz) needed more confirmation there. And then I see that the
+00:28:40 (Charlene Armendariz) appointment time and date is listed here. The date is really small, but maybe we can
+00:28:44 (Charlene Armendariz) even out the viewing here so it just looks a little more
+00:28:48 (Charlene Armendariz) clean and clear. Not so small on the
+00:28:52 (Charlene Armendariz) date. Okay. What we found the tag itself was never broken. Tested the
+00:28:56 (Charlene Armendariz) real created and didn't work perfectly. The screen to manage tags just wasn't reachable where you were
+00:29:00 (Charlene Armendariz) looking. It is now. Okay. Great. All right. So then
+00:29:04 (Charlene Armendariz) CSV import tells you what actually went wrong. Okay.
+00:29:08 (Charlene Armendariz) So try importing a CSV with the header row that doesn't have a recognizable
+00:29:12 (Charlene Armendariz) name or column like your test file did. Now it'll tell you a clear
+00:29:16 (Charlene Armendariz) error telling you exactly that instead of Q confusing already in practice.
+00:29:20 (Charlene Armendariz) Okay. So let's go home.
+00:29:24 (Charlene Armendariz) Oops. Do this
+00:29:28 (Charlene Armendariz) again. Provider.
+00:29:32 (Charlene Armendariz) Okay. Let's do an import client.
+00:29:36 (Charlene Armendariz) This should always let's see probably default to
+00:29:40 (Charlene Armendariz) the client that we're profile already
+00:29:44 (Charlene Armendariz) accessed. I shouldn't that could be pro a
+00:29:48 (Charlene Armendariz) problem. Choose a CSV
+00:29:52 (Charlene Armendariz) file. Choose that. Open.
+00:29:56 (Charlene Armendariz) Import. No name column found the Header row needs a
+00:30:00 (Charlene Armendariz) name or first name column. Okay, so let's fix
+00:30:04 (Charlene Armendariz) it now. Where is it? Here.
+00:30:08 (Charlene Armendariz) XLs. Let's
+00:30:12 (Charlene Armendariz) see. Okay, so
+00:30:16 (Charlene Armendariz) we want to I guess delete
+00:30:20 (Charlene Armendariz) this first
+00:30:24 (Charlene Armendariz) name. Let's go.
+00:30:28 (Charlene Armendariz) Name, phone number, tags, client
+00:30:32 (Charlene Armendariz) number. Okay, let's see. File, save
+00:30:36 (Charlene Armendariz) as. Let's do
+00:30:40 (Charlene Armendariz) CSV.
+00:30:44 (Charlene Armendariz) Okay, let's call this
+00:30:48 (Charlene Armendariz) test ESV.
+00:30:52 (Charlene Armendariz) Save. Close that. All
+00:30:56 (Charlene Armendariz) right. So then let's try
+00:31:00 (Charlene Armendariz) again here. Open.
+00:31:04 (Charlene Armendariz) Okay. And then we're going to go import.mp import
+00:31:08 (Charlene Armendariz) complete. Okay. These tag names didn't match anything any existing
+00:31:12 (Charlene Armendariz) client tag for this provider. Create or rename a tag to match. Then edit these
+00:31:16 (Charlene Armendariz) clients.
+00:31:20 (Charlene Armendariz) Okay. Interesting. Looks like it took that. So let's look at
+00:31:24 (Charlene Armendariz) uh Evelyn. No, let's do
+00:31:28 (Charlene Armendariz) No, let's do Mia Collins. Okay, let's search
+00:31:32 (Charlene Armendariz) that client now.
+00:31:36 (Charlene Armendariz) Search Mia Collins. Oh,
+00:31:40 (Charlene Armendariz) can't find her.
+00:31:44 (Charlene Armendariz) Why? So, did the import not
+00:31:48 (Charlene Armendariz) work? Mia. Okay, there we go. Mia
+00:31:52 (Charlene Armendariz) Collins. I'm going to click on it. No tag
+00:31:56 (Charlene Armendariz) set. Manage
+00:32:16 (Charlene Armendariz) tags. So I think the import
+00:32:20 (Charlene Armendariz) should upload the tags to this
+00:32:24 (Charlene Armendariz) provider's tag list. Otherwise, what if a client
+00:32:28 (Charlene Armendariz) has 500 names that they need to import and then we have to go one
+00:32:32 (Charlene Armendariz) by one to adjust all the
+00:32:36 (Charlene Armendariz) tags. Let me
+00:32:40 (Charlene Armendariz) see. Yeah, no tag
+00:32:44 (Charlene Armendariz) set. manage new
+00:32:52 (Charlene Armendariz) tag. Okay, so it imported the name. It just didn't import their
+00:32:56 (Charlene Armendariz) tags, but That's a good
+00:33:00 (Charlene Armendariz) starting place. Okay. So then uh what we
+00:33:04 (Charlene Armendariz) found this was never actually duplicate detection. Your test file row
+00:33:08 (Charlene Armendariz) didn't match any recognized column. So every row silently failed or had no name.
+00:33:12 (Charlene Armendariz) Okay. Okay. So that's something to work on.
+00:33:16 (Charlene Armendariz) Uh smaller things all from the same recording. This is number eight. Section
+00:33:20 (Charlene Armendariz) 8. All right. So a client's recent appointment
+00:33:24 (Charlene Armendariz) list. Client name on the admin side now shows a date on every row. not
+00:33:28 (Charlene Armendariz) just the time. That's great. Uh I did see
+00:33:32 (Charlene Armendariz) that we just want to adjust the fonts so it's very clear.
+00:33:36 (Charlene Armendariz) It's a little hard to see
+00:33:40 (Charlene Armendariz) on let's say brown bear for example.
+00:33:44 (Charlene Armendariz) Brown bear. It's kind of hard to see how tiny it looks right
+00:33:48 (Charlene Armendariz) here. Okay. So maybe it's
+00:33:52 (Charlene Armendariz) of equal value or we spread it out a little bit and it shows the
+00:33:56 (Charlene Armendariz) date clearly and large and then the time nice and clearly just like
+00:34:00 (Charlene Armendariz) it does here. That 9:00 a.m. is a good font
+00:34:04 (Charlene Armendariz) size. Let's see what happens when I cancel his 20th appointment. I want
+00:34:08 (Charlene Armendariz) to confirm cancellation. Okay. And then
+00:34:12 (Charlene Armendariz) it says canceled. So let's go back to appointments. Let me go see. I should have
+00:34:16 (Charlene Armendariz) been able to go back to my client brown bear that I was looking at. didn't follow
+00:34:20 (Charlene Armendariz) the page. Let's
+00:34:24 (Charlene Armendariz) refresh. Okay. And he shows a cancelled on
+00:34:28 (Charlene Armendariz) the 20th. That's good. I also noticed that I have
+00:34:32 (Charlene Armendariz) to manually refresh every time. So, I'm not sure if that's something we can fix in the
+00:34:36 (Charlene Armendariz) system, but let's see. Calendar October
+00:34:40 (Charlene Armendariz) 20th here. Oh, man. We have
+00:34:44 (Charlene Armendariz) the wrong provider again here. Okay. Search to the provider
+00:34:48 (Charlene Armendariz) the 20th. Okay, he fell off. That's good. That's expected behavior.
+00:34:52 (Charlene Armendariz) Okay. Uh, all right. Create number two. Step on part eight. Create
+00:34:56 (Charlene Armendariz) a brand new client from Gloria's booking flow. Then immediately search for them. Shows
+00:35:00 (Charlene Armendariz) up right away. No more n manual refresh. This one was for all over.
+00:35:04 (Charlene Armendariz) So create a brand new client. All right. So
+00:35:08 (Charlene Armendariz) client, let's go new client. And we're going to
+00:35:12 (Charlene Armendariz) do orange man. and
+00:35:16 (Charlene Armendariz) we're going to select Gloria
+00:35:20 (Charlene Armendariz) here Saturday test
+00:35:24 (Charlene Armendariz) tag. Okay. What should happen? He should show up right away.
+00:35:28 (Charlene Armendariz) Okay. So, schedule his appointment. Let's go
+00:35:32 (Charlene Armendariz) to this is 26 at 10:00 a.m. Let's book
+00:35:36 (Charlene Armendariz) him for a screen recording. Save. All right.
+00:35:40 (Charlene Armendariz) Here I should be able to just go back to calendar. Uh, I'm gonna
+00:35:44 (Charlene Armendariz) click profile for now. All right. So, shows up right away. No more manual
+00:35:48 (Charlene Armendariz) refresh. Okay. So,
+00:35:52 (Charlene Armendariz) clients orange. There you go. So, that looked like it went right away.
+00:35:56 (Charlene Armendariz) So, some pages still require a full refresh. But every time I go
+00:36:00 (Charlene Armendariz) back, it never takes me back to the page I was working with just before. It
+00:36:04 (Charlene Armendariz) seems to take me back to the dashboard on most of
+00:36:08 (Charlene Armendariz) these. Okay. All right. Now, step three. As
+00:36:12 (Charlene Armendariz) admin or agent, book a brand new client's first appointment. On the
+00:36:16 (Charlene Armendariz) confirmation screen, look for add another client. It's there and now works. This
+00:36:20 (Charlene Armendariz) is a different screen than the one fixed earlier in the week, which was recording qu.
+00:36:24 (Charlene Armendariz) Okay. So, as admin, book a brand new client's first
+00:36:28 (Charlene Armendariz) appointment. New client. Let's go. Uh, what's another
+00:36:32 (Charlene Armendariz) color we haven't used? How about
+00:36:36 (Charlene Armendariz) gray suit? Okay, we're going
+00:36:40 (Charlene Armendariz) to add them to tax
+00:36:44 (Charlene Armendariz) Gloria consult, right? And then we're going to
+00:36:48 (Charlene Armendariz) say on the confirmation screen, look for add another client. Okay, add another
+00:36:52 (Charlene Armendariz) client. But this is still not working here. So that
+00:36:56 (Charlene Armendariz) is not working. view profile
+00:37:00 (Charlene Armendariz) instead. If I go back, I would expect that we go back to that screen we were
+00:37:04 (Charlene Armendariz) just at, but it didn't. Um,
+00:37:08 (Charlene Armendariz) back. So, now I got to go find this guy again. Gray
+00:37:12 (Charlene Armendariz) suit. Okay. So, that page did
+00:37:16 (Charlene Armendariz) not work on the add another client. Took it took it the wrong
+00:37:20 (Charlene Armendariz) way. All right. One thing we're fully we're not fully sure
+00:37:24 (Charlene Armendariz) about your it takes you back to the dashboard instead of the calendar
+00:37:28 (Charlene Armendariz) note. We think this is mostly resolved as a side effect of fixing from item two.
+00:37:32 (Charlene Armendariz) Every appointment now opens a real screen where the working back button which is most
+00:37:36 (Charlene Armendariz) of what we want, but we haven't been able to click through it ourselves to be 100%
+00:37:40 (Charlene Armendariz) sure if it's still happening anywhere specific tells exactly where and we'll chase it down.
+00:37:44 (Charlene Armendariz) Okay, I think we caught that a few times already going through
+00:37:48 (Charlene Armendariz) here. Uh just when we hit back. So, for example, let's see. Weight list, I should go
+00:37:52 (Charlene Armendariz) back. Okay, that's right. Calendar. If I'm
+00:37:56 (Charlene Armendariz) looking at uh
+00:38:00 (Charlene Armendariz) Gloria and I click
+00:38:04 (Charlene Armendariz) here, let's go ahead and fill it with let's see, we
+00:38:08 (Charlene Armendariz) have looks like Jane Doe can fill here. I would like to
+00:38:12 (Charlene Armendariz) see us be able to click on Jane Doe and then hit
+00:38:16 (Charlene Armendariz) fill or book this slot, but you can't do that here.
+00:38:20 (Charlene Armendariz) So now it's suggesting it. It's just we can't add them in. But okay. So let's go to
+00:38:24 (Charlene Armendariz) search existing. I'm going to type in No, I don't want that.
+00:38:28 (Charlene Armendariz) Gray suit. I'm going to put them October
+00:38:32 (Charlene Armendariz) 29th or 28th
+00:38:36 (Charlene Armendariz) W2. Let's go for let's
+00:38:40 (Charlene Armendariz) put it for 30 minutes
+00:38:44 (Charlene Armendariz) 28th. Okay, here we should be able to just view the
+00:38:52 (Charlene Armendariz) calendar. and I just scheduled
+00:38:56 (Charlene Armendariz) his first appointment. So, we don't want to put this shouldn't show schedule first
+00:39:00 (Charlene Armendariz) appointment. We should go to the calendar where he was added. So,
+00:39:04 (Charlene Armendariz) let's go to calendar. Okay. So, it looks like some screens are
+00:39:08 (Charlene Armendariz) still showing back. Okay. They're not going back to where
+00:39:12 (Charlene Armendariz) we had just come from from the
+00:39:16 (Charlene Armendariz) path. Okay. So, pretty good. Those are some improvements. That's good news.
+00:39:20 (Charlene Armendariz) So, let's go home. I'm going to log out. I'm going to log back into Gloria's
+00:39:24 (Charlene Armendariz) one last time here. Sign
+00:39:28 (Charlene Armendariz) in. And I did find a little
+00:39:32 (Charlene Armendariz) drawing.
+00:39:36 (Charlene Armendariz) Here.
+00:39:40 (Charlene Armendariz) Here. Hopefully I'm still doing a screen recording.
+00:39:44 (Charlene Armendariz) Yeah. Want a pen. Okay. So,
+00:39:48 (Charlene Armendariz) here. Can I do this pen? Hold on.
+00:39:56 (Charlene Armendariz) All right. Well, I thought I
+00:40:00 (Charlene Armendariz) was able to do a little drawing pen, but it's not working for me here. But again, on this
+00:40:04 (Charlene Armendariz) homepage, this is just where we want to make it user friendly,
+00:40:08 (Charlene Armendariz) right? So, when I click on Thursday as
+00:40:12 (Charlene Armendariz) a provider, I should see that I have Oliver Blue at 10:00 and then I should see
+00:40:16 (Charlene Armendariz) all my open spots. And then from that open
+00:40:20 (Charlene Armendariz) spots, be able to book somebody directly in
+00:40:24 (Charlene Armendariz) um there.
+00:40:28 (Charlene Armendariz) So maybe that means we adjust
+00:40:32 (Charlene Armendariz) instead of add appointment, it just we click on this this date that
+00:40:36 (Charlene Armendariz) we want to book the appointment and then we have the list
+00:40:40 (Charlene Armendariz) of available appointments and we book it just like the admin sees here. I think
+00:40:44 (Charlene Armendariz) that would make it a lot user more user friendly. And then we
+00:40:48 (Charlene Armendariz) just want to make sure this calendar either has a drop down or something clickable
+00:40:52 (Charlene Armendariz) where she could say she wants to schedule in December that she could say,
+00:40:56 (Charlene Armendariz) "Okay, I I don't end at just this row. I can click in December and
+00:41:00 (Charlene Armendariz) then whatever date then book the slot or appointment at
+00:41:04 (Charlene Armendariz) that point. One thing I do want to test is a request.
+00:41:08 (Charlene Armendariz) Let's see. Gloria has a request and she needs an estivo
+00:41:12 (Charlene Armendariz) to I don't know call Brown bear and she wants to do an
+00:41:16 (Charlene Armendariz) outbound or reschedule or something. Let me see. Call
+00:41:20 (Charlene Armendariz) back please. Advise. We
+00:41:24 (Charlene Armendariz) need A B C and D documents for
+00:41:28 (Charlene Armendariz) his appointment. Okay. Send
+00:41:32 (Charlene Armendariz) request. Now I should be able to go into the
+00:41:36 (Charlene Armendariz) admin login
+00:41:40 (Charlene Armendariz) here and see that request pop
+00:41:44 (Charlene Armendariz) up. Okay. So where is the
+00:41:48 (Charlene Armendariz) request? I don't see any notification for the request. If I go up
+00:41:52 (Charlene Armendariz) here, there should definitely be like a notification
+00:41:56 (Charlene Armendariz) counter so that the agent would know that there There was an incoming
+00:42:00 (Charlene Armendariz) request. Let's click it. Okay. So, it does show here. It
+00:42:04 (Charlene Armendariz) just doesn't alert anybody on the admin side that that came in. So, let's check
+00:42:08 (Charlene Armendariz) it. Okay. Call back. Let's see.
+00:42:12 (Charlene Armendariz) Uh, ticket number T-11. Call back priority.
+00:42:16 (Charlene Armendariz) Okay. So, this is a little unclear. Please advise. We need
+00:42:20 (Charlene Armendariz) whatever documents for his appointment. Like, who am I calling back? Oh, say brown
+00:42:24 (Charlene Armendariz) bear. We would want to retain that info. Was this
+00:42:28 (Charlene Armendariz) done? Called back and left
+00:42:32 (Charlene Armendariz) message. Okay, let's
+00:42:36 (Charlene Armendariz) hit let's make it in progress.
+00:42:40 (Charlene Armendariz) Okay, so then the ticket
+00:42:44 (Charlene Armendariz) should move to in
+00:42:48 (Charlene Armendariz) progress. All right, now let's see what happens on
+00:42:52 (Charlene Armendariz) Gloria's end here. I close that. Close that. Oops. Hold on.
+00:42:56 (Charlene Armendariz) Close that. And I'm going to log
+00:43:00 (Charlene Armendariz) into
+00:43:04 (Charlene Armendariz) Gloria's here. Okay. Oh, okay. She's
+00:43:08 (Charlene Armendariz) got a counter on her request. So, that's good news.
+00:43:12 (Charlene Armendariz) And let me see here. We hit please advise.
+00:43:16 (Charlene Armendariz) Okay. So, she has an open
+00:43:20 (Charlene Armendariz) one. Let's see. In progress. Okay. So, I don't see.
+00:43:24 (Charlene Armendariz) Okay. Called back and left a message. So, it's not very clear on what the status is
+00:43:28 (Charlene Armendariz) until we click on it. So, maybe that view needs to update to the most
+00:43:32 (Charlene Armendariz) recent note here. Okay. I'm going to hit uh
+00:43:36 (Charlene Armendariz) reply.
+00:43:40 (Charlene Armendariz) Okay. Called back and left a message. Let's see if now Gloria, let's say she
+00:43:44 (Charlene Armendariz) says council, we don't need it. Need it. It looks
+00:43:48 (Charlene Armendariz) like she had to delete the verbiage from the agent. So, that shouldn't happen. and
+00:43:52 (Charlene Armendariz) that should just be stored within that history of that ticket and she shouldn't be deleting it.
+00:43:56 (Charlene Armendariz) So, let's hit reply. Okay, when I hit reply,
+00:44:00 (Charlene Armendariz) it does not update on the ticket. So,
+00:44:04 (Charlene Armendariz) that is also a little bit of a
+00:44:08 (Charlene Armendariz) problem here. Okay, now it updates
+00:44:12 (Charlene Armendariz) here, but again, she can delete it. So, that's not secure for two-way
+00:44:16 (Charlene Armendariz) communication there. So, okay, let's see.
+00:44:20 (Charlene Armendariz) council. We don't need it. We want her to be able to tell us an
+00:44:24 (Charlene Armendariz) action. It's save on the ticket so we can see what was supposed to be happening on the actual
+00:44:28 (Charlene Armendariz) ticket. And then as the admin, we want to be able
+00:44:32 (Charlene Armendariz) to on here. Uh we want to be able to log in
+00:44:36 (Charlene Armendariz) here and see her
+00:44:40 (Charlene Armendariz) response. See, I should have another
+00:44:44 (Charlene Armendariz) notification
+00:44:48 (Charlene Armendariz) progress. Okay, so it's does show it here, but this is very
+00:44:52 (Charlene Armendariz) choppy. It needs to have a clear history of what back and
+00:44:56 (Charlene Armendariz) forth notes had occurred. All right. So let's call this
+00:45:00 (Charlene Armendariz) resolved. Now it's resolved. Did it put it back? Yeah, that's good news.
+00:45:04 (Charlene Armendariz) Now, let me look in Gloria's bucket or login to
+00:45:08 (Charlene Armendariz) see if she shows it as resolved.
+00:45:12 (Charlene Armendariz) Gloria, now she has no request, but she can look at
+00:45:16 (Charlene Armendariz) resolved here. Okay. And she doesn't see a clear outcome that
+00:45:20 (Charlene Armendariz) it's resolved. So, we want to clean that up so it it's clear to
+00:45:24 (Charlene Armendariz) each party viewing the ticket the note from the other party and
+00:45:28 (Charlene Armendariz) the action that is being taken.
+00:45:32 (Charlene Armendariz) Okay, good. Okay, cool. That was
+00:45:36 (Charlene Armendariz) a good improvement. I think we're almost there. We can get
+00:45:40 (Charlene Armendariz) that communication fix a little bit of the
+00:45:44 (Charlene Armendariz) viewability here and how the provider actually is able to book it and make it mirror
+00:45:48 (Charlene Armendariz) the way the booking actions are shown on the admin. Then
+00:45:52 (Charlene Armendariz) we might be able to start this pilot. Okay, we'll
+00:45:56 (Charlene Armendariz) talk soon. Thank
+00:46:00 (Charlene Armendariz) you.

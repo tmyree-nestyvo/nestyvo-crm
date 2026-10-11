@@ -1,0 +1,13 @@
+{
+  "name": "nestyvo-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "compare": "node run.mjs",
+    "compare:write": "node run.mjs --write",
+    "compare:headed": "node run.mjs --headed"
+  },
+  "devDependencies": {
+    "playwright": "1.61.1"
+  }
+}
