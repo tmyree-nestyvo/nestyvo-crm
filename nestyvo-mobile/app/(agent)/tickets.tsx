@@ -9,6 +9,7 @@ import { ticketsApi } from '../../lib/api';
 import { useAuthStore } from '../../lib/store';
 import { hasRole, PRACTICE_MANAGEMENT } from '../../lib/role-groups';
 import { HomeButton } from '../../components/HomeButton';
+import { TicketHistory, ClientLine, LastActivity, ResolvedBanner } from '../../components/tickets/TicketParts';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   open: { label: 'Open', color: '#d97706', bg: '#fffbeb' },
@@ -61,9 +62,12 @@ export default function TicketsScreen() {
   const updateTicket = useMutation({
     mutationFn: (updates: { status?: string; replyText?: string }) =>
       ticketsApi.update(active.id, updates),
-    onSuccess: () => {
+    // Keep the ticket open and show the updated history right away (Oct 10
+    // recording 44:00 — "when I hit reply, it does not update on the ticket").
+    onSuccess: (updated: any) => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
-      setActive(null);
+      queryClient.invalidateQueries({ queryKey: ['tickets-attention'] });
+      setActive(updated);
       setNotes('');
     },
     onError: (err: any) => {
@@ -132,15 +136,21 @@ export default function TicketsScreen() {
                   <View className="flex-1">
                     <Text className="text-gray-300 text-[10px] font-semibold tracking-wide mb-0.5">#T-{t.ticketNumber}</Text>
                     <Text className="text-gray-900 font-semibold text-sm">{t.subject}</Text>
-                    {t.patient ? (
-                      <Text className="text-gray-400 text-xs mt-0.5">{t.patient.firstName} {t.patient.lastName}</Text>
-                    ) : null}
+                    <ClientLine patient={t.patient} />
                   </View>
-                  <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: cfg.bg }}>
-                    <Text className="text-xs font-medium" style={{ color: cfg.color }}>{cfg.label}</Text>
+                  <View className="items-end gap-1">
+                    <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: cfg.bg }}>
+                      <Text className="text-xs font-medium" style={{ color: cfg.color }}>{cfg.label}</Text>
+                    </View>
+                    {t.awaitingOffice ? (
+                      <View className="rounded-full px-2 py-0.5 bg-red-50">
+                        <Text className="text-xs font-semibold text-red-600">Needs reply</Text>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
                 <Text className="text-gray-500 text-sm mt-2 leading-5" numberOfLines={2}>{t.description}</Text>
+                <LastActivity entry={t.lastEntry} />
                 <View className="flex-row items-center gap-2 mt-2.5 pt-2.5 border-t border-gray-50">
                   <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: PRIORITY_COLOR[t.priority] }} />
                   <Text className="text-gray-400 text-xs capitalize">{t.priority}</Text><Text className="text-gray-400 text-xs"> · {CATEGORY_LABEL[t.category] ?? t.category}</Text>
@@ -159,28 +169,24 @@ export default function TicketsScreen() {
           <View className="bg-white rounded-t-3xl px-5 pt-5 pb-10">
             <Text className="text-gray-400 text-xs font-semibold tracking-wide mb-1">#T-{active?.ticketNumber}</Text>
             <Text className="text-base font-bold text-gray-900 mb-1">{active?.subject}</Text>
-            <Text className="text-gray-400 text-sm mb-4">
+            <ClientLine patient={active?.patient} size="md" />
+            <Text className="text-gray-400 text-sm mt-1 mb-3">
               <Text className="capitalize">{active?.priority}</Text> priority · {CATEGORY_LABEL[active?.category] ?? active?.category}
+              {active?.createdByUser ? ` · from ${active.createdByUser.firstName} ${active.createdByUser.lastName}` : ''}
             </Text>
             <Text className="text-gray-600 text-sm leading-5 mb-4">{active?.description}</Text>
 
-            {/* Oct 11 2026 — read-only conversation history, newest-last.
-                Every reply from either side is appended server-side, never
-                overwritten — see tickets.service.ts's replyText handling. */}
-            {active?.resolutionNotes ? (
-              <View className="mb-4">
-                <Text className="text-gray-500 text-xs font-medium mb-2">History</Text>
-                <ScrollView className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 max-h-40">
-                  <Text className="text-gray-700 text-sm leading-5">{active.resolutionNotes}</Text>
-                </ScrollView>
-              </View>
-            ) : null}
+            <ResolvedBanner ticket={active} />
+            {/* Every reply and status change from either side, in order —
+                appended server-side, never overwritten. */}
+            <Text className="text-gray-500 text-xs font-medium mb-2">History</Text>
+            <TicketHistory notes={active?.resolutionNotes} />
 
-            <Text className="text-gray-500 text-xs font-medium mb-2">Resolution notes</Text>
+            <Text className="text-gray-500 text-xs font-medium mb-2">Add a note</Text>
             <TextInput
               value={notes}
               onChangeText={setNotes}
-              placeholder="What was done?"
+              placeholder="What was done, or what's needed next?"
               multiline
               numberOfLines={3}
               className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 mb-4"
@@ -188,6 +194,13 @@ export default function TicketsScreen() {
             />
 
             <View className="flex-row gap-2">
+              <TouchableOpacity
+                onPress={() => updateTicket.mutate({ replyText: notes })}
+                disabled={!notes.trim() || updateTicket.isPending}
+                className={`flex-1 rounded-xl py-2.5 items-center border ${notes.trim() ? 'border-primary-600' : 'border-gray-200'}`}
+              >
+                <Text className={`text-sm font-medium ${notes.trim() ? 'text-primary-600' : 'text-gray-300'}`}>Reply</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => updateTicket.mutate({ status: 'in_progress', replyText: notes })}
                 className="flex-1 bg-gray-100 rounded-xl py-2.5 items-center"

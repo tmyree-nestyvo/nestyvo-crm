@@ -11,6 +11,37 @@ import { Patient } from '../../database/entities/patient.entity';
 // different questions, conflated here until Oct 2 2026 — see isCrossPractice.
 const OFFICE_ROLES = [UserRole.ADMINISTRATOR, UserRole.PRACTICE_MANAGER];
 
+const STATUS_ACTION: Record<string, string> = {
+  open: 'Reopened this request',
+  in_progress: 'Marked In Progress',
+  resolved: 'Marked Resolved',
+  closed: 'Closed this request',
+};
+
+/**
+ * History entries are stored as "[Oct 10, 7:45 AM] Name: text" blocks in
+ * resolutionNotes (see update()). Adds two derived fields, no schema change:
+ *  - lastEntry: the most recent entry, for list previews (Oct 10 recording
+ *    43:28 — "not very clear what the status is until we click on it").
+ *  - awaitingOffice: true when the last word came from the requester (or
+ *    nobody has responded yet) — drives the admin Requests counter
+ *    (41:48 — "there should definitely be like a notification counter").
+ */
+function withActivity<T extends Ticket>(ticket: T) {
+  const blocks = (ticket.resolutionNotes ?? '').split(/\n\n(?=\[)/).filter(Boolean);
+  const last = blocks[blocks.length - 1];
+  const m = last?.match(/^\[([^\]]+)\] ([^:]+): ([\s\S]*)$/);
+  const lastEntry = m ? { at: m[1], author: m[2], text: m[3] } : null;
+  const creatorName = ticket.createdByUser
+    ? `${ticket.createdByUser.firstName} ${ticket.createdByUser.lastName}`.trim()
+    : null;
+  const active = ticket.status !== TicketStatus.RESOLVED && ticket.status !== TicketStatus.CLOSED;
+  // Only provider-raised requests wait on the office; office-created tickets don't count.
+  const fromProvider = ticket.createdByUser?.role === UserRole.PROVIDER;
+  const awaitingOffice = active && fromProvider && (!lastEntry || lastEntry.author === creatorName);
+  return Object.assign(ticket, { lastEntry, awaitingOffice });
+}
+
 @Injectable()
 export class TicketsService {
   constructor(
@@ -79,7 +110,18 @@ export class TicketsService {
       // implies the correct practice.
       const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
       if (!provider) return [];
-      where.patient = { assignedProviderId: provider.id };
+      // Their clients' tickets, plus any request they created themselves —
+      // a request sent without picking a client used to vanish from their
+      // own Requests list entirely.
+      const tickets = await this.ticketRepo.find({
+        where: [
+          { ...where, patient: { assignedProviderId: provider.id } },
+          { ...where, createdByUserId: user.id },
+        ],
+        relations: { patient: true, createdByUser: true, assignedToUser: true },
+        order: { createdAt: 'DESC' },
+      });
+      return tickets.map(withActivity);
     } else if (!this.isCrossPractice(user)) {
       where.practiceId = user.practiceId;
       if (!isOffice) where.createdByUserId = user.id;
@@ -89,11 +131,12 @@ export class TicketsService {
     // and SCHEDULING_AGENT already saw every ticket within one practice —
     // this just removes the practice boundary itself).
 
-    return this.ticketRepo.find({
+    const tickets = await this.ticketRepo.find({
       where,
       relations: { patient: true, createdByUser: true, assignedToUser: true },
       order: { createdAt: 'DESC' },
     });
+    return tickets.map(withActivity);
   }
 
   async findOne(id: string, user: User) {
@@ -107,13 +150,14 @@ export class TicketsService {
 
     if (isProvider) {
       const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
-      if (!provider || ticket.patient?.assignedProviderId !== provider.id) {
+      const ownsPatient = provider && ticket.patient?.assignedProviderId === provider.id;
+      if (!ownsPatient && ticket.createdByUserId !== user.id) {
         throw new ForbiddenException('Not one of your patients');
       }
     } else if (!OFFICE_ROLES.includes(user.role) && !this.isCrossPractice(user) && ticket.createdByUserId !== user.id) {
       throw new ForbiddenException('Not your ticket');
     }
-    return ticket;
+    return withActivity(ticket);
   }
 
   async update(
@@ -148,7 +192,26 @@ export class TicketsService {
       }
     }
 
-    if (updates.status !== undefined) {
+    const authorName = `${user.firstName} ${user.lastName}`.trim() || 'Unknown';
+    const stamp = () => new Date().toLocaleString('en-US', {
+      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles',
+    });
+    const append = (text: string) => {
+      const entry = `[${stamp()}] ${authorName}: ${text}`;
+      ticket.resolutionNotes = ticket.resolutionNotes ? `${ticket.resolutionNotes}\n\n${entry}` : entry;
+    };
+
+    // Reply first, then the status change, so "Called back and left a
+    // message" reads before "Marked In Progress" in the history.
+    if (updates.replyText !== undefined && updates.replyText.trim()) {
+      append(updates.replyText.trim());
+    }
+    if (updates.status !== undefined && updates.status !== ticket.status) {
+      // Charlene, Oct 10 recording (45:16) — "she doesn't see a clear outcome
+      // that it's resolved… clear to each party… the action that is being
+      // taken." Status changes used to happen silently; now each one is a
+      // line in the history with who did it and when.
+      append(`${STATUS_ACTION[updates.status] ?? `Changed status to ${updates.status}`}`);
       ticket.status = updates.status;
       if (updates.status === TicketStatus.RESOLVED || updates.status === TicketStatus.CLOSED) {
         ticket.resolvedAt = new Date();
@@ -158,15 +221,15 @@ export class TicketsService {
     // Direct overwrite — kept for any caller that genuinely wants it, but
     // neither tickets screen uses this anymore (see replyText below).
     if (updates.resolutionNotes !== undefined) ticket.resolutionNotes = updates.resolutionNotes;
-    if (updates.replyText !== undefined && updates.replyText.trim()) {
-      const authorName = `${user.firstName} ${user.lastName}`.trim() || 'Unknown';
-      const timestamp = new Date().toLocaleString('en-US', {
-        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles',
-      });
-      const entry = `[${timestamp}] ${authorName}: ${updates.replyText.trim()}`;
-      ticket.resolutionNotes = ticket.resolutionNotes ? `${ticket.resolutionNotes}\n\n${entry}` : entry;
-    }
 
-    return this.ticketRepo.save(ticket);
+    await this.ticketRepo.save(ticket);
+    // Full ticket back (relations + activity) so both screens can show the
+    // new history immediately instead of waiting for a manual refresh
+    // (Oct 10 recording 44:00, "when I hit reply, it does not update").
+    const fresh = await this.ticketRepo.findOne({
+      where: { id: ticket.id },
+      relations: { patient: true, createdByUser: true, assignedToUser: true },
+    });
+    return withActivity(fresh!);
   }
 }

@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ticketsApi, api } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
+import { TicketHistory, ClientLine, LastActivity, ResolvedBanner } from '../../components/tickets/TicketParts';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   open: { label: 'Open', color: '#d97706', bg: '#fffbeb' },
@@ -68,9 +69,12 @@ export default function ProviderTicketsScreen() {
   const updateTicket = useMutation({
     mutationFn: (updates: { status?: string; replyText?: string }) =>
       ticketsApi.update(active.id, updates),
-    onSuccess: () => {
+    // Stay on the ticket and show the new entry immediately (Oct 10
+    // recording 44:00 — "when I hit reply, it does not update on the ticket").
+    onSuccess: (updated: any) => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
-      setActive(null);
+      queryClient.invalidateQueries({ queryKey: ['provider-dashboard'] });
+      setActive(updated);
       setNotes('');
     },
     onError: (err: any) => {
@@ -144,15 +148,22 @@ export default function ProviderTicketsScreen() {
                   <View className="flex-1">
                     <Text className="text-gray-300 text-[10px] font-semibold tracking-wide mb-0.5">#T-{t.ticketNumber}</Text>
                     <Text className="text-gray-900 font-semibold text-sm">{t.subject}</Text>
-                    {t.patient ? (
-                      <Text className="text-gray-400 text-xs mt-0.5">{t.patient.firstName} {t.patient.lastName}</Text>
-                    ) : null}
+                    <ClientLine patient={t.patient} />
                   </View>
-                  <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: cfg.bg }}>
-                    <Text className="text-xs font-medium" style={{ color: cfg.color }}>{cfg.label}</Text>
+                  <View className="items-end gap-1">
+                    <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: cfg.bg }}>
+                      <Text className="text-xs font-medium" style={{ color: cfg.color }}>{cfg.label}</Text>
+                    </View>
+                    {/* The office answered last — her turn to look. */}
+                    {t.lastEntry && !t.awaitingOffice && t.status !== 'resolved' && t.status !== 'closed' ? (
+                      <View className="rounded-full px-2 py-0.5 bg-primary-50">
+                        <Text className="text-xs font-semibold text-primary-700">New reply</Text>
+                      </View>
+                    ) : null}
                   </View>
                 </View>
                 <Text className="text-gray-500 text-sm mt-2 leading-5" numberOfLines={2}>{t.description}</Text>
+                <LastActivity entry={t.lastEntry} />
                 <View className="flex-row items-center gap-2 mt-2.5 pt-2.5 border-t border-gray-50">
                   <Text className="text-gray-400 text-xs">{CATEGORY_LABEL[t.category] ?? t.category}</Text>
                   <Text className="text-gray-300 text-xs ml-auto">
@@ -171,23 +182,15 @@ export default function ProviderTicketsScreen() {
           <View className="bg-white rounded-t-3xl px-5 pt-5 pb-10">
             <Text className="text-gray-400 text-xs font-semibold tracking-wide mb-1">#T-{active?.ticketNumber}</Text>
             <Text className="text-base font-bold text-gray-900 mb-1">{active?.subject}</Text>
-            {active?.patient ? (
-              <Text className="text-gray-400 text-sm mb-1">{active.patient.firstName} {active.patient.lastName}</Text>
-            ) : null}
-            <Text className="text-gray-400 text-sm mb-4">{CATEGORY_LABEL[active?.category] ?? active?.category}</Text>
+            <ClientLine patient={active?.patient} size="md" />
+            <Text className="text-gray-400 text-sm mt-1 mb-3">{CATEGORY_LABEL[active?.category] ?? active?.category}</Text>
             <Text className="text-gray-600 text-sm leading-5 mb-4">{active?.description}</Text>
 
-            {/* Oct 11 2026 — read-only conversation history, newest-last.
-                Every reply from either side is appended server-side, never
-                overwritten — see tickets.service.ts's replyText handling. */}
-            {active?.resolutionNotes ? (
-              <View className="mb-4">
-                <Text className="text-gray-500 text-xs font-medium mb-2">History</Text>
-                <ScrollView className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 max-h-40">
-                  <Text className="text-gray-700 text-sm leading-5">{active.resolutionNotes}</Text>
-                </ScrollView>
-              </View>
-            ) : null}
+            <ResolvedBanner ticket={active} />
+            {/* Every reply and status change from either side, in order —
+                appended server-side, never overwritten. */}
+            <Text className="text-gray-500 text-xs font-medium mb-2">History</Text>
+            <TicketHistory notes={active?.resolutionNotes} />
 
             <Text className="text-gray-500 text-xs font-medium mb-2">Your reply / next action</Text>
             <TextInput
@@ -202,10 +205,11 @@ export default function ProviderTicketsScreen() {
 
             <View className="flex-row gap-2">
               <TouchableOpacity
-                onPress={() => updateTicket.mutate({ status: 'in_progress', replyText: notes })}
+                onPress={() => updateTicket.mutate({ replyText: notes })}
+                disabled={!notes.trim() || updateTicket.isPending}
                 className="flex-1 bg-gray-100 rounded-xl py-2.5 items-center"
               >
-                <Text className="text-gray-700 text-sm font-medium">Reply</Text>
+                <Text className={`text-sm font-medium ${notes.trim() ? 'text-gray-700' : 'text-gray-300'}`}>Reply</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => updateTicket.mutate({ status: 'resolved', replyText: notes })}
@@ -250,6 +254,9 @@ function NewRequestModal({ visible, onClose }: { visible: boolean; onClose: () =
     onClose();
   };
 
+  const needsClient = category === 'outbound_call' || category === 'reschedule_request';
+  const canSend = !!subject && !!description && (!needsClient || !!patient);
+
   const createTicket = useMutation({
     mutationFn: () => ticketsApi.create({ patientId: patient?.id, category, subject, description }),
     onSuccess: () => {
@@ -268,13 +275,16 @@ function NewRequestModal({ visible, onClose }: { visible: boolean; onClose: () =
           <Text className="text-base font-bold text-gray-900 mb-1">New Request</Text>
           <Text className="text-gray-400 text-sm mb-4">Ask the call center to call a client or help with something.</Text>
 
-          <Text className="text-gray-500 text-xs font-medium mb-2">Client (optional)</Text>
+          {/* Oct 10 recording (42:20) — the agent receiving a call-back request
+              had to ask "who am I calling back?" Required for Outbound Call
+              and Reschedule requests; optional for anything else. */}
+          <Text className="text-gray-500 text-xs font-medium mb-2">Client{needsClient ? ' *' : ' (optional)'}</Text>
           <TouchableOpacity
             onPress={() => setPickerOpen(true)}
             className="flex-row items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 mb-4"
           >
             <Text className={patient ? 'text-gray-900 text-sm' : 'text-gray-400 text-sm'}>
-              {patient ? patient.name : 'Not tied to a specific client'}
+              {patient ? patient.name : needsClient ? 'Choose the client this is about' : 'Not tied to a specific client'}
             </Text>
             <Ionicons name="chevron-down" size={16} color="#9ca3af" />
           </TouchableOpacity>
@@ -313,8 +323,8 @@ function NewRequestModal({ visible, onClose }: { visible: boolean; onClose: () =
 
           <TouchableOpacity
             onPress={() => createTicket.mutate()}
-            disabled={!subject || !description || createTicket.isPending}
-            className={`rounded-xl py-3 items-center ${!subject || !description ? 'bg-gray-200' : 'bg-primary-600'}`}
+            disabled={!canSend || createTicket.isPending}
+            className={`rounded-xl py-3 items-center ${!canSend ? 'bg-gray-200' : 'bg-primary-600'}`}
           >
             {createTicket.isPending ? (
               <ActivityIndicator color="#fff" />

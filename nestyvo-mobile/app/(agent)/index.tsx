@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../lib/store';
 import { hasRole, PRACTICE_MANAGEMENT, OFFICE_STAFF } from '../../lib/role-groups';
-import { api } from '../../lib/api';
+import { api, ticketsApi } from '../../lib/api';
 import { StatCard } from '../../components/dashboard/StatCard';
 import { signOut } from '../../lib/auth';
 
@@ -156,6 +156,16 @@ export default function AgentDashboard() {
   const { name, role, clearAuth } = useAuthStore();
   const { data, isLoading, refetch, isRefetching } = useDashboard();
   const [allExpanded, setAllExpanded] = useState(false);
+  // Charlene, Oct 10 recording (41:48, 44:44) — a provider's new request or
+  // reply came in with no signal on the admin side. Counts active requests
+  // still waiting on the office (new, or the provider replied last); polls
+  // so it shows up without a manual refresh.
+  const { data: activeTickets = [] } = useQuery({
+    queryKey: ['tickets-attention'],
+    queryFn: () => ticketsApi.list(),
+    refetchInterval: 60_000,
+  });
+  const needsReply = (activeTickets as any[]).filter((t) => t.awaitingOffice).length;
 
   const handleSignOut = async () => {
     await signOut();
@@ -197,6 +207,11 @@ export default function AgentDashboard() {
             className="p-2"
           >
             <Ionicons name="flag-outline" size={22} color="#6b7280" />
+            {needsReply > 0 && (
+              <View className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-red-600 items-center justify-center">
+                <Text className="text-white text-[10px] font-bold">{needsReply}</Text>
+              </View>
+            )}
           </TouchableOpacity>
           {/* One partner-management entry point, not three (Charlene, Sep 30
               2026). The separate gear ("Provider Settings") and the "Provider"
