@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { providersApi } from '../../../lib/api';
 import { HomeButton } from '../../../components/HomeButton';
+import { DateTimeSlotPicker } from '../../../components/DateTimeSlotPicker';
 
 // Oct 9 2026 — Charlene/Troy call: "the provider login cannot edit,
 // reschedule, or manage existing appointments... when you click on any of
@@ -53,19 +54,6 @@ function InfoRow({ icon, label, value, onPress }: { icon: any; label: string; va
   );
 }
 
-// Same simple HH:MM parse already used for provider block times
-// (app/(agent)/provider-settings.tsx's normalizeTime) — kept local rather
-// than imported, this screen has no other dependency on that file.
-function normalizeTime(raw: string): string | null {
-  const v = raw.trim();
-  const m = v.match(/^(\d{1,2})\s*:?\s*(\d{2})?$/);
-  if (!m) return null;
-  const h = Number(m[1]);
-  const min = m[2] === undefined ? 0 : Number(m[2]);
-  if (h > 23 || min > 59) return null;
-  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
-}
-
 export default function ProviderAppointmentDetailScreen() {
   // Oct 11 2026 — Charlene's second recording: "back" from here kept
   // landing on the dashboard instead of wherever she'd actually come from
@@ -83,8 +71,13 @@ export default function ProviderAppointmentDetailScreen() {
   const [cancelModal, setCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [rescheduling, setRescheduling] = useState(false);
-  const [newDate, setNewDate] = useState('');
-  const [newTime, setNewTime] = useState('');
+  // Oct 11 2026 — Charlene's second recording called back-navigation out
+  // specifically here, but the deeper complaint underneath both recordings
+  // was the same: reschedule was a blind YYYY-MM-DD / HH:MM text form with
+  // no view into what's actually open. Now a real calendar + real-slots
+  // picker, same data the admin side's Available Slots screen already
+  // shows (see components/DateTimeSlotPicker.tsx).
+  const [newStartAt, setNewStartAt] = useState<string | null>(null);
 
   const { data: appt, isLoading } = useQuery({
     queryKey: ['appointment-detail', providerId, id],
@@ -107,14 +100,11 @@ export default function ProviderAppointmentDetailScreen() {
 
   const rescheduleMutation = useMutation({
     mutationFn: () => {
-      const time = normalizeTime(newTime);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate.trim())) throw new Error('Enter the date as YYYY-MM-DD.');
-      if (!time) throw new Error('Enter the time as HH:MM (24-hour).');
+      if (!newStartAt) throw new Error('Pick a new date and time.');
       const durationMs = new Date(appt.endAt).getTime() - new Date(appt.startAt).getTime();
-      const newStartAt = new Date(`${newDate.trim()}T${time}:00`);
-      const newEndAt = new Date(newStartAt.getTime() + durationMs);
+      const newEndAt = new Date(new Date(newStartAt).getTime() + durationMs);
       return providersApi.rescheduleAppointment(providerId, id, {
-        newStartAt: newStartAt.toISOString(),
+        newStartAt,
         newEndAt: newEndAt.toISOString(),
       });
     },
@@ -209,21 +199,10 @@ export default function ProviderAppointmentDetailScreen() {
               <Text className="text-gray-400 text-xs mb-3">
                 Keeps the same {Math.round((new Date(appt.endAt).getTime() - new Date(appt.startAt).getTime()) / 60000)}-minute length.
               </Text>
-              <Text className="text-gray-500 text-xs font-medium mb-1.5">New date</Text>
-              <TextInput
-                value={newDate}
-                onChangeText={setNewDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#9ca3af"
-                className="bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-900 mb-3"
-              />
-              <Text className="text-gray-500 text-xs font-medium mb-1.5">New time</Text>
-              <TextInput
-                value={newTime}
-                onChangeText={setNewTime}
-                placeholder="HH:MM (24-hour)"
-                placeholderTextColor="#9ca3af"
-                className="bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-900 mb-4"
+              <DateTimeSlotPicker
+                label="New date & time"
+                value={newStartAt}
+                onSelect={setNewStartAt}
               />
               <View className="flex-row gap-2">
                 <TouchableOpacity
@@ -234,9 +213,9 @@ export default function ProviderAppointmentDetailScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => rescheduleMutation.mutate()}
-                  disabled={rescheduleMutation.isPending}
+                  disabled={rescheduleMutation.isPending || !newStartAt}
                   className="flex-1 items-center py-3 rounded-xl"
-                  style={{ backgroundColor: '#7c3aed' }}
+                  style={{ backgroundColor: !newStartAt ? '#d1d5db' : '#7c3aed' }}
                 >
                   {rescheduleMutation.isPending ? (
                     <ActivityIndicator color="#fff" />

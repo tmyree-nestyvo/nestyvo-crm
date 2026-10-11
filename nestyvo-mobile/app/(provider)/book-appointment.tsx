@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, patientsApi, providersApi } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
+import { DateTimeSlotPicker } from '../../components/DateTimeSlotPicker';
 
 const TZ = 'America/Los_Angeles';
 function fmt(iso: string) {
@@ -26,17 +27,6 @@ function fmt(iso: string) {
 // the actual booking call all reuse the exact same (agent)/book-slot.tsx
 // every other booking path already goes through — one booking
 // implementation, not a second provider-only one.
-// Same simple HH:MM parse already used for provider blocks and reschedule
-// (see app/(provider)/appointments/[id].tsx) — kept local, no shared import.
-function normalizeTime(raw: string): string | null {
-  const v = raw.trim();
-  const m = v.match(/^(\d{1,2})\s*:?\s*(\d{2})?$/);
-  if (!m) return null;
-  const h = Number(m[1]);
-  const min = m[2] === undefined ? 0 : Number(m[2]);
-  if (h > 23 || min > 59) return null;
-  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
-}
 
 export default function ProviderBookAppointmentScreen() {
   const { slotStartAt: paramStartAt, slotEndAt: paramEndAt, date: presetDate } = useLocalSearchParams<{
@@ -54,17 +44,17 @@ export default function ProviderBookAppointmentScreen() {
   // (book-slot.tsx's own originalDurationMin default) — and fully
   // adjustable in book-slot.tsx once a type is picked, same as any other
   // booking path.
-  const [customDate, setCustomDate] = useState(presetDate ?? '');
-  const [customTime, setCustomTime] = useState('');
-  const normalizedTime = normalizeTime(customTime);
-  const validCustomDate = /^\d{4}-\d{2}-\d{2}$/.test(customDate.trim());
-  const customSlotReady = validCustomDate && !!normalizedTime;
+  // Oct 11 2026 — Charlene's second recording: this used to be two blind
+  // YYYY-MM-DD / HH:MM text boxes with no view into what's actually open.
+  // Replaced with the real calendar + real-slots picker (same data the
+  // admin side's Available Slots screen shows), same as the "pick a new
+  // time" piece of reschedule.
+  const [customStartAt, setCustomStartAt] = useState<string | null>(null);
+  const customSlotReady = !!customStartAt;
 
-  const slotStartAt = paramStartAt || (customSlotReady ? `${customDate.trim()}T${normalizedTime}:00` : undefined);
+  const slotStartAt = paramStartAt || customStartAt || undefined;
   const slotEndAt = paramEndAt || (
-    customSlotReady
-      ? new Date(new Date(`${customDate.trim()}T${normalizedTime}:00`).getTime() + 45 * 60000).toISOString()
-      : undefined
+    customStartAt ? new Date(new Date(customStartAt).getTime() + 45 * 60000).toISOString() : undefined
   );
   const needsCustomTime = !paramStartAt;
 
@@ -136,21 +126,11 @@ export default function ProviderBookAppointmentScreen() {
         <View className="mx-5 mt-3 bg-white rounded-2xl border border-gray-100 p-4">
           <Text className="text-sm font-semibold text-gray-900 mb-1">Pick a date &amp; time</Text>
           <Text className="text-gray-400 text-xs mb-3">Starts as a 45-minute appointment — adjust the exact length on the next step.</Text>
-          <Text className="text-gray-500 text-xs font-medium mb-1.5">Date</Text>
-          <TextInput
-            value={customDate}
-            onChangeText={setCustomDate}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor="#9ca3af"
-            className="bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-900 mb-3"
-          />
-          <Text className="text-gray-500 text-xs font-medium mb-1.5">Time</Text>
-          <TextInput
-            value={customTime}
-            onChangeText={setCustomTime}
-            placeholder="HH:MM (24-hour)"
-            placeholderTextColor="#9ca3af"
-            className="bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-900"
+          <DateTimeSlotPicker
+            label="Date & time"
+            value={customStartAt}
+            onSelect={setCustomStartAt}
+            initialDate={presetDate}
           />
         </View>
       ) : slotStartAt ? (
