@@ -247,10 +247,20 @@ export const CHECKPOINTS = [
         await h.click('Continue to Appointment Type');
       }
       await h.page.waitForTimeout(1200);
+      // Appointment Type is required before Confirm is enabled
+      await h.click('Select an appointment type', { exact: false });
+      const option = await h.firstOnTop(h.page.getByText(/\d+\s?min/), { last: true });
+      if (!option) throw new Error('no appointment type options shown');
+      await option.click();
+      await h.page.waitForTimeout(800);
       await h.click('Confirm Booking', { exact: false });
       await h.waitFor('Appointment Booked');
       h.check('"Back to Calendar" button on the success screen', await h.has('Back to Calendar'));
       h.check('"Add Another Client" removed from the success screen', !(await h.has('Add Another Client')));
+      h.check('No admin tab bar on the provider\'s booking screen', !(await h.has('Copilot', { exact: true })));
+      await h.click('Back to Calendar');
+      await h.page.waitForTimeout(1500);
+      h.check('Back to Calendar lands on My Schedule', await h.has('Open Times'));
       h.cleanup(async ({ token, request }) => {
         if (!booking?.id) throw new Error('booking id not captured — cancel the Playwright Tester appointment by hand');
         const res = await request.patch(`${h.cfg.apiUrl}/providers/${booking.providerId}/appointments/${booking.id}/cancel`, {

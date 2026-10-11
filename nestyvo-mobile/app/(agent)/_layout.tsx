@@ -1,14 +1,22 @@
 import { Tabs, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore } from '../../lib/store';
 
 export default function AgentLayout() {
+  // A provider only ever lands in this group for the shared book-slot.tsx
+  // screen. Showing the admin tab bar there (Dashboard/Copilot/Clients/
+  // Calendar) let a provider tap into admin-only screens — Charlene, Oct 10
+  // recording 23:12: "it was almost like it took on the admin. That was
+  // weird." Hidden for providers; book-slot has its own back/Home buttons.
+  const role = useAuthStore((s) => s.role);
+  const isProvider = role === 'provider';
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#2563eb',
         tabBarInactiveTintColor: '#9ca3af',
-        tabBarStyle: {
+        tabBarStyle: isProvider ? { display: 'none' } : {
           borderTopWidth: 1,
           borderTopColor: '#f3f4f6',
           paddingBottom: 4,
