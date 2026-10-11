@@ -231,8 +231,11 @@ export const CHECKPOINTS = [
       await h.page.waitForTimeout(1200);
       let booking = null;
       h.page.on('response', async (r) => {
-        if (r.request().method() === 'POST' && /\/providers\/[^/]+\/appointments$/.test(new URL(r.url()).pathname)) {
-          booking = await r.json().catch(() => null);
+        const m = new URL(r.url()).pathname.match(/\/providers\/([^/]+)\/appointments$/);
+        if (r.request().method() === 'POST' && m) {
+          const body = await r.json().catch(() => null);
+          // provider id from the URL — the response body doesn't carry it
+          booking = { id: body?.id ?? body?.appointment?.id, providerId: m[1] };
         }
       });
       await h.page.getByPlaceholder(/Search by name/).fill(h.cfg.testClient);
