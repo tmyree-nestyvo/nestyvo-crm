@@ -38,6 +38,8 @@ const cfg = {
   provider: { email: process.env.PROVIDER_EMAIL, password: process.env.PROVIDER_PASSWORD },
   apiUrl: process.env.API_URL || 'https://nestyvo-crm-production.up.railway.app/api/v1',
   providerName: process.env.PROVIDER_NAME || 'Gloria',
+  // Admin checkpoints follow Charlene's recording, which worked on Gloria's real calendar (read-only).
+  adminProviderName: process.env.ADMIN_PROVIDER_NAME || 'Gloria Ortiz',
   testClient: process.env.TEST_CLIENT || 'Playwright Tester',
 };
 const neededRoles = new Set(CHECKPOINTS
@@ -56,6 +58,49 @@ mkdirSync(join(OUT, 'app'), { recursive: true });
 mkdirSync(join(OUT, 'video'), { recursive: true });
 
 // ---- helpers handed to every checkpoint ----------------------------------
+// Expo Router's tabs keep other screens mounted *and laid out* underneath the
+// active one, so Playwright's isVisible() is true for text on a hidden tab.
+// "On screen" here means: inside the viewport and actually the topmost
+// element at its own position.
+async function onTop(locator) {
+  return locator.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height || r.bottom < 0 || r.top > window.innerHeight) return false;
+    const t = document.elementFromPoint(r.left + Math.min(r.width / 2, 8), r.top + r.height / 2);
+    return !!t && (t === el || el.contains(t) || t.contains(el));
+  }).catch(() => false);
+}
+async function firstOnTop(locator, { last = false } = {}) {
+  const n = await locator.count();
+  const order = [...Array(n).keys()];
+  if (last) order.reverse();
+  for (const i of order) if (await onTop(locator.nth(i))) return locator.nth(i);
+  return null;
+}
+/** Like firstOnTop, but scrolls each candidate into view first (for clicking). */
+async function scrollToOnTop(locator, { last = false } = {}) {
+  const n = await locator.count();
+  const order = [...Array(n).keys()];
+  if (last) order.reverse();
+  for (const i of order) {
+    const el = locator.nth(i);
+    if (await onTop(el)) return el;
+    if (!(await el.isVisible().catch(() => false))) continue;
+    await el.scrollIntoViewIfNeeded({ timeout: 1000 }).catch(() => {});
+    if (await onTop(el)) return el;
+  }
+  return null;
+}
+async function waitOnTop(locator, timeout, opts = {}) {
+  const end = Date.now() + timeout;
+  do {
+    const el = opts.scroll ? await scrollToOnTop(locator, opts) : await firstOnTop(locator, opts);
+    if (el) return el;
+    await new Promise((r) => setTimeout(r, 250));
+  } while (Date.now() < end);
+  return null;
+}
+
 function makeHelpers(page, role, cleanup) {
   const h = {
     page, cfg, role, WRITE,
@@ -63,24 +108,26 @@ function makeHelpers(page, role, cleanup) {
     check(label, pass, detail = '') { h.checks.push({ label, pass: !!pass, detail }); },
     note(label, detail = '') { h.checks.push({ label, pass: null, detail }); },
     async text(t, opts = {}) { return page.getByText(t, { exact: opts.exact ?? false }).first(); },
+    /** Click the on-screen element with this text (opts.last: prefer the last match, e.g. inside a modal). */
     async click(t, opts = {}) {
-      const el = page.getByText(t, { exact: opts.exact ?? true }).first();
-      await el.waitFor({ state: 'visible', timeout: opts.timeout ?? 10_000 });
+      const el = await waitOnTop(page.getByText(t, { exact: opts.exact ?? true }), opts.timeout ?? 10_000, { scroll: true, ...opts });
+      if (!el) throw new Error(`"${t}" not on screen`);
       await el.click();
       await page.waitForTimeout(opts.settle ?? 900);
     },
     async has(t, opts = {}) {
-      return page.getByText(t, { exact: opts.exact ?? false }).first()
-        .isVisible({ timeout: opts.timeout ?? 2_500 }).catch(() => false);
+      return !!(await waitOnTop(page.getByText(t, { exact: opts.exact ?? false }), opts.timeout ?? 2_500));
     },
     async waitFor(t, timeout = 10_000) {
-      await page.getByText(t, { exact: false }).first().waitFor({ state: 'visible', timeout });
+      if (!(await waitOnTop(page.getByText(t, { exact: false }), timeout))) throw new Error(`"${t}" never appeared`);
     },
     /** True when the element's top is inside the visible viewport (no scrolling needed). */
     async aboveFold(t) {
-      const box = await page.getByText(t, { exact: false }).first().boundingBox().catch(() => null);
+      const el = await firstOnTop(page.getByText(t, { exact: false }));
+      const box = el && (await el.boundingBox());
       return !!box && box.y >= 0 && box.y < VIEWPORT.height;
     },
+    onTop, firstOnTop,
     async home() {
       await page.goto(cfg.url, { waitUntil: 'networkidle' });
       await page.waitForTimeout(1200);
@@ -150,7 +197,8 @@ for (const cp of todo) {
   const frame = `video/${cp.id}.jpg`;
   const haveFrame = extractFrame(cp.frameAt ?? cp.ts, join(OUT, frame));
   const failed = h.checks.some((c) => c.pass === false);
-  console.log(error ? `ERROR (${error})` : failed ? 'FAIL' : 'ok');
+  const passedAny = h.checks.some((c) => c.pass === true);
+  console.log(error ? `ERROR (${error})` : failed ? 'FAIL' : passedAny ? 'pass' : 'look (compare screenshots)');
   results.push({ ...cp, checks: h.checks, error, shot, frame: haveFrame ? frame : null });
   if (cp.role === 'none') await page.context().close();
 }

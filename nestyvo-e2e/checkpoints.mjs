@@ -11,14 +11,33 @@
 const PROVIDER_HOME = async (h) => { await h.home(); await h.waitFor('My Schedule'); };
 const ADMIN_HOME = async (h) => { await h.home(); await h.waitFor('Available Appointments'); };
 
-/** Admin: Calendar tab → choose the provider (Gloria). */
+const PROVIDER_NAMES = /^(Gencia Williams|James Patel|Sarah Torres|Gloria Ortiz|Playwright Test)/;
+
+/** Admin: Calendar tab → pick the provider Charlene used (Gloria Ortiz). */
 async function adminCalendarForProvider(h) {
   await ADMIN_HOME(h);
   await h.click('Calendar');
-  if (await h.has('Select Provider')) {
-    await h.click('Select Provider', { exact: false });
+  // Tabs keep other screens mounted (hidden) — only ever click visible text.
+  const picker = await h.firstOnTop(h.page.getByText(PROVIDER_NAMES));
+  if (!picker) throw new Error('provider picker not found');
+  await picker.click();
+  await h.page.waitForTimeout(700);
+  await h.click(h.cfg.adminProviderName, { exact: false, last: true });
+  await h.page.waitForTimeout(1200);
+}
+
+/** Admin calendar: click days from today forward until one shows an appointment. */
+async function adminDayWithAppointment(h) {
+  const today = new Date();
+  const last = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  for (let day = today.getDate(); day <= last; day++) {
+    const cell = await h.firstOnTop(h.page.getByText(String(day), { exact: true }));
+    if (!cell) continue;
+    await cell.click().catch(() => {});
+    await h.page.waitForTimeout(600);
+    if (await h.has('scheduled', { exact: true, timeout: 700 })) return day;
   }
-  await h.click(h.cfg.providerName, { exact: false });
+  return null;
 }
 
 /** Provider: on My Schedule, select the first upcoming date (this month) that has open times. */
@@ -52,6 +71,7 @@ export const CHECKPOINTS = [
     expect: 'Each Smart Fill candidate has a Book action; only this practice\'s clients; no "Westside Mental Health" text.',
     async run(h) {
       await ADMIN_HOME(h);
+      await h.click(h.cfg.adminProviderName, { exact: false });
       await h.click('Fill', { exact: true });
       await h.page.waitForTimeout(1500);
       h.check('A "Book" button is shown on candidates', await h.has('Book', { exact: true }));
@@ -80,14 +100,19 @@ export const CHECKPOINTS = [
     expect: 'Calendar → appointment → back lands on the Calendar, not the Dashboard.',
     async run(h) {
       await adminCalendarForProvider(h);
-      const appt = h.page.getByText(/scheduled/i).first();
-      await appt.click({ timeout: 8000 });
+      const day = await adminDayWithAppointment(h);
+      if (!day) throw new Error('No appointment found on Gloria\'s calendar for the rest of this month');
+      await h.click('scheduled');
       await h.page.waitForTimeout(1200);
       await h.waitFor('Appointment');
-      await h.page.locator('[tabindex="0"]').first().click(); // header back arrow (first touchable on the page)
+      // header back arrow: the touchable just left of the "Appointment" title
+      const title = await h.firstOnTop(h.page.getByText('Appointment', { exact: true }));
+      const tb = await title.boundingBox();
+      await h.page.mouse.click(tb.x - 30, tb.y + tb.height / 2);
       await h.page.waitForTimeout(1500);
       h.check('Back landed on the Calendar (not the Dashboard)',
-        !(await h.has('Available Appointments')) && (await h.has(h.cfg.providerName)));
+        !(await h.has('Available Appointments')) && (await h.has(h.cfg.adminProviderName)));
+      h.check('Calendar is still on Gloria (provider remembered)', await h.has(h.cfg.adminProviderName));
     },
   },
   {
@@ -118,7 +143,13 @@ export const CHECKPOINTS = [
       await PROVIDER_HOME(h);
       const d = await selectDateWithOpenTimes(h);
       h.check('Open times appear for a selected date', !!d, d ? d.toDateString() : 'no date with open times found in the next 3 weeks');
-      if (d) h.check('Open times are visible without scrolling (concise layout)', await h.aboveFold('Open Times'));
+      if (d) {
+        // Playwright scrolls to whatever it clicks; put every scroller back at
+        // the top so this measures what Charlene sees on arrival.
+        await h.page.evaluate(() => document.querySelectorAll('*').forEach((el) => { if (el.scrollTop) el.scrollTop = 0; }));
+        await h.page.waitForTimeout(400);
+        h.check('Open times are visible without scrolling (concise layout)', await h.aboveFold('Open Times'));
+      }
     },
   },
   {
@@ -159,7 +190,9 @@ export const CHECKPOINTS = [
     expect: 'Add Appointment shows a calendar and the open times for the chosen date in 12-hour format.',
     async run(h) {
       await PROVIDER_HOME(h);
-      await h.click('Add Appointment', { exact: false });
+      // "Add Appointment" before the Oct 11 redesign, "Book a different time" after
+      await h.click('Book a different time', { exact: false, timeout: 3000 })
+        .catch(() => h.click('Add Appointment', { exact: false }));
       await h.page.getByText('Pick a date & time').last().click();
       await h.page.waitForTimeout(1000);
       // choose the first date that has open times inside the picker
