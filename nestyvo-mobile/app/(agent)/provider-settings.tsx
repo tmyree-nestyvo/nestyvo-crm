@@ -114,6 +114,96 @@ function fmtBlockDate(iso: string) {
   });
 }
 
+// Charlene, Oct 10 recording (25:28) — "we probably don't need to list every
+// single date that has a block because it looks like this is a recurring
+// block… just a clean list… otherwise this list could be very lengthy over
+// time." Recurring blocks are stored as one row per date, so this groups
+// rows with the same time-of-day and reason into one line ("Daily, 1:45 PM –
+// 2:45 PM, Oct 10 – Dec 31 · 58 dates") that expands to the individual dates.
+function blockSeriesKey(b: any) {
+  const t = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: TZ });
+  return `${t(b.startAt)}|${t(b.endAt)}|${b.reason ?? ''}`;
+}
+const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function BlockList({ blocks, onEdit, onRemove }: {
+  blocks: any[]; onEdit: (b: any) => void; onRemove: (ids: string[]) => void;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+  const [confirmKey, setConfirmKey] = useState<string | null>(null);
+  const groups = new Map<string, any[]>();
+  for (const b of [...blocks].sort((x, y) => +new Date(x.startAt) - +new Date(y.startAt))) {
+    const k = blockSeriesKey(b);
+    groups.set(k, [...(groups.get(k) ?? []), b]);
+  }
+  const fmtDay = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: TZ });
+  return (
+    <>
+      <Text className="text-gray-400 text-xs font-medium mb-2">
+        Upcoming blocks ({groups.size === blocks.length ? blocks.length : `${blocks.length} dates`})
+      </Text>
+      {[...groups.entries()].map(([key, rows]) => {
+        const [start, end, reason] = key.split('|');
+        if (rows.length === 1) {
+          const b = rows[0];
+          return (
+            <View key={b.id} className="flex-row items-center justify-between py-1.5">
+              <Text className="text-gray-600 text-xs flex-1">
+                {fmtBlockDate(b.startAt)} – {end}{reason ? ` · ${reason}` : ''}
+              </Text>
+              <TouchableOpacity onPress={() => onEdit(b)} className="p-1 ml-1">
+                <Ionicons name="pencil-outline" size={15} color="#9ca3af" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => onRemove([b.id])} className="p-1">
+                <Ionicons name="close-circle" size={16} color="#d1d5db" />
+              </TouchableOpacity>
+            </View>
+          );
+        }
+        const days = new Set(rows.map((r) => new Date(new Date(r.startAt).toLocaleString('en-US', { timeZone: TZ })).getDay()));
+        const pattern = days.size === 7 ? 'Daily' : `Every ${[...days].sort().map((d) => DOW_SHORT[d]).join(', ')}`;
+        const expanded = open === key;
+        return (
+          <View key={key} className="py-1.5">
+            <View className="flex-row items-center justify-between">
+              <TouchableOpacity onPress={() => setOpen(expanded ? null : key)} className="flex-1 flex-row items-center gap-1">
+                <Ionicons name={expanded ? 'chevron-down' : 'chevron-forward'} size={13} color="#9ca3af" />
+                <Text className="text-gray-700 text-xs flex-1">
+                  <Text className="font-semibold">{pattern}, {start} – {end}</Text>
+                  {reason ? ` · ${reason}` : ''} · {fmtDay(rows[0].startAt)} – {fmtDay(rows[rows.length - 1].startAt)} ({rows.length} dates)
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  if (confirmKey !== key) { setConfirmKey(key); return; }
+                  setConfirmKey(null);
+                  onRemove(rows.map((r) => r.id));
+                }}
+                className="p-1 ml-1"
+              >
+                <Text className="text-red-500 text-[11px] font-medium">
+                  {confirmKey === key ? `Remove ${rows.length} dates?` : 'Remove all'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {expanded && rows.map((b) => (
+              <View key={b.id} className="flex-row items-center justify-between py-1 pl-5">
+                <Text className="text-gray-500 text-xs flex-1">{fmtBlockDate(b.startAt)}</Text>
+                <TouchableOpacity onPress={() => onEdit(b)} className="p-1 ml-1">
+                  <Ionicons name="pencil-outline" size={14} color="#9ca3af" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => onRemove([b.id])} className="p-1">
+                  <Ionicons name="close-circle" size={15} color="#d1d5db" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        );
+      })}
+    </>
+  );
+}
+
 const SOURCE_LABEL: Record<ExternalCalendarSource, string> = { rula: 'Rula', headway: 'Headway', other: 'Other' };
 
 function timeAgo(iso: string | null) {
@@ -951,23 +1041,11 @@ export default function ProviderSettingsScreen() {
                 <ActivityIndicator color="#2563eb" style={{ marginTop: 12 }} />
               ) : blocks.length > 0 ? (
                 <View className="mt-4 pt-4 border-t border-gray-50">
-                  <Text className="text-gray-400 text-xs font-medium mb-2">
-                    Upcoming blocks ({blocks.length})
-                  </Text>
-                  {blocks.map((b: any) => (
-                    <View key={b.id} className="flex-row items-center justify-between py-1.5">
-                      <Text className="text-gray-600 text-xs flex-1">
-                        {fmtBlockDate(b.startAt)} – {new Date(b.endAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: TZ })}
-                        {b.reason ? ` · ${b.reason}` : ''}
-                      </Text>
-                      <TouchableOpacity onPress={() => startEditBlock(b)} className="p-1 ml-1">
-                        <Ionicons name="pencil-outline" size={15} color="#9ca3af" />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => removeBlock.mutate(b.id)} className="p-1">
-                        <Ionicons name="close-circle" size={16} color="#d1d5db" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
+                  <BlockList
+                    blocks={blocks}
+                    onEdit={startEditBlock}
+                    onRemove={(ids) => ids.forEach((id) => removeBlock.mutate(id))}
+                  />
                 </View>
               ) : null}
             </View>

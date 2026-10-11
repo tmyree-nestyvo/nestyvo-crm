@@ -39,7 +39,7 @@ const TYPE_CONFIG: Record<string, { color: string; icon: any }> = {
 };
 
 const WAITLIST_TYPES = [
-  { id: 'new_patient', label: 'New Patient' },
+  { id: 'new_patient', label: 'New Client' },
   { id: 'followup', label: 'Follow-up' },
   { id: 'urgent', label: 'Urgent' },
 ];
@@ -180,7 +180,7 @@ export default function ProviderWaitlistScreen() {
         <View className="flex-1">
           <Text className="text-xl font-bold text-gray-900">My Waitlist</Text>
           <Text className="text-gray-500 text-sm mt-0.5">
-            {data?.length ?? 0} patients waiting
+            {data?.length ?? 0} {data?.length === 1 ? 'client' : 'clients'} waiting
           </Text>
         </View>
         <TouchableOpacity
@@ -205,7 +205,7 @@ export default function ProviderWaitlistScreen() {
           ListEmptyComponent={
             <View className="items-center pt-16">
               <Ionicons name="list-outline" size={48} color="#e5e7eb" />
-              <Text className="text-gray-400 text-sm mt-3">No patients on waitlist</Text>
+              <Text className="text-gray-400 text-sm mt-3">No clients on waitlist</Text>
             </View>
           }
           renderItem={({ item }) => {

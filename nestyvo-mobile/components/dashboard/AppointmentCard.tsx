@@ -124,7 +124,7 @@ export function AppointmentCard({
   const [externalDetail, setExternalDetail] = useState(false);
   const time = new Date(appt.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dateLabel = showDate
-    ? new Date(appt.startAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: TZ })
+    ? new Date(appt.startAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: TZ })
     : null;
   const isExternal = appt.source === 'external';
   const isBlock = appt.source === 'block';
@@ -143,9 +143,12 @@ export function AppointmentCard({
           disabled={isBlock || (!isExternal && !onPress)}
           className="p-4 flex-row items-center gap-3"
         >
-          <View className="items-center w-14">
+          {/* Charlene, Oct 10 recording (28:40, 33:44) — the date was a tiny
+              grey line above the time: "show the date clearly and large and
+              then the time nice and clearly." Same size as the time now. */}
+          <View className={`items-center ${dateLabel ? 'w-24' : 'w-14'}`}>
             {dateLabel && (
-              <Text className={`text-[10px] font-medium ${isDimmed ? 'text-gray-400' : 'text-gray-400'}`}>{dateLabel}</Text>
+              <Text className={`font-bold text-sm ${isDimmed ? 'text-gray-500' : 'text-gray-900'}`}>{dateLabel}</Text>
             )}
             <Text className={`font-bold text-sm ${isDimmed ? 'text-gray-500' : 'text-primary-700'}`}>{time}</Text>
             <View

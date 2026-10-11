@@ -4,7 +4,7 @@ import { Alert } from '../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { practicesApi, providersApi, patientsApi } from '../../lib/api';
 import { useAuthStore } from '../../lib/store';
 import { hasRole, ADMIN_AND_AGENT } from '../../lib/role-groups';
@@ -41,7 +41,9 @@ export default function ImportClientsScreen() {
     skippedNoName?: number;
     skippedDuplicate?: number;
     unmatchedTags: { row: string; tag: string }[];
+    createdTags?: { name: string; blockMinutes: number }[];
   } | null>(null);
+  const queryClient = useQueryClient();
 
   const effectivePracticeId = isCrossPractice ? (practice?.id ?? params.presetPracticeId) : myPracticeId ?? undefined;
 
@@ -77,7 +79,14 @@ export default function ImportClientsScreen() {
 
   const importMutation = useMutation({
     mutationFn: () => patientsApi.import({ practiceId: effectivePracticeId!, assignedProviderId: provider?.id, csvText: csvText! }),
-    onSuccess: (data) => setResult(data),
+    onSuccess: (data) => {
+      setResult(data);
+      // Oct 10 recording (31:36) — imported clients didn't show up in search
+      // ("can't find her") until a manual refresh.
+      queryClient.invalidateQueries({ queryKey: ['patients'] });
+      queryClient.invalidateQueries({ queryKey: ['provider-roster'] });
+      queryClient.invalidateQueries({ queryKey: ['client-tags'] });
+    },
     onError: (err: any) => Alert.alert("Couldn't import", err?.response?.data?.message || 'Please try again.'),
   });
 
@@ -115,6 +124,19 @@ export default function ImportClientsScreen() {
               <Text className="text-amber-600 text-xs mt-1 text-center">
                 {result.skippedNoName} skipped — no name found for that row (check the Name/First Name column)
               </Text>
+            )}
+            {!!result.createdTags?.length && (
+              <View className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 mt-4 w-full">
+                <Text className="text-green-800 text-xs font-semibold mb-1">
+                  {result.createdTags.length} new Client Tag{result.createdTags.length !== 1 ? 's' : ''} created from your file
+                </Text>
+                <Text className="text-green-700 text-xs mb-2">
+                  Applied to the imported clients. Each starts at {result.createdTags[0].blockMinutes} min — adjust the length in Client Tags if needed.
+                </Text>
+                {result.createdTags.map((t, i) => (
+                  <Text key={i} className="text-green-700 text-xs">• {t.name}</Text>
+                ))}
+              </View>
             )}
             {result.unmatchedTags.length > 0 && (
               <View className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mt-4 w-full">
@@ -166,7 +188,7 @@ export default function ImportClientsScreen() {
 
             <Text className="text-gray-500 text-xs font-medium mb-2">Client Directory (CSV)</Text>
             <Text className="text-gray-400 text-xs mb-3">
-              Columns: Name (or First/Last Name), Phone, Email, Tag. A Tag value is matched against this practice's existing Client Tags.
+              Columns: Name (or First/Last Name), Phone, Email, Tag. A Tag value is matched against this practice's Client Tags; new tag names are created automatically.
             </Text>
             <TouchableOpacity
               onPress={pickFile}

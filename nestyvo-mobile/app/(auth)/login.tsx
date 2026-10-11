@@ -121,7 +121,9 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text className="text-center text-xs text-gray-400 mt-8">HIPAA-compliant • Secured by Nestyvo Auth</Text>
+        {/* Charlene, Oct 10 recording (01:40) — removed "HIPAA-compliant":
+            not true yet (see the Oct 4 pre-PHI assessment). */}
+        <Text className="text-center text-xs text-gray-400 mt-8">Secured by Nestyvo Auth</Text>
       </View>
     </KeyboardAvoidingView>
   );

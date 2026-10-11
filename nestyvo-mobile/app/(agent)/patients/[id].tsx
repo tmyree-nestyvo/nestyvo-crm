@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Linking } from 'react-native';
 import { Alert } from '../../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -164,7 +164,7 @@ export default function PatientDetailScreen() {
               showDate
               onPress={
                 appt.source !== 'external' && appt.providerId
-                  ? () => router.push({ pathname: '/(agent)/appointments/[id]', params: { id: appt.id, providerId: appt.providerId } })
+                  ? () => router.push({ pathname: '/(agent)/appointments/[id]', params: { id: appt.id, providerId: appt.providerId, returnTo: `/(agent)/patients/${id}` } })
                   : undefined
               }
             />
@@ -302,7 +302,7 @@ function TicketModal({ visible, onClose, patientId }: { visible: boolean; onClos
 }
 
 const WAITLIST_TYPES: { value: string; label: string }[] = [
-  { value: 'new_patient', label: 'New patient' },
+  { value: 'new_patient', label: 'New client' },
   { value: 'followup', label: 'Follow-up' },
   { value: 'urgent', label: 'Urgent' },
 ];
@@ -476,6 +476,13 @@ function TagSection({
   practiceName?: string;
 }) {
   const [picker, setPicker] = useState(false);
+  // Oct 10 recording (28:24) — "I don't see a way to confirm it's saved."
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  useEffect(() => {
+    if (!savedAt) return;
+    const t = setTimeout(() => setSavedAt(null), 3000);
+    return () => clearTimeout(t);
+  }, [savedAt]);
   const queryClient = useQueryClient();
   const { role, practiceId: myPracticeId } = useAuthStore();
   const isCrossPractice = hasRole(role, ADMIN_ONLY) && practiceId && practiceId !== myPracticeId;
@@ -494,6 +501,7 @@ function TagSection({
       // stale fill-candidates lists elsewhere in the app need to refetch too.
       queryClient.invalidateQueries({ queryKey: ['fill-candidates'] });
       setPicker(false);
+      setSavedAt(Date.now());
     },
     onError: (err: any) => {
       Alert.alert('Couldn\'t update tag', err?.response?.data?.message || 'Please try again.');
@@ -508,7 +516,15 @@ function TagSection({
             duration. Renamed to Client Tag; it's classification/Smart
             Fill matching only, never binding on the actual appointment
             duration (set independently at booking time). */}
-        <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Client Tag</Text>
+        <View className="flex-row items-center justify-between mb-3">
+          <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Client Tag</Text>
+          {savedAt ? (
+            <View className="flex-row items-center gap-1">
+              <Ionicons name="checkmark-circle" size={14} color="#16a34a" />
+              <Text className="text-green-700 text-xs font-semibold">Saved</Text>
+            </View>
+          ) : null}
+        </View>
         <TouchableOpacity onPress={() => setPicker(true)} className="flex-row items-center gap-3">
           <View className="w-7 h-7 bg-gray-50 rounded-lg items-center justify-center">
             <Ionicons name="pricetag-outline" size={14} color="#6b7280" />

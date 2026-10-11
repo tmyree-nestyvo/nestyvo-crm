@@ -356,7 +356,7 @@ export default function NewClientScreen() {
         <TextInput
           value={referralSource}
           onChangeText={setReferralSource}
-          placeholder="e.g. Headway, word of mouth"
+          placeholder="e.g. Referral, word of mouth"
           className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-900 mb-6"
         />
 

@@ -315,6 +315,7 @@ export class PatientsService {
     skippedNoName: number;
     skippedDuplicate: number;
     unmatchedTags: { row: string; tag: string }[];
+    createdTags: { name: string; blockMinutes: number }[];
   }> {
     const practiceId = user.role === UserRole.PRACTICE_MANAGER ? user.practiceId : input.practiceId;
     if (!practiceId) throw new BadRequestException('practiceId is required');
@@ -328,7 +329,7 @@ export class PatientsService {
 
     const rows = parseCsv(input.csvText);
     if (rows.length === 0) {
-      return { imported: 0, skipped: 0, skippedNoName: 0, skippedDuplicate: 0, unmatchedTags: [] };
+      return { imported: 0, skipped: 0, skippedNoName: 0, skippedDuplicate: 0, unmatchedTags: [], createdTags: [] };
     }
 
     const header = rows[0].map((h) => h.trim().toLowerCase());
@@ -367,6 +368,17 @@ export class PatientsService {
     let skippedNoName = 0;
     let skippedDuplicate = 0;
     const unmatchedTags: { row: string; tag: string }[] = [];
+    // Charlene, Oct 10 recording (32:16) — "the import should upload the tags
+    // to this provider's tag list. Otherwise, what if a client has 500 names…
+    // we have to go one by one to adjust all the tags." A tag name that
+    // doesn't exist yet is now created (once) for this practice and applied,
+    // starting at the provider's default session length; adjustable after in
+    // Client Tags.
+    const createdTags: { name: string; blockMinutes: number }[] = [];
+    const assignedProvider = input.assignedProviderId
+      ? await this.providerRepo.findOne({ where: { id: input.assignedProviderId } })
+      : null;
+    const newTagMinutes = assignedProvider?.defaultSlotDurationMin || 60;
 
     for (const cells of rows.slice(1)) {
       if (cells.every((c) => !c.trim())) continue; // blank row
@@ -397,9 +409,15 @@ export class PatientsService {
       let tagId: string | undefined;
       const tagRaw = tagCol >= 0 ? cells[tagCol]?.trim() : undefined;
       if (tagRaw) {
-        const match = tagByName.get(tagRaw.toLowerCase());
-        if (match) tagId = match.id;
-        else unmatchedTags.push({ row: `${firstName} ${lastName}`.trim(), tag: tagRaw });
+        let match = tagByName.get(tagRaw.toLowerCase());
+        if (!match) {
+          match = await this.tagRepo.save(
+            this.tagRepo.create({ practiceId, name: tagRaw, blockMinutes: newTagMinutes, isActive: true }),
+          );
+          tagByName.set(tagRaw.toLowerCase(), match);
+          createdTags.push({ name: tagRaw, blockMinutes: newTagMinutes });
+        }
+        tagId = match.id;
       }
 
       const saved = await this.patientRepo.save(
@@ -436,6 +454,7 @@ export class PatientsService {
       skippedNoName,
       skippedDuplicate,
       unmatchedTags,
+      createdTags,
     };
   }
 

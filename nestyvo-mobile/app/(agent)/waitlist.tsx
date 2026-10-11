@@ -24,7 +24,7 @@ function fmtSlot(iso: string) {
 
 const TYPE_CONFIG = {
   urgent:      { label: 'Urgent',      color: '#dc2626', bg: '#fef2f2' },
-  new_patient: { label: 'New patient', color: '#2563eb', bg: '#eff6ff' },
+  new_patient: { label: 'New client', color: '#2563eb', bg: '#eff6ff' },
   followup:    { label: 'Follow-up',   color: '#7c3aed', bg: '#f5f3ff' },
 };
 
