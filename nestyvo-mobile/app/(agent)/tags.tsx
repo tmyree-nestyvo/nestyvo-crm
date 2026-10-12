@@ -54,6 +54,19 @@ export default function TagsScreen() {
     },
   });
 
+  // Charlene, Oct 11 Full Pass (P2 05:00) — "I just can't edit the time
+  // length." Inline edit of a tag's name and Smart Fill minutes.
+  const [editing, setEditing] = useState<{ id: string; name: string; minutes: string } | null>(null);
+  const updateTag = useMutation({
+    mutationFn: (e: { id: string; name: string; minutes: string }) =>
+      clientTagsApi.update(e.id, { name: e.name.trim(), blockMinutes: parseInt(e.minutes, 10), practiceId: effectivePracticeId! }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['client-tags'] });
+      setEditing(null);
+    },
+  });
+  const canSaveEdit = !!editing && editing.name.trim().length > 0 && parseInt(editing.minutes, 10) > 0;
+
   const removeTag = useMutation({
     mutationFn: (id: string) => clientTagsApi.remove(id, effectivePracticeId!),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['client-tags', effectivePracticeId] }),
@@ -158,13 +171,58 @@ export default function TagsScreen() {
                     key={t.id}
                     className={`px-4 py-3.5 flex-row items-center justify-between ${i < tags.length - 1 ? 'border-b border-gray-50' : ''}`}
                   >
-                    <View>
-                      <Text className="text-gray-900 text-sm font-medium">{t.name}</Text>
-                      <Text className="text-gray-400 text-xs mt-0.5">Smart Fill: {t.blockMinutes} min</Text>
-                    </View>
-                    <TouchableOpacity onPress={() => removeTag.mutate(t.id)}>
-                      <Ionicons name="trash-outline" size={18} color="#dc2626" />
-                    </TouchableOpacity>
+                    {editing?.id === t.id ? (
+                      <View className="flex-1 gap-2">
+                        <View className="flex-row gap-2">
+                          <TextInput
+                            value={editing?.name}
+                            onChangeText={(v) => setEditing((e) => e && { ...e, name: v })}
+                            placeholder="Tag name"
+                            className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900"
+                          />
+                          <TextInput
+                            value={editing?.minutes}
+                            onChangeText={(v) => setEditing((e) => e && { ...e, minutes: v })}
+                            placeholder="Min"
+                            keyboardType="number-pad"
+                            className="w-20 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-900"
+                          />
+                        </View>
+                        {updateTag.isError ? (
+                          <Text className="text-red-600 text-xs">Couldn't save — please try again.</Text>
+                        ) : null}
+                        <View className="flex-row gap-2">
+                          <TouchableOpacity
+                            onPress={() => editing && updateTag.mutate(editing)}
+                            disabled={!canSaveEdit || updateTag.isPending}
+                            className={`rounded-xl px-4 py-2 ${canSaveEdit ? 'bg-primary-600' : 'bg-gray-200'}`}
+                          >
+                            {updateTag.isPending ? <ActivityIndicator color="#fff" /> : <Text className="text-white text-sm font-semibold">Save</Text>}
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => { setEditing(null); updateTag.reset(); }} className="rounded-xl px-4 py-2 border border-gray-200">
+                            <Text className="text-gray-600 text-sm">Cancel</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ) : (
+                      <>
+                        <View className="flex-1">
+                          <Text className="text-gray-900 text-sm font-medium">{t.name}</Text>
+                          <Text className="text-gray-400 text-xs mt-0.5">Smart Fill: {t.blockMinutes} min</Text>
+                        </View>
+                        <View className="flex-row items-center gap-4">
+                          <TouchableOpacity
+                            onPress={() => { updateTag.reset(); setEditing({ id: t.id, name: t.name, minutes: String(t.blockMinutes) }); }}
+                            accessibilityLabel={`Edit ${t.name}`}
+                          >
+                            <Ionicons name="create-outline" size={18} color="#2563eb" />
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => removeTag.mutate(t.id)} accessibilityLabel={`Delete ${t.name}`}>
+                            <Ionicons name="trash-outline" size={18} color="#dc2626" />
+                          </TouchableOpacity>
+                        </View>
+                      </>
+                    )}
                   </View>
                 ))}
               </View>

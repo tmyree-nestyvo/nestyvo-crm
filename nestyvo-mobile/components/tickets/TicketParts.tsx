@@ -62,13 +62,31 @@ export function ClientLine({ patient, size = 'sm' }: { patient?: { firstName: st
   );
 }
 
-/** Latest reply preview for a list row. */
-export function LastActivity({ entry }: { entry?: Entry | null }) {
-  if (!entry) return null;
+/**
+ * List-row preview: the latest actual note, plus any status change made after
+ * it. Charlene, Oct 11 Full Pass (P1 09:16) — "Charlene marked it as progress.
+ * It doesn't say what." A reply sent with In Progress is stored as the note
+ * then the status line, so showing only the very last entry hid the note.
+ */
+export function LastActivity({ notes }: { notes?: string | null }) {
+  const entries = parseHistory(notes);
+  if (!entries.length) return null;
+  const noteIdx = entries.map((e) => !STATUS_LINE.test(e.text)).lastIndexOf(true);
+  const note = noteIdx >= 0 ? entries[noteIdx] : null;
+  const status = [...entries.slice(noteIdx + 1)].reverse().find((e) => STATUS_LINE.test(e.text));
   return (
-    <Text className="text-gray-600 text-xs mt-2 leading-4" numberOfLines={2}>
-      <Text className="font-semibold">{entry.author}</Text> · {entry.at}: {entry.text}
-    </Text>
+    <View className="mt-2">
+      {note ? (
+        <Text className="text-gray-600 text-xs leading-4" numberOfLines={2}>
+          <Text className="font-semibold">{note.author}</Text> · {note.at}: {note.text}
+        </Text>
+      ) : null}
+      {status ? (
+        <Text className="text-gray-400 text-xs mt-0.5" numberOfLines={1}>
+          {status.author} {status.text.charAt(0).toLowerCase() + status.text.slice(1)} · {status.at}
+        </Text>
+      ) : null}
+    </View>
   );
 }
 

@@ -161,7 +161,7 @@ function LogCallbackModal({ visible, onClose }: { visible: boolean; onClose: () 
 
 function daysAgo(iso: string) {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (d === 0) return 'Today';
+  if (d <= 0) return 'Today'; // <= : a just-created row can read a hair in the future (clock skew)
   if (d === 1) return 'Yesterday';
   return `${d}d ago`;
 }

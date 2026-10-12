@@ -155,8 +155,7 @@ export const CHECKPOINTS = [
     expect: 'Only one way to start a booking from the day panel (nit).',
     async run(h) {
       await PROVIDER_HOME(h);
-      if (await h.has('Book a different time')) h.open('"+ Book a different time" still shown under Open Times', 'outstanding nit — not changed yet');
-      else h.check('"+ Book a different time" removed', true);
+      h.check('"+ Book a different time" removed (fixed Oct 12)', !(await h.has('Book a different time')));
     },
   },
   {
@@ -281,7 +280,7 @@ export const CHECKPOINTS = [
     async run(h) {
       await PROVIDER_HOME(h);
       await tab(h, 'Requests');
-      h.open('Row preview still shows the status line, not the latest note', 'outstanding nit');
+      h.note('Fixed Oct 12: rows preview the latest note plus any later status change. The --write round trip (F09) exercises it; compare the rows by eye here.');
     },
   },
   {
@@ -290,7 +289,7 @@ export const CHECKPOINTS = [
     expect: 'After Reply or Resolve the detail closes and the list shows the change (nit).',
     async run(h) {
       await ADMIN_HOME(h);
-      h.open('Detail still stays open after Reply/Resolve until Close is tapped', 'outstanding nit');
+      h.note('Fixed Oct 12: Reply / In Progress / Resolve close the ticket and confirm above the list. Needs a real ticket to show — see F09 with --write.');
     },
   },
   {
@@ -340,8 +339,12 @@ export const CHECKPOINTS = [
     quote: 'We can edit them if we need to manage tags… I just can\'t edit the time length, but that\'s okay. We could work around that for now.',
     expect: 'A tag\'s Smart Fill minutes can be changed after it is created.',
     async run(h) {
+      const provs = (await h.api('GET', '/providers')).body ?? [];
+      const gl = provs.find((p) => `${p.firstName} ${p.lastName}` === h.cfg.adminProviderName && p.practiceId && p.status !== 'inactive');
       await ADMIN_HOME(h);
-      h.open('No edit UI for a tag\'s minutes yet (the API supports it)', 'outstanding — she said OK to work around for now');
+      await h.page.goto(`${h.cfg.url}/tags?practiceId=${gl.practiceId}`, { waitUntil: 'networkidle' });
+      await sleep(h, 2500);
+      h.check('Each tag has an Edit button (fixed Oct 12)', (await h.page.locator('[aria-label^="Edit "]').count()) > 0);
     },
   },
   { ...oct10('C01'), id: 'F17', part: 'P2', ts: '00:05:20', title: 'Login screen — HIPAA text removed',

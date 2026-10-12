@@ -343,18 +343,11 @@ export default function ProviderScheduleScreen() {
                           : 'No open times this day.'}
                   </Text>
                 )}
-                {/* Charlene (40:28) — "instead of add appointment, we click on
-                    this date… then we have the list of available appointments."
-                    The open times above are the main path now; this stays as
-                    a small link for booking outside the regular open slots. */}
-                {selectedDate >= today && (
-                  <TouchableOpacity
-                    onPress={() => router.push({ pathname: '/(provider)/book-appointment', params: { date: selectedDate } })}
-                    className="self-start py-1.5 mb-4"
-                  >
-                    <Text className="text-primary-600 text-sm font-medium">+ Book a different time</Text>
-                  </TouchableOpacity>
-                )}
+                {/* "+ Book a different time" used to sit here. It opened the
+                    same open-slot picker as the times above (Charlene, Oct 11
+                    Full Pass P1 02:44 — "that might be a little redundant"),
+                    so it's gone; the times above are the way to book. */}
+                <View className="mb-4" />
 
                 <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Appointments</Text>
                 {isLoading ? (

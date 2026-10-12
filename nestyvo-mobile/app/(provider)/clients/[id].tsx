@@ -31,7 +31,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 function daysAgo(iso: string) {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (d === 0) return 'Today';
+  if (d <= 0) return 'Today'; // <= : a just-created row can read a hair in the future (clock skew)
   if (d === 1) return 'Yesterday';
   return `${d}d ago`;
 }
@@ -236,7 +236,7 @@ function AppointmentsCard({ client }: { client: any }) {
               </View>
               <View className="flex-1">
                 <Text className="text-gray-900 text-sm font-medium">
-                  {d.toLocaleDateString('en-US', { weekday: 'short' })} · {d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  {d.toLocaleDateString('en-US', { weekday: 'short' })}, {d.getFullYear()} · {d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                 </Text>
                 <Text className="text-gray-400 text-xs mt-0.5">{[a.type, a.patient].filter(Boolean).join(' · ')}</Text>
               </View>

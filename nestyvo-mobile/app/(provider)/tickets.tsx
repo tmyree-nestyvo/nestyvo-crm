@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { Alert } from '../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -41,7 +41,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 function daysAgo(iso: string) {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (d === 0) return 'Today';
+  if (d <= 0) return 'Today'; // <= : a just-created row can read a hair in the future (clock skew)
   if (d === 1) return 'Yesterday';
   return `${d}d ago`;
 }
@@ -59,6 +59,13 @@ export default function ProviderTicketsScreen() {
   const [filter, setFilter] = useState<string | undefined>(undefined);
   const [active, setActive] = useState<any | null>(null);
   const [notes, setNotes] = useState('');
+  // Confirmation shown above the list after a reply/status change closes the ticket.
+  const [flash, setFlash] = useState<string | null>(null);
+  useEffect(() => {
+    if (!flash) return;
+    const t = setTimeout(() => setFlash(null), 4000);
+    return () => clearTimeout(t);
+  }, [flash]);
   const [newRequest, setNewRequest] = useState(false);
 
   const { data = [], isLoading, refetch, isRefetching } = useQuery({
@@ -69,13 +76,20 @@ export default function ProviderTicketsScreen() {
   const updateTicket = useMutation({
     mutationFn: (updates: { status?: string; replyText?: string }) =>
       ticketsApi.update(active.id, updates),
-    // Stay on the ticket and show the new entry immediately (Oct 10
-    // recording 44:00 — "when I hit reply, it does not update on the ticket").
-    onSuccess: (updated: any) => {
+    // Charlene, Oct 11 Full Pass (P1 09:48) — "once you reply or resolve or
+    // close that maybe this just closes without having to hit close and then
+    // you can see it here." Closes the ticket and confirms above the list;
+    // the row's preview shows the new note (see LastActivity).
+    onSuccess: (updated: any, updates) => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
       queryClient.invalidateQueries({ queryKey: ['provider-dashboard'] });
-      setActive(updated);
+      setActive(null);
       setNotes('');
+      setFlash(
+        updates.status === 'resolved' ? `#T-${updated.ticketNumber} resolved`
+          : updates.status === 'in_progress' ? `#T-${updated.ticketNumber} marked In Progress`
+            : `Reply added to #T-${updated.ticketNumber}`,
+      );
     },
     onError: (err: any) => {
       Alert.alert('Couldn\'t update', err?.response?.data?.message || 'Please try again.');
@@ -120,6 +134,12 @@ export default function ProviderTicketsScreen() {
         contentContainerClassName="px-5 pb-8"
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
       >
+        {flash ? (
+          <View className="flex-row items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2.5 mb-3">
+            <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
+            <Text className="text-green-800 text-sm font-medium">{flash}</Text>
+          </View>
+        ) : null}
         {isLoading ? (
           <View className="items-center py-12">
             <ActivityIndicator color="#2563eb" />
@@ -163,7 +183,7 @@ export default function ProviderTicketsScreen() {
                   </View>
                 </View>
                 <Text className="text-gray-500 text-sm mt-2 leading-5" numberOfLines={2}>{t.description}</Text>
-                <LastActivity entry={t.lastEntry} />
+                <LastActivity notes={t.resolutionNotes} />
                 <View className="flex-row items-center gap-2 mt-2.5 pt-2.5 border-t border-gray-50">
                   <Text className="text-gray-400 text-xs">{CATEGORY_LABEL[t.category] ?? t.category}</Text>
                   <Text className="text-gray-300 text-xs ml-auto">
