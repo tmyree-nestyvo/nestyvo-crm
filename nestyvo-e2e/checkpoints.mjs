@@ -8,13 +8,13 @@
 // copy change can break a step — the report then shows ERROR plus a screenshot
 // of where it stopped.
 
-const PROVIDER_HOME = async (h) => { await h.home(); await h.waitFor('My Schedule'); };
-const ADMIN_HOME = async (h) => { await h.home(); await h.waitFor('Available Appointments'); };
+export const PROVIDER_HOME = async (h) => { await h.home(); await h.waitFor('My Schedule'); };
+export const ADMIN_HOME = async (h) => { await h.home(); await h.waitFor('Available Appointments'); };
 
 const PROVIDER_NAMES = /^(Gencia Williams|James Patel|Sarah Torres|Gloria Ortiz|Playwright Test)/;
 
 /** Admin: Calendar tab → pick the provider Charlene used (Gloria Ortiz). */
-async function adminCalendarForProvider(h) {
+export async function adminCalendarForProvider(h) {
   await ADMIN_HOME(h);
   await h.click('Calendar');
   // Tabs keep other screens mounted (hidden) — only ever click visible text.
@@ -41,7 +41,7 @@ async function adminDayWithAppointment(h) {
 }
 
 /** Provider: on My Schedule, select the first upcoming date (this month) that has open times. */
-async function selectDateWithOpenTimes(h) {
+export async function selectDateWithOpenTimes(h) {
   const today = new Date();
   const last = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   for (let day = today.getDate() + 1; day <= last; day++) {

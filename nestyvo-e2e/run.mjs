@@ -8,20 +8,28 @@
 //   npm run compare:write          # also runs the booking checkpoints (one real
 //                                  # booking for a fixed test client, cancelled at the end)
 //   npm run compare -- --only C06,C07   # run a subset
+//   npm run compare -- --set fullpass   # Oct 11 "Full Pass" recording (2 parts)
+//                                       # instead → out-fullpass/report.html
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CHECKPOINTS } from './checkpoints.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const OUT = join(HERE, 'out');
 const args = process.argv.slice(2);
 const WRITE = args.includes('--write');
 const HEADED = args.includes('--headed');
 const onlyIdx = args.indexOf('--only');
 const ONLY = onlyIdx >= 0 ? args[onlyIdx + 1].split(',') : null;
+const setIdx = args.indexOf('--set');
+const SET = setIdx >= 0 ? args[setIdx + 1] : 'oct10';
+const SETS = {
+  oct10: { file: './checkpoints.mjs', out: 'out' },
+  fullpass: { file: './checkpoints-fullpass.mjs', out: 'out-fullpass' },
+};
+if (!SETS[SET]) { console.error(`Unknown --set ${SET} (have: ${Object.keys(SETS).join(', ')})`); process.exit(1); }
+const { CHECKPOINTS, META = {} } = await import(SETS[SET].file);
 
 // ---- config ---------------------------------------------------------------
 const envFile = join(HERE, '.env.e2e');
@@ -42,6 +50,12 @@ const cfg = {
   adminProviderName: process.env.ADMIN_PROVIDER_NAME || 'Gloria Ortiz',
   testClient: process.env.TEST_CLIENT || 'Playwright Tester',
 };
+const OUT = join(HERE, SETS[SET].out);
+// Recordings: a set can have several parts (checkpoint.part picks one).
+const videos = META.videos ?? { default: cfg.video };
+const videoFor = (cp) => videos[cp.part ?? 'default'] ?? cfg.video;
+// Crop to the browser content; Charlene's recordings differ in where it sits.
+const CROP = META.crop ?? 'crop=1432:780:8:155';
 const neededRoles = new Set(CHECKPOINTS
   .filter((c) => (!ONLY || ONLY.includes(c.id)) && (WRITE || !c.write) && c.role !== 'none')
   .map((c) => c.role));
@@ -101,11 +115,40 @@ async function waitOnTop(locator, timeout, opts = {}) {
   return null;
 }
 
+const apiTokens = {};
 function makeHelpers(page, role, cleanup) {
   const h = {
     page, cfg, role, WRITE,
     checks: [],
     check(label, pass, detail = '') { h.checks.push({ label, pass: !!pass, detail }); },
+    /** A known, already-reported open item: shown amber, never counted as a regression. */
+    open(label, detail = '') { h.checks.push({ label, pass: 'open', detail }); },
+    /** Call the API as one of the test logins (token fetched once per role). */
+    async api(method, path, body, as = role) {
+      apiTokens[as] ??= await fetch(`${cfg.apiUrl}/auth/login`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: cfg[as].email, password: cfg[as].password }),
+      }).then((r) => r.json()).then((j) => j.token);
+      const r = await fetch(`${cfg.apiUrl}${path}`, {
+        method, headers: { authorization: `Bearer ${apiTokens[as]}`, 'content-type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      let json = null; try { json = await r.json(); } catch {}
+      return { status: r.status, body: json };
+    },
+    /** Text of every element that is actually on top (what a person sees), newline-joined. */
+    async visibleText() {
+      return page.evaluate(() => {
+        const out = []; const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        while (w.nextNode()) {
+          const el = w.currentNode.parentElement; const r = el.getBoundingClientRect();
+          if (!r.width || !r.height || r.bottom < 0 || r.top > innerHeight) continue;
+          const t = document.elementFromPoint(r.left + 2, r.top + r.height / 2);
+          if (t && (t === el || el.contains(t) || t.contains(el))) out.push(w.currentNode.textContent.trim());
+        }
+        return out.filter(Boolean).join('\n');
+      });
+    },
     note(label, detail = '') { h.checks.push({ label, pass: null, detail }); },
     async text(t, opts = {}) { return page.getByText(t, { exact: opts.exact ?? false }).first(); },
     /** Click the on-screen element with this text (opts.last: prefer the last match, e.g. inside a modal). */
@@ -131,6 +174,14 @@ function makeHelpers(page, role, cleanup) {
     async home() {
       await page.goto(cfg.url, { waitUntil: 'networkidle' });
       await page.waitForTimeout(1200);
+      // The app signs an idle session out; a long run can come back to the login form.
+      if (role !== 'none' && await page.getByPlaceholder('you@practice.com').isVisible().catch(() => false)) {
+        await page.getByPlaceholder('you@practice.com').fill(cfg[role].email);
+        await page.getByPlaceholder('••••••••').fill(cfg[role].password);
+        await page.getByText('Sign In', { exact: true }).click();
+        await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 20_000 });
+        await page.waitForTimeout(2000);
+      }
     },
     cleanup,
   };
@@ -156,12 +207,12 @@ async function login(browser, who) {
   return { context, page, getToken: () => token };
 }
 
-function extractFrame(ts, file) {
+function extractFrame(ts, file, video) {
   if (existsSync(file)) return true;
-  if (!existsSync(cfg.video)) return false;
+  if (!existsSync(video)) return false;
   try {
-    execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-ss', ts, '-i', cfg.video, '-frames:v', '1',
-      '-vf', 'crop=1432:780:8:155', file]);
+    execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-ss', ts, '-i', video, '-frames:v', '1',
+      '-vf', CROP, file]);
     return true;
   } catch { return false; }
 }
@@ -195,10 +246,12 @@ for (const cp of todo) {
   const shot = `app/${cp.id}.png`;
   await page.screenshot({ path: join(OUT, shot) }).catch(() => {});
   const frame = `video/${cp.id}.jpg`;
-  const haveFrame = extractFrame(cp.frameAt ?? cp.ts, join(OUT, frame));
+  const haveFrame = extractFrame(cp.frameAt ?? cp.ts, join(OUT, frame), videoFor(cp));
   const failed = h.checks.some((c) => c.pass === false);
   const passedAny = h.checks.some((c) => c.pass === true);
-  console.log(error ? `ERROR (${error})` : failed ? 'FAIL' : passedAny ? 'pass' : 'look (compare screenshots)');
+  const openAny = h.checks.some((c) => c.pass === 'open');
+  console.log(error ? `ERROR (${error})` : failed ? 'FAIL' : openAny ? 'open (known)' : passedAny ? 'pass' : 'look (compare screenshots)');
+  for (const c of h.checks) console.log(`    ${c.pass === 'open' ? '~' : c.pass === null ? '◦' : c.pass ? '✓' : '✗'} ${c.label}${c.detail ? ` — ${c.detail}` : ''}`);
   results.push({ ...cp, checks: h.checks, error, shot, frame: haveFrame ? frame : null });
   if (cp.role === 'none') await page.context().close();
 }
@@ -211,22 +264,25 @@ await browser.close();
 
 // ---- report ----------------------------------------------------------------
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const status = (r) => r.error ? 'err' : r.checks.some((c) => c.pass === false) ? 'fail'
+  : r.checks.some((c) => c.pass === 'open') ? 'open' : r.checks.some((c) => c.pass === true) ? 'pass' : 'man';
 const badge = (r) => r.error ? '<b class="err">ERROR</b>'
   : r.checks.some((c) => c.pass === false) ? '<b class="fail">FAIL</b>'
+  : r.checks.some((c) => c.pass === 'open') ? '<b class="open">OPEN</b>'
   : r.checks.some((c) => c.pass === true) ? '<b class="pass">PASS</b>' : '<b class="man">LOOK</b>';
 const rows = results.map((r) => `
 <section>
-  <h2>${badge(r)} ${r.id} · <span class="ts">${r.ts}</span> · ${esc(r.title)}</h2>
+  <h2>${badge(r)} ${r.id} · <span class="ts">${r.part ? `${r.part} ` : ''}${r.ts}</span> · ${esc(r.title)}</h2>
   <blockquote>“${esc(r.quote)}”</blockquote>
   <p class="want"><b>What she asked for:</b> ${esc(r.expect)}</p>
   ${r.error ? `<p class="errline">Script error: ${esc(r.error)} (screenshot shows where it stopped; a selector may need updating)</p>` : ''}
-  <ul>${r.checks.map((c) => `<li class="${c.pass === null ? 'man' : c.pass ? 'pass' : 'fail'}">${c.pass === null ? '◦' : c.pass ? '✓' : '✗'} ${esc(c.label)}${c.detail ? ` — <i>${esc(c.detail)}</i>` : ''}</li>`).join('')}</ul>
+  <ul>${r.checks.map((c) => `<li class="${c.pass === 'open' ? 'open' : c.pass === null ? 'man' : c.pass ? 'pass' : 'fail'}">${c.pass === 'open' ? '~' : c.pass === null ? '◦' : c.pass ? '✓' : '✗'} ${esc(c.label)}${c.detail ? ` — <i>${esc(c.detail)}</i>` : ''}</li>`).join('')}</ul>
   <div class="pair">
-    <figure><figcaption>Recording @ ${r.frameAt ?? r.ts}</figcaption>${r.frame ? `<img src="${r.frame}">` : '<div class="nof">frame unavailable</div>'}</figure>
+    <figure><figcaption>Recording${r.part ? ` ${r.part}` : ''} @ ${r.frameAt ?? r.ts}</figcaption>${r.frame ? `<img src="${r.frame}">` : '<div class="nof">frame unavailable</div>'}</figure>
     <figure><figcaption>Live app now (${r.role})</figcaption><img src="${r.shot}"></figure>
   </div>
 </section>`).join('\n');
-const html = `<!doctype html><meta charset="utf-8"><title>Charlene recording vs live app</title>
+const html = `<!doctype html><meta charset="utf-8"><title>${esc(META.title ?? "Charlene's Oct 10 recording vs. the live app")}</title>
 <style>
 body{font:14px/1.45 -apple-system,system-ui,sans-serif;margin:0;padding:24px;background:#f6f7f9;color:#111}
 section{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px 20px;margin:0 0 20px}
@@ -236,13 +292,17 @@ blockquote{margin:0 0 8px;padding:6px 12px;border-left:3px solid #c7d2fe;color:#
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}figure{margin:0}figcaption{font-size:12px;color:#6b7280;margin-bottom:4px}
 img{width:100%;border:1px solid #e5e7eb;border-radius:8px}.nof{padding:40px;text-align:center;color:#9ca3af;border:1px dashed #d1d5db;border-radius:8px}
 b.pass{color:#fff;background:#16a34a}b.fail{color:#fff;background:#dc2626}b.err{color:#fff;background:#9333ea}b.man{color:#fff;background:#6b7280}
-b.pass,b.fail,b.err,b.man{font-size:11px;padding:2px 7px;border-radius:999px;margin-right:4px}.errline{color:#7e22ce}
+li.open{color:#b45309}b.open{color:#fff;background:#d97706}
+b.pass,b.fail,b.err,b.man,b.open{font-size:11px;padding:2px 7px;border-radius:999px;margin-right:4px}.errline{color:#7e22ce}
 @media(max-width:900px){.pair{grid-template-columns:1fr}}
 </style>
-<h1>Charlene's Oct 10 recording vs. the live app</h1>
+<h1>${esc(META.title ?? "Charlene's Oct 10 recording vs. the live app")}</h1>
+${META.intro ? `<p>${META.intro}</p>` : ''}
 <p>${new Date().toLocaleString()} · ${esc(cfg.url)} · ${WRITE ? 'read + write mode' : 'read-only mode'} ·
-${results.filter((r) => !r.error && !r.checks.some((c) => c.pass === false) && r.checks.some((c) => c.pass)).length} pass,
-${results.filter((r) => r.checks.some((c) => c.pass === false)).length} fail,
+${results.filter((r) => status(r) === 'pass').length} pass,
+${results.filter((r) => status(r) === 'fail').length} fail,
+${results.filter((r) => status(r) === 'open').length} known-open,
+${results.filter((r) => status(r) === 'man').length} look,
 ${results.filter((r) => r.error).length} script errors${skipped.length ? `, ${skipped.length} booking checkpoints skipped (run with --write)` : ''}</p>
 ${rows}`;
 writeFileSync(join(OUT, 'report.html'), html);

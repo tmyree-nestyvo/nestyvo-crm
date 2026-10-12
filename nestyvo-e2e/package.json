@@ -5,7 +5,9 @@
   "scripts": {
     "compare": "node run.mjs",
     "compare:write": "node run.mjs --write",
-    "compare:headed": "node run.mjs --headed"
+    "compare:headed": "node run.mjs --headed",
+    "compare:fullpass": "node run.mjs --set fullpass",
+    "compare:fullpass:write": "node run.mjs --set fullpass --write"
   },
   "devDependencies": {
     "playwright": "1.61.1"
