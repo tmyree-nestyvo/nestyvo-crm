@@ -106,6 +106,16 @@ export default function ProviderScheduleScreen() {
     }
     return map;
   }, [data?.schedule]);
+  // Dots on the month grid mean real bookings only — a recurring block used
+  // to put a "Booked" dot on every weekday (Full Pass recording, Oct 11 2026).
+  const bookedByDate = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    for (const [iso, appts] of Object.entries(apptsByDate)) {
+      const real = appts.filter((a) => a.source !== 'block');
+      if (real.length) map[iso] = real;
+    }
+    return map;
+  }, [apptsByDate]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -274,7 +284,7 @@ export default function ProviderScheduleScreen() {
               >
                 <MonthCalendarGrid
                   year={year} month={month} today={today} selectedDate={selectedDate}
-                  apptsByDate={apptsByDate}
+                  apptsByDate={bookedByDate}
                   openDates={openDates}
                   compact
                   onPrevMonth={() => setMonth((m) => { if (m === 0) { setYear((y) => y - 1); return 11; } return m - 1; })}

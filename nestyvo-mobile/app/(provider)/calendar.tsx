@@ -77,6 +77,16 @@ export default function ProviderCalendarScreen() {
     for (const key of Object.keys(map)) map[key].sort((a, b) => a.startAt.localeCompare(b.startAt));
     return map;
   }, [schedule]);
+  // Dots on the month grid mean real bookings only — a recurring block used
+  // to put a "Booked" dot on every weekday (Full Pass recording, Oct 11 2026).
+  const bookedByDate = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    for (const [iso, appts] of Object.entries(apptsByDate)) {
+      const real = appts.filter((a) => a.source !== 'block');
+      if (real.length) map[iso] = real;
+    }
+    return map;
+  }, [apptsByDate]);
 
   const goToDay = (iso: string) => {
     setSelectedDate(iso);
@@ -124,7 +134,7 @@ export default function ProviderCalendarScreen() {
       ) : viewMode === 'month' ? (
         <MonthCalendarGrid
           year={year} month={month} today={today} selectedDate={selectedDate}
-          apptsByDate={apptsByDate}
+          apptsByDate={bookedByDate}
           onPrevMonth={() => setMonth((m) => { if (m === 0) { setYear((y) => y - 1); return 11; } return m - 1; })}
           onNextMonth={() => setMonth((m) => { if (m === 11) { setYear((y) => y + 1); return 0; } return m + 1; })}
           onSelectDay={goToDay}

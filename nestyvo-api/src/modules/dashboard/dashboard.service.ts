@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, Not, Between, MoreThanOrEqual } from 'typeorm';
+import { Repository, In, Not, Between, MoreThan, MoreThanOrEqual } from 'typeorm';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Provider, ACTIVE_PROVIDER_WHERE } from '../../database/entities/provider.entity';
 import { Appointment, AppointmentStatus } from '../../database/entities/appointment.entity';
@@ -85,7 +85,7 @@ export class DashboardService {
         }),
 
         this.fillOpRepo.count({
-          where: { providerId: In(providerIds), status: FillOpportunityStatus.OPEN },
+          where: { providerId: In(providerIds), status: FillOpportunityStatus.OPEN, slotStartAt: MoreThan(new Date()) },
         }),
 
         this.waitlistRepo.count({
@@ -499,7 +499,7 @@ export class DashboardService {
 
     const [opps, waitlistEntries] = await Promise.all([
       this.fillOpRepo.find({
-        where: { providerId: In(providerIds), status: FillOpportunityStatus.OPEN },
+        where: { providerId: In(providerIds), status: FillOpportunityStatus.OPEN, slotStartAt: MoreThan(new Date()) },
         relations: { provider: true, sourceAppointment: { patient: true }, appointmentType: true },
         order: { slotStartAt: 'ASC' },
       }),
@@ -552,6 +552,9 @@ export class DashboardService {
     );
   }
 
+  // Open cancellations only count while the slot is still ahead (Charlene's
+  // Full Pass recording, Oct 11 2026: the waitlist offered "Cancellation open
+  // Wed, Oct 7" on Oct 11 — an opportunity stays OPEN after its time passes).
   async getAgentWaitlist(user: User): Promise<any[]> {
     const providerIds = await this.getScopedProviderIds(user);
     if (!providerIds.length) return [];
@@ -563,7 +566,7 @@ export class DashboardService {
         order: { providerId: 'ASC', priorityScore: 'DESC', dateAdded: 'ASC' },
       }),
       this.fillOpRepo.find({
-        where: { providerId: In(providerIds), status: FillOpportunityStatus.OPEN },
+        where: { providerId: In(providerIds), status: FillOpportunityStatus.OPEN, slotStartAt: MoreThan(new Date()) },
         order: { slotStartAt: 'ASC' },
       }),
     ]);

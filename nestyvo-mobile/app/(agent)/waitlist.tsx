@@ -66,9 +66,15 @@ function WaitlistCard({ entry, showProvider }: { entry: any; showProvider?: bool
       ) : null}
 
       <View className="flex-row items-start justify-between gap-2">
-        <View className="flex-1">
+        {/* Tapping the client opens their profile (Full Pass recording, Oct 11
+            2026: "you can't click on the client"). */}
+        <TouchableOpacity
+          className="flex-1"
+          activeOpacity={0.7}
+          onPress={() => router.push({ pathname: '/(agent)/patients/[id]', params: { id: entry.patient.id, returnTo: '/(agent)/waitlist' } })}
+        >
           <View className="flex-row items-center gap-2 flex-wrap">
-            <Text className="text-gray-900 font-semibold text-sm">{entry.patient.name}</Text>
+            <Text className="text-primary-700 font-semibold text-sm">{entry.patient.name}</Text>
             <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: cfg.bg }}>
               <Text className="text-xs font-medium" style={{ color: cfg.color }}>{cfg.label}</Text>
             </View>
@@ -78,7 +84,8 @@ function WaitlistCard({ entry, showProvider }: { entry: any; showProvider?: bool
             Waiting {entry.daysWaiting === 0 ? 'since today' : `${entry.daysWaiting}d`}
             {entry.appointmentType ? ` · ${entry.appointmentType}` : ''}
           </Text>
-        </View>
+          {entry.notes ? <Text className="text-gray-500 text-xs mt-1">{entry.notes}</Text> : null}
+        </TouchableOpacity>
 
         {entry.patient.phone ? (
           <TouchableOpacity
@@ -141,7 +148,7 @@ export default function WaitlistScreen() {
         <View className="flex-1">
           <Text className="text-xl font-bold text-gray-900">Waitlist</Text>
           <Text className="text-xs text-gray-400 mt-0.5">
-            {data.length} patient{data.length !== 1 ? 's' : ''} waiting
+            {data.length} client{data.length !== 1 ? 's' : ''} waiting
             {matchCount > 0 ? ` · ${matchCount} match${matchCount !== 1 ? 'es' : ''} an open cancellation` : ''}
           </Text>
         </View>

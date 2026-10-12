@@ -26,6 +26,16 @@ class CreatePatientDto {
   @IsOptional() @IsString() tagId?: string;
 }
 
+class UpdatePatientDto {
+  @IsOptional() @IsString() firstName?: string;
+  @IsOptional() @IsString() lastName?: string;
+  @IsOptional() @IsString() phone?: string;
+  @IsOptional() @IsString() email?: string;
+  @IsOptional() @IsString() dob?: string;
+  @IsOptional() @IsEnum(PreferredContact) preferredContact?: PreferredContact;
+  @IsOptional() @IsString() referralSource?: string;
+}
+
 class ImportClientsDto {
   @IsOptional() @IsString() practiceId?: string;
   @IsOptional() @IsString() assignedProviderId?: string;
@@ -73,10 +83,20 @@ export class PatientsController {
     return this.patientsService.getRoster(user);
   }
 
+  // Full Pass recording (Oct 11 2026) — providers get a full client
+  // profile too (details, tag, appointments), limited to their own clients
+  // by PatientsService.assertCanAccess.
   @Get(':id')
-  @Roles(...OFFICE_STAFF)
-  findOne(@Param('id') id: string) {
+  @Roles(...ALL_STAFF)
+  async findOne(@Param('id') id: string, @CurrentUser() user: User) {
+    await this.patientsService.assertCanAccess(id, user);
     return this.patientsService.findById(id);
+  }
+
+  @Patch(':id')
+  @Roles(...ALL_STAFF)
+  update(@Param('id') id: string, @Body() dto: UpdatePatientDto, @CurrentUser() user: User) {
+    return this.patientsService.update(id, dto as any, user);
   }
 
   @Get(':id/attempts')
@@ -86,7 +106,7 @@ export class PatientsController {
   }
 
   @Patch(':id/tag')
-  @Roles(...OFFICE_STAFF)
+  @Roles(...ALL_STAFF)
   setTag(@Param('id') id: string, @Body() dto: SetTagDto, @CurrentUser() user: User) {
     return this.patientsService.setTag(id, dto.tagId ?? null, user);
   }

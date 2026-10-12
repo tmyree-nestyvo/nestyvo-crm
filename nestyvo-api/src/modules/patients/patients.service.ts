@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike, In, Raw } from 'typeorm';
 import { Patient, PreferredContact } from '../../database/entities/patient.entity';
@@ -80,6 +80,59 @@ export class PatientsService {
     }));
   }
 
+  /**
+   * A provider may open and edit only their own clients: assigned to them,
+   * or seen by them. Office staff keep their existing access.
+   */
+  async assertCanAccess(patientId: string, user: User): Promise<void> {
+    if (user.role !== UserRole.PROVIDER) return;
+    const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
+    const patient = await this.patientRepo.findOne({ where: { id: patientId } });
+    if (!patient) throw new NotFoundException('Patient not found');
+    if (provider && patient.assignedProviderId === provider.id) return;
+    if (provider && (await this.appointmentRepo.count({ where: { patientId, providerId: provider.id } })) > 0) return;
+    throw new ForbiddenException('Not one of your clients');
+  }
+
+  async update(
+    id: string,
+    dto: Partial<Pick<Patient, 'firstName' | 'lastName' | 'phone' | 'email' | 'dob' | 'preferredContact' | 'referralSource'>>,
+    user: User,
+  ) {
+    await this.assertCanAccess(id, user);
+    const patient = await this.patientRepo.findOne({ where: { id } });
+    if (!patient) throw new NotFoundException('Patient not found');
+
+    const fields = ['firstName', 'lastName', 'phone', 'email', 'dob', 'preferredContact', 'referralSource'] as const;
+    const oldValues: Record<string, any> = {};
+    const newValues: Record<string, any> = {};
+    for (const k of fields) {
+      if (dto[k] === undefined) continue;
+      let v: any = typeof dto[k] === 'string' ? (dto[k] as string).trim() : dto[k];
+      if ((k === 'firstName' || k === 'lastName') && !v) throw new BadRequestException('First and last name are required');
+      if (v === '') v = null;
+      if (v !== (patient as any)[k]) {
+        oldValues[k] = (patient as any)[k];
+        newValues[k] = v;
+        (patient as any)[k] = v;
+      }
+    }
+    if (Object.keys(newValues).length) {
+      await this.patientRepo.save(patient);
+      await this.auditRepo.save(
+        this.auditRepo.create({
+          userId: user.id,
+          action: 'patient.update',
+          resourceType: 'patient',
+          resourceId: id,
+          oldValues,
+          newValues,
+        }),
+      );
+    }
+    return this.findById(id);
+  }
+
   async findById(id: string): Promise<any> {
     const patient = await this.patientRepo.findOne({
       where: { id },
@@ -97,6 +150,8 @@ export class PatientsService {
     return {
       id: patient.id,
       name: `${patient.firstName} ${patient.lastName}`,
+      firstName: patient.firstName,
+      lastName: patient.lastName,
       dob: patient.dob,
       phone: patient.phone,
       email: patient.email,
@@ -187,8 +242,12 @@ export class PatientsService {
         (a) => new Date(a.startAt) > now && a.status === AppointmentStatus.SCHEDULED,
       );
 
+      // A client added in the last 90 days with nothing booked yet is new,
+      // not inactive (Charlene's Full Pass recording, Oct 11 2026: every
+      // client she had just imported landed under Inactive).
+      const isNew = appts.length === 0 && new Date(p.createdAt) >= ninetyDaysAgo;
       const isActive = !!(
-        (lastAppt && new Date(lastAppt.startAt) >= ninetyDaysAgo) || nextAppt
+        (lastAppt && new Date(lastAppt.startAt) >= ninetyDaysAgo) || nextAppt || isNew
       );
 
       let age: number | null = null;
@@ -459,6 +518,7 @@ export class PatientsService {
   }
 
   async setTag(patientId: string, tagId: string | null, user: User) {
+    await this.assertCanAccess(patientId, user);
     const patient = await this.patientRepo.findOne({ where: { id: patientId } });
     if (!patient) throw new NotFoundException('Patient not found');
 

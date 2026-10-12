@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import { Alert } from '../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, providersApi, waitlistApi, appointmentTypesApi } from '../../lib/api';
@@ -32,10 +33,13 @@ function useRoster() {
   });
 }
 
-const TYPE_CONFIG: Record<string, { color: string; icon: any }> = {
-  urgent: { color: '#dc2626', icon: 'alert-circle' },
-  new_patient: { color: '#2563eb', icon: 'person-add' },
-  followup: { color: '#7c3aed', icon: 'refresh' },
+// Labels spelled out rather than derived from the stored code — the code is
+// still `new_patient`, which used to show as "New Patient" (Full Pass
+// recording, Oct 11 2026).
+const TYPE_CONFIG: Record<string, { color: string; icon: any; label: string }> = {
+  urgent: { color: '#dc2626', icon: 'alert-circle', label: 'Urgent' },
+  new_patient: { color: '#2563eb', icon: 'person-add', label: 'New Client' },
+  followup: { color: '#7c3aed', icon: 'refresh', label: 'Follow-up' },
 };
 
 const WAITLIST_TYPES = [
@@ -209,9 +213,16 @@ export default function ProviderWaitlistScreen() {
             </View>
           }
           renderItem={({ item }) => {
-            const cfg = TYPE_CONFIG[item.type] ?? { color: '#6b7280', icon: 'person' };
+            const cfg = TYPE_CONFIG[item.type] ?? { color: '#6b7280', icon: 'person', label: 'Waiting' };
             return (
-              <View className="bg-white rounded-xl border border-gray-100 px-4 py-4 mb-2">
+              // Tapping an entry opens the client (Full Pass recording: "I want
+              // to see what… Jane Doe… I just can't open it").
+              <TouchableOpacity
+                activeOpacity={0.7}
+                disabled={!item.patientId}
+                onPress={() => router.push({ pathname: '/(provider)/clients/[id]', params: { id: item.patientId, name: item.patient } })}
+                className="bg-white rounded-xl border border-gray-100 px-4 py-4 mb-2"
+              >
                 <View className="flex-row items-center gap-3">
                   <View
                     className="w-8 h-8 rounded-full items-center justify-center flex-shrink-0"
@@ -226,8 +237,8 @@ export default function ProviderWaitlistScreen() {
                     </Text>
                   </View>
                   <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: `${cfg.color}18` }}>
-                    <Text className="text-xs font-medium capitalize" style={{ color: cfg.color }}>
-                      {item.type?.replace('_', ' ')}
+                    <Text className="text-xs font-medium" style={{ color: cfg.color }}>
+                      {cfg.label}
                     </Text>
                   </View>
                   <TouchableOpacity onPress={() => removeMutation.mutate(item.id)} className="pl-1">
@@ -251,7 +262,8 @@ export default function ProviderWaitlistScreen() {
                     ))}
                   </View>
                 )}
-              </View>
+                {item.notes ? <Text className="text-gray-500 text-xs mt-2.5 leading-4">{item.notes}</Text> : null}
+              </TouchableOpacity>
             );
           }}
         />

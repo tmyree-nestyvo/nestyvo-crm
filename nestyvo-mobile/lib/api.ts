@@ -91,6 +91,15 @@ export const patientsApi = {
     referralSource?: string;
     tagId?: string;
   }) => api.post('/patients', input).then((r) => r.data),
+  update: (id: string, input: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    email?: string;
+    dob?: string;
+    preferredContact?: string;
+    referralSource?: string;
+  }) => api.patch(`/patients/${id}`, input).then((r) => r.data),
   // Charlene, Oct 6 2026 (Tax Refund 1040 pilot, item 8).
   import: (input: { practiceId: string; assignedProviderId?: string; csvText: string }) =>
     api.post('/patients/import', input).then((r) => r.data),

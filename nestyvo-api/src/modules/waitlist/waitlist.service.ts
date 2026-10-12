@@ -83,6 +83,8 @@ export class WaitlistService {
     return entries.map((e) => ({
       id: e.id,
       patient: `${e.patient.firstName} ${e.patient.lastName}`,
+      patientId: e.patientId,
+      notes: e.notes ?? null,
       type: e.waitlistType,
       appointmentType: e.appointmentType?.name,
       daysWaiting: Math.floor((Date.now() - new Date(e.dateAdded).getTime()) / 86_400_000),
@@ -102,6 +104,8 @@ export class WaitlistService {
     return entries.map((e) => ({
       id: e.id,
       patient: `${e.patient.firstName} ${e.patient.lastName}`,
+      patientId: e.patientId,
+      notes: e.notes ?? null,
       type: e.waitlistType,
       appointmentType: e.appointmentType?.name,
       daysWaiting: Math.floor((Date.now() - new Date(e.dateAdded).getTime()) / 86_400_000),

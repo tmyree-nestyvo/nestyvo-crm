@@ -199,7 +199,7 @@ export default function CallbacksScreen() {
         <View className="flex-1">
           <Text className="text-xl font-bold text-gray-900">Open Callbacks</Text>
           <Text className="text-xs text-gray-400 mt-0.5">
-            {data.length} patient{data.length !== 1 ? 's' : ''} to call back
+            {data.length} client{data.length !== 1 ? 's' : ''} to call back
           </Text>
         </View>
         <TouchableOpacity

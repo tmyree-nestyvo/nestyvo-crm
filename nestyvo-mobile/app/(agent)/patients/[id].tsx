@@ -48,7 +48,10 @@ function timeAgo(iso: string) {
 }
 
 export default function PatientDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, returnTo } = useLocalSearchParams<{ id: string; returnTo?: string }>();
+  // Opened from a list that passes returnTo (e.g. the Waitlist) → Back goes
+  // there; otherwise the previous screen, as before.
+  const goBack = () => (returnTo ? router.replace(returnTo as any) : router.back());
   const { role } = useAuthStore();
   const { data: patient, isLoading } = usePatient(id);
   const { data: attempts = [] } = useAttempts(id);
@@ -66,7 +69,7 @@ export default function PatientDetailScreen() {
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
       {/* Header */}
       <View className="px-5 pt-3 pb-4 flex-row items-center gap-3 bg-white border-b border-gray-100">
-        <TouchableOpacity onPress={() => router.back()} className="p-1">
+        <TouchableOpacity onPress={goBack} className="p-1">
           <Ionicons name="arrow-back" size={22} color="#374151" />
         </TouchableOpacity>
         <HomeButton href="/(agent)" />

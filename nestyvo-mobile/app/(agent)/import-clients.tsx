@@ -46,6 +46,10 @@ export default function ImportClientsScreen() {
   const queryClient = useQueryClient();
 
   const effectivePracticeId = isCrossPractice ? (practice?.id ?? params.presetPracticeId) : myPracticeId ?? undefined;
+  // Started from a provider's page → import into that provider and practice
+  // only; no pickers (Charlene, Full Pass recording Oct 11 2026: "you'd only
+  // always want to import to the one that you're already working on").
+  const locked = !!(params.presetPracticeId && params.presetProviderId);
 
   const { data: practices = [] } = useQuery({
     queryKey: ['practices'],
@@ -160,7 +164,17 @@ export default function ImportClientsScreen() {
           </View>
         ) : (
           <>
-            {isCrossPractice && (
+            {locked ? (
+              <View className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 mb-5">
+                <Text className="text-gray-500 text-xs font-medium">Importing into</Text>
+                <Text className="text-gray-900 text-sm font-semibold mt-0.5">
+                  {[practices.find((p: any) => p.id === params.presetPracticeId)?.name, params.presetProviderName].filter(Boolean).join(' · ')}
+                </Text>
+                <Text className="text-gray-400 text-xs mt-1">Every client in the file is added to this practice and assigned to this provider.</Text>
+              </View>
+            ) : null}
+
+            {isCrossPractice && !locked && (
               <>
                 <Text className="text-gray-500 text-xs font-medium mb-2">Business / Practice</Text>
                 <TouchableOpacity
@@ -173,7 +187,9 @@ export default function ImportClientsScreen() {
               </>
             )}
 
-            <Text className="text-gray-500 text-xs font-medium mb-2">Provider (optional)</Text>
+{!locked && (
+              <>
+                        <Text className="text-gray-500 text-xs font-medium mb-2">Provider (optional)</Text>
             <TouchableOpacity
               onPress={() => setProviderPickerOpen(true)}
               disabled={!effectivePracticeId}
@@ -185,6 +201,8 @@ export default function ImportClientsScreen() {
               <Ionicons name="chevron-down" size={16} color="#9ca3af" />
             </TouchableOpacity>
             <Text className="text-gray-400 text-xs mb-5">Leave unset to import clients without a provider assigned.</Text>
+              </>
+            )}
 
             <Text className="text-gray-500 text-xs font-medium mb-2">Client Directory (CSV)</Text>
             <Text className="text-gray-400 text-xs mb-3">
