@@ -7,6 +7,7 @@ import { AuditLog } from '../../database/entities/audit-log.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { Provider } from '../../database/entities/provider.entity';
 import { ClientTag } from '../../database/entities/client-tag.entity';
+import { WaitlistEntry, WaitlistEntryStatus } from '../../database/entities/waitlist-entry.entity';
 
 @Injectable()
 export class PatientsService {
@@ -16,6 +17,7 @@ export class PatientsService {
     @InjectRepository(AuditLog) private auditRepo: Repository<AuditLog>,
     @InjectRepository(Provider) private providerRepo: Repository<Provider>,
     @InjectRepository(ClientTag) private tagRepo: Repository<ClientTag>,
+    @InjectRepository(WaitlistEntry) private waitlistRepo: Repository<WaitlistEntry>,
   ) {}
 
   async search(query: string, user: User): Promise<any[]> {
@@ -147,6 +149,14 @@ export class PatientsService {
       take: 10,
     });
 
+    // Patient.waitlistStatus is never updated when someone is added to or
+    // removed from the waitlist, so the profile couldn't tell they were on it
+    // (Charlene, Oct 14 "Last Review" — Add to Waitlist on the profile).
+    // Read it from the waitlist itself.
+    const onWaitlist = await this.waitlistRepo.exists({
+      where: { patientId: id, status: WaitlistEntryStatus.ACTIVE },
+    });
+
     return {
       id: patient.id,
       name: `${patient.firstName} ${patient.lastName}`,
@@ -157,7 +167,7 @@ export class PatientsService {
       email: patient.email,
       preferredContact: patient.preferredContact,
       referralSource: patient.referralSource,
-      waitlistStatus: patient.waitlistStatus,
+      waitlistStatus: onWaitlist ? 'active' : patient.waitlistStatus === 'scheduled' ? 'scheduled' : 'none',
       practiceId: patient.practiceId,
       practiceName: patient.practice.name,
       assignedProviderId: patient.assignedProviderId ?? null,
