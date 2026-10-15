@@ -37,9 +37,14 @@ function todayPT() {
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: TZ });
 }
+// Date-only values are built at local noon, not midnight: isoDate() reads the
+// date in Pacific time, and local midnight anywhere east of Pacific is still
+// the previous day there — the week started a day early and Day view's arrows
+// didn't move for anyone outside Pacific (found Oct 14 checking the new week
+// arrows from an Eastern-time browser).
 function startOfWeek(iso: string) {
   const [y, m, d] = iso.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
+  const date = new Date(y, m - 1, d, 12);
   date.setDate(date.getDate() - date.getDay());
   return date;
 }
@@ -169,11 +174,11 @@ function WeekView({
   // Charlene, Oct 14 "Last Review" (7:04): the week view was stuck on the
   // current week — other weeks were only reachable through Month view.
   const shiftWeek = (delta: number) => {
-    const d = new Date(selectedDate + 'T00:00:00');
+    const d = new Date(selectedDate + 'T12:00:00');
     d.setDate(d.getDate() + delta * 7);
     onSelectDay(isoDate(d));
   };
-  const fmt = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const fmt = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   return (
     <ScrollView className="flex-1" contentContainerClassName="px-5 pb-8">
@@ -190,7 +195,7 @@ function WeekView({
       </View>
       <View className="flex-row mb-4">
         {days.map((iso) => {
-          const d = new Date(iso + 'T00:00:00');
+          const d = new Date(iso + 'T12:00:00');
           const isToday = iso === today;
           const isSelected = iso === selectedDate;
           const count = apptsByDate[iso]?.length ?? 0;
@@ -214,7 +219,7 @@ function WeekView({
       {days.map((iso) => {
         const appts = apptsByDate[iso] ?? [];
         if (appts.length === 0) return null;
-        const d = new Date(iso + 'T00:00:00');
+        const d = new Date(iso + 'T12:00:00');
         return (
           <View key={iso} className="mb-4">
             <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
@@ -234,11 +239,11 @@ function DayView({
   selectedDate, today, appts, onChangeDate, providerId,
 }: { selectedDate: string; today: string; appts: any[]; onChangeDate: (iso: string) => void; providerId?: string }) {
   const shift = (delta: number) => {
-    const d = new Date(selectedDate + 'T00:00:00');
+    const d = new Date(selectedDate + 'T12:00:00');
     d.setDate(d.getDate() + delta);
     onChangeDate(isoDate(d));
   };
-  const label = new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
+  const label = new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric',
   });
 
@@ -305,7 +310,7 @@ function JournalView({
         </View>
       ) : (
         dates.map((iso) => {
-          const d = new Date(iso + 'T00:00:00');
+          const d = new Date(iso + 'T12:00:00');
           return (
             <View key={iso} className="mb-4">
               <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
