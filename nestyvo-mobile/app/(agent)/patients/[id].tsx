@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, patientLinksApi, clientTagsApi, ticketsApi, waitlistApi } from '../../../lib/api';
 import { AppointmentCard } from '../../../components/dashboard/AppointmentCard';
 import { HomeButton } from '../../../components/HomeButton';
+import { ClientDetailsCard } from '../../../components/ClientDetailsCard';
 import { useAuthStore } from '../../../lib/store';
 import { hasRole, ADMIN_ONLY, OFFICE_STAFF } from '../../../lib/role-groups';
 
@@ -91,18 +92,8 @@ export default function PatientDetailScreen() {
       </View>
 
       <ScrollView className="flex-1" contentContainerClassName="px-5 py-5 pb-10">
-        {/* Contact Info */}
-        <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
-          <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Contact</Text>
-          <InfoRow
-            icon="call-outline"
-            label="Phone"
-            value={patient?.phone ?? '—'}
-            onPress={patient?.phone ? () => Linking.openURL(`tel:${patient.phone.replace(/\D/g, '')}`) : undefined}
-          />
-          <InfoRow icon="mail-outline" label="Email" value={patient?.email ?? '—'} />
-          <InfoRow icon="chatbubble-outline" label="Preferred" value={patient?.preferredContact ?? '—'} />
-        </View>
+        {/* Contact Info — editable (Charlene, Oct 14 "Last Review" 13:24) */}
+        {patient && <ClientDetailsCard client={patient} />}
 
         {/* Provider + Status */}
         <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">

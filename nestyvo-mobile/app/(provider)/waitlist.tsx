@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Modal, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Alert } from '../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, providersApi, waitlistApi, appointmentTypesApi } from '../../lib/api';
+import { api, providersApi, waitlistApi } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
+import { AddToWaitlistModal } from '../../components/AddToWaitlistModal';
 
 // Charlene, Oct 5 2026 — this screen was read-only before (view your
 // waitlist, no way to actually add or remove anyone). POST /waitlist
@@ -41,130 +42,6 @@ const TYPE_CONFIG: Record<string, { color: string; icon: any; label: string }> =
   new_patient: { color: '#2563eb', icon: 'person-add', label: 'New Client' },
   followup: { color: '#7c3aed', icon: 'refresh', label: 'Follow-up' },
 };
-
-const WAITLIST_TYPES = [
-  { id: 'new_patient', label: 'New Client' },
-  { id: 'followup', label: 'Follow-up' },
-  { id: 'urgent', label: 'Urgent' },
-];
-
-function AddToWaitlistModal({ visible, onClose, providerId }: { visible: boolean; onClose: () => void; providerId: string }) {
-  const queryClient = useQueryClient();
-  const [step, setStep] = useState<'client' | 'details'>('client');
-  const [patient, setPatient] = useState<{ id: string; name: string } | null>(null);
-  const [waitlistType, setWaitlistType] = useState('followup');
-  const [appointmentTypeId, setAppointmentTypeId] = useState<string | null>(null);
-
-  const { data: roster } = useQuery({
-    queryKey: ['provider-roster'],
-    queryFn: () => api.get('/patients/roster').then((r) => r.data),
-    enabled: visible,
-  });
-  const { data: types = [] } = useQuery({
-    queryKey: ['appointment-types', providerId],
-    queryFn: () => appointmentTypesApi.list(providerId),
-    enabled: visible,
-  });
-  const activeClients = [...(roster?.active ?? [])];
-
-  const reset = () => {
-    setStep('client');
-    setPatient(null);
-    setWaitlistType('followup');
-    setAppointmentTypeId(null);
-  };
-
-  const addMutation = useMutation({
-    mutationFn: () =>
-      waitlistApi.add({
-        patientId: patient!.id,
-        waitlistType,
-        appointmentTypeId: appointmentTypeId ?? undefined,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['provider-waitlist'] });
-      reset();
-      onClose();
-    },
-    onError: (err: any) => Alert.alert("Couldn't add to waitlist", err?.response?.data?.message || 'Please try again.'),
-  });
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 justify-end bg-black/40">
-        <View className="bg-white rounded-t-3xl px-5 pt-5 pb-10 max-h-[80%]">
-          <View className="flex-row items-center justify-between mb-4">
-            <Text className="text-base font-bold text-gray-900">
-              {step === 'client' ? 'Add to Waitlist' : patient?.name}
-            </Text>
-            <TouchableOpacity onPress={() => { reset(); onClose(); }}>
-              <Ionicons name="close" size={20} color="#9ca3af" />
-            </TouchableOpacity>
-          </View>
-
-          {step === 'client' ? (
-            <ScrollView>
-              {activeClients.length === 0 ? (
-                <Text className="text-gray-400 text-sm text-center py-8">No clients yet.</Text>
-              ) : (
-                activeClients.map((p: any) => (
-                  <TouchableOpacity
-                    key={p.id}
-                    onPress={() => { setPatient({ id: p.id, name: `${p.firstName} ${p.lastName}` }); setStep('details'); }}
-                    className="flex-row items-center justify-between px-4 py-3.5 rounded-xl border border-gray-100 bg-gray-50 mb-2"
-                  >
-                    <Text className="text-gray-800 font-medium text-sm">{p.firstName} {p.lastName}</Text>
-                    <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
-                  </TouchableOpacity>
-                ))
-              )}
-            </ScrollView>
-          ) : (
-            <ScrollView>
-              <Text className="text-gray-500 text-xs font-medium mb-2">Waiting for</Text>
-              <View className="flex-row flex-wrap gap-2 mb-4">
-                {WAITLIST_TYPES.map((t) => (
-                  <TouchableOpacity
-                    key={t.id}
-                    onPress={() => setWaitlistType(t.id)}
-                    className={`px-3 py-1.5 rounded-full border ${waitlistType === t.id ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`}
-                  >
-                    <Text className={`text-xs font-medium ${waitlistType === t.id ? 'text-white' : 'text-gray-600'}`}>{t.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {types.length > 0 && (
-                <>
-                  <Text className="text-gray-500 text-xs font-medium mb-2">Appointment type (optional)</Text>
-                  <View className="flex-row flex-wrap gap-2 mb-4">
-                    {types.filter((t: any) => t.isActive).map((t: any) => (
-                      <TouchableOpacity
-                        key={t.id}
-                        onPress={() => setAppointmentTypeId(appointmentTypeId === t.id ? null : t.id)}
-                        className={`px-3 py-1.5 rounded-full border ${appointmentTypeId === t.id ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`}
-                      >
-                        <Text className={`text-xs font-medium ${appointmentTypeId === t.id ? 'text-white' : 'text-gray-600'}`}>{t.name}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </>
-              )}
-
-              <TouchableOpacity
-                onPress={() => addMutation.mutate()}
-                disabled={addMutation.isPending}
-                className="bg-primary-600 rounded-xl py-3.5 items-center"
-              >
-                {addMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-semibold text-sm">Add to Waitlist</Text>}
-              </TouchableOpacity>
-            </ScrollView>
-          )}
-        </View>
-      </View>
-    </Modal>
-  );
-}
 
 export default function ProviderWaitlistScreen() {
   const { data, isLoading } = useWaitlist();
@@ -269,7 +146,7 @@ export default function ProviderWaitlistScreen() {
         />
       )}
 
-      {self && <AddToWaitlistModal visible={addModal} onClose={() => setAddModal(false)} providerId={self.id} />}
+      {self && <AddToWaitlistModal visible={addModal} onClose={() => setAddModal(false)} providerId={self.id} practiceId={self.practiceId} />}
     </SafeAreaView>
   );
 }

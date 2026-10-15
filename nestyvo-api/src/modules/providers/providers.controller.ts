@@ -290,13 +290,29 @@ export class ProvidersController {
     const provider = await this.providersService.findByUserId(user.id);
     if (!provider) throw new ForbiddenException('Not a provider account');
 
+    // Every upcoming block, not just 30 days — the provider's Block Time
+    // screen lists recurring series end to end, like the admin's does.
     const now = new Date();
-    const thirtyDays = new Date(now.getTime() + 30 * 86_400_000);
     const blocks = await this.blockRepo.find({
       where: { providerId: provider.id },
       order: { startAt: 'ASC' },
     });
-    return blocks.filter((b) => b.endAt >= now && b.startAt <= thirtyDays);
+    return blocks.filter((b) => b.endAt >= now);
+  }
+
+  // Charlene, Oct 14 "Last Review" (10:40–11:10): the provider's Block Time
+  // screen should match the admin's, including removing a block or a whole
+  // recurring series. Declared before ":id/blocks/:blockId" for the same
+  // route-ordering reason as self/blocks above.
+  @Delete('self/blocks/:blockId')
+  @Roles(...PROVIDER_ONLY)
+  async deleteSelfBlock(@Param('blockId') blockId: string, @CurrentUser() user: User) {
+    const provider = await this.providersService.findByUserId(user.id);
+    if (!provider) throw new ForbiddenException('Not a provider account');
+    const block = await this.blockRepo.findOne({ where: { id: blockId, providerId: provider.id } });
+    if (!block) throw new NotFoundException('Block not found');
+    await this.blockRepo.remove(block);
+    return { success: true };
   }
 
   @Get(':id/schedule')

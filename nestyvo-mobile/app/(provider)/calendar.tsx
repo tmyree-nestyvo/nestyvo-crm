@@ -166,8 +166,28 @@ function WeekView({
     return isoDate(d);
   });
 
+  // Charlene, Oct 14 "Last Review" (7:04): the week view was stuck on the
+  // current week — other weeks were only reachable through Month view.
+  const shiftWeek = (delta: number) => {
+    const d = new Date(selectedDate + 'T00:00:00');
+    d.setDate(d.getDate() + delta * 7);
+    onSelectDay(isoDate(d));
+  };
+  const fmt = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
   return (
     <ScrollView className="flex-1" contentContainerClassName="px-5 pb-8">
+      <View className="flex-row items-center justify-between mb-3">
+        <TouchableOpacity onPress={() => shiftWeek(-1)} className="p-2" accessibilityLabel="Previous week">
+          <Ionicons name="chevron-back" size={20} color="#374151" />
+        </TouchableOpacity>
+        <Text className="text-sm font-semibold text-gray-900">
+          {fmt(days[0])} – {fmt(days[6])}, {days[6].slice(0, 4)}
+        </Text>
+        <TouchableOpacity onPress={() => shiftWeek(1)} className="p-2" accessibilityLabel="Next week">
+          <Ionicons name="chevron-forward" size={20} color="#374151" />
+        </TouchableOpacity>
+      </View>
       <View className="flex-row mb-4">
         {days.map((iso) => {
           const d = new Date(iso + 'T00:00:00');
@@ -188,6 +208,9 @@ function WeekView({
         })}
       </View>
 
+      {days.every((iso) => !(apptsByDate[iso]?.length)) && (
+        <Text className="text-gray-400 text-sm text-center py-8">Nothing on the calendar this week.</Text>
+      )}
       {days.map((iso) => {
         const appts = apptsByDate[iso] ?? [];
         if (appts.length === 0) return null;

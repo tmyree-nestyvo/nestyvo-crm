@@ -274,7 +274,11 @@ function NewRequestModal({ visible, onClose }: { visible: boolean; onClose: () =
     onClose();
   };
 
-  const needsClient = category === 'outbound_call' || category === 'reschedule_request';
+  // Reschedule Request no longer needs a client — Charlene, Oct 14 "Last
+  // Review" (5:16): "call and clear all my appointments for Friday" is about
+  // a whole day, not one client. Outbound Call still does ("who am I
+  // calling back?").
+  const needsClient = category === 'outbound_call';
   const canSend = !!subject && !!description && (!needsClient || !!patient);
 
   const createTicket = useMutation({
@@ -296,8 +300,8 @@ function NewRequestModal({ visible, onClose }: { visible: boolean; onClose: () =
           <Text className="text-gray-400 text-sm mb-4">Ask the call center to call a client or help with something.</Text>
 
           {/* Oct 10 recording (42:20) — the agent receiving a call-back request
-              had to ask "who am I calling back?" Required for Outbound Call
-              and Reschedule requests; optional for anything else. */}
+              had to ask "who am I calling back?" Required for Outbound Call;
+              optional for anything else. */}
           <Text className="text-gray-500 text-xs font-medium mb-2">Client{needsClient ? ' *' : ' (optional)'}</Text>
           <TouchableOpacity
             onPress={() => setPickerOpen(true)}

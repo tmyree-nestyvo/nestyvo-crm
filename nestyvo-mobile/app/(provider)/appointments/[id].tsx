@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { Alert } from '../../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { providersApi } from '../../../lib/api';
@@ -80,6 +80,19 @@ export default function ProviderAppointmentDetailScreen() {
   // shows (see components/DateTimeSlotPicker.tsx).
   const [newStartAt, setNewStartAt] = useState<string | null>(null);
 
+  // Charlene, Oct 14 "Last Review" (8:50–9:40): after a reschedule, opening
+  // the moved appointment again still showed the Confirm form — this screen
+  // stays mounted, so the half-finished state survived until a hard refresh.
+  // Every visit starts on the plain detail view.
+  useFocusEffect(
+    useCallback(() => {
+      setRescheduling(false);
+      setNewStartAt(null);
+      setCancelModal(false);
+      setCancelReason('');
+    }, [id]),
+  );
+
   const { data: appt, isLoading } = useQuery({
     queryKey: ['appointment-detail', providerId, id],
     queryFn: () => providersApi.getAppointmentDetail(providerId, id),
@@ -110,6 +123,9 @@ export default function ProviderAppointmentDetailScreen() {
       });
     },
     onSuccess: (saved: any) => {
+      setRescheduling(false);
+      setNewStartAt(null);
+      queryClient.invalidateQueries({ queryKey: ['appointment-detail', providerId, id] });
       queryClient.invalidateQueries({ queryKey: ['provider-dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['provider-schedule'] });
       // Oct 10 recording (14:00) — "this screen should wrap up and go back

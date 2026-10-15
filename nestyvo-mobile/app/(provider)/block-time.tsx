@@ -1,113 +1,135 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Alert } from '../../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../lib/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api, providersApi } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
+import { Option, PickerField, TIME_OPTIONS, timeLabel, toMinutes, TZ, BlockList } from '../../components/BlockTimeParts';
 
-const TZ = 'America/Los_Angeles';
-
-// Next 30 days as date strings
-function buildDays() {
-  return Array.from({ length: 30 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    const iso = d.toLocaleDateString('en-CA', { timeZone: TZ });
-    const label = i === 0
-      ? 'Today'
-      : i === 1
-      ? 'Tomorrow'
-      : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: TZ });
-    return { iso, label };
-  });
-}
-
-const HOURS = Array.from({ length: 22 }, (_, i) => {
-  const h = Math.floor(i / 2) + 7; // 7am to 5:30pm
-  const m = i % 2 === 0 ? '00' : '30';
-  const label = new Date(`2000-01-01T${String(h).padStart(2,'0')}:${m}:00`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  return { value: `${String(h).padStart(2,'0')}:${m}`, label };
-});
-
-const BLOCK_TYPES = [
-  { value: 'vacation', label: 'Vacation' },
-  { value: 'personal', label: 'Personal' },
-  { value: 'administrative', label: 'Admin' },
-  { value: 'other', label: 'Other' },
-];
-
-const FREQUENCIES = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-] as const;
+// Charlene, Oct 14 "Last Review" (7:30–8:30, 10:40–11:10): the old screen —
+// rows of date and time chips, plus Type and Reason — was "a little hard for
+// the provider to look at". It now matches the admin's Hours & Blocks card:
+// One-time / Daily / Weekly / Monthly, start and end dropdowns, and the
+// upcoming blocks grouped into collapsible series with "Remove all".
+// Type and Reason are gone ("we don't need type or reason really").
 
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+type Frequency = 'once' | 'daily' | 'weekly' | 'monthly';
+
+function dateOptions(days: number): Option[] {
+  return Array.from({ length: days }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const id = d.toLocaleDateString('en-CA', { timeZone: TZ });
+    const label = i === 0 ? 'Today' : i === 1 ? 'Tomorrow'
+      : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: TZ });
+    return { id, label };
+  });
+}
+const DATES = dateOptions(120);
+const END_DATES = dateOptions(366);
+const dateLabel = (opts: Option[], id: string) => opts.find((o) => o.id === id)?.label ?? id;
 
 export default function BlockTimeScreen() {
-  const days = buildDays();
-  const [selectedDate, setSelectedDate] = useState(days[0].iso);
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('12:00');
-  const [blockType, setBlockType] = useState('other');
-  const [reason, setReason] = useState('');
-  const [repeats, setRepeats] = useState(false);
-  const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
-  const [endDate, setEndDate] = useState(''); // optional YYYY-MM-DD
-  // Weekly recurrence — one or more weekdays (Charlene: needed to block e.g.
-  // Mon/Wed/Fri in one go, not three separate recurring blocks).
-  const [weeklyDays, setWeeklyDays] = useState<number[]>([new Date().getDay()]);
-  const toggleWeeklyDay = (i: number) =>
-    setWeeklyDays((prev) => (prev.includes(i) ? prev.filter((d) => d !== i) : [...prev, i].sort()));
-
   const queryClient = useQueryClient();
+  const [frequency, setFrequency] = useState<Frequency>('once');
+  const [date, setDate] = useState(DATES[0].id);
+  const [weeklyDays, setWeeklyDays] = useState<number[]>([new Date().getDay()]);
+  const [dayOfMonth, setDayOfMonth] = useState('1');
+  const [start, setStart] = useState('09:00');
+  const [end, setEnd] = useState('12:00');
+  const [ends, setEnds] = useState<'indefinite' | 'date'>('indefinite');
+  const [endDate, setEndDate] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  const createBlock = useMutation({
-    mutationFn: () => {
-      if (repeats) {
-        const [y, m, d] = selectedDate.split('-').map(Number);
-        return api.post('/providers/self/recurring-block', {
-          frequency,
-          daysOfWeek: frequency === 'weekly' ? weeklyDays : undefined,
-          dayOfMonth: frequency === 'monthly' ? d : undefined,
-          startTime,
-          endTime,
-          endDate: endDate || undefined,
-          blockType,
-          reason: reason || undefined,
-        });
-      }
-      const startAt = `${selectedDate}T${startTime}:00`;
-      const endAt = `${selectedDate}T${endTime}:00`;
-      return api.post('/providers/self/blocks', { startAt, endAt, blockType, reason: reason || undefined });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['provider-dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['provider-available-slots'] });
-      Alert.alert(
-        'Time Blocked',
-        repeats
-          ? `${startLabel} – ${endLabel}, repeating ${
-              frequency === 'weekly' ? `every ${weeklyDays.map((d) => DAY_LABELS[d]).join(', ')}` : frequency
-            }${endDate ? ` through ${endDate}` : ''}.`
-          : `${selectedLabel} ${startLabel} – ${endLabel} is now blocked.`,
-        [{ text: 'OK', onPress: () => router.back() }],
-      );
-    },
-    onError: () => Alert.alert('Error', 'Could not save block. Please try again.'),
+  const { data: blocks = [], isLoading } = useQuery({
+    queryKey: ['provider-self-blocks'],
+    queryFn: providersApi.getSelfBlocks,
   });
 
-  const selectedDay = days.find((d) => d.iso === selectedDate)!;
-  const selectedLabel = selectedDay?.label ?? selectedDate;
-  const startLabel = HOURS.find((h) => h.value === startTime)?.label ?? startTime;
-  const endLabel = HOURS.find((h) => h.value === endTime)?.label ?? endTime;
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['provider-self-blocks'] });
+    queryClient.invalidateQueries({ queryKey: ['provider-dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['provider-available-slots'] });
+    queryClient.invalidateQueries({ queryKey: ['provider-schedule'] });
+  };
 
-  const startIdx = HOURS.findIndex((h) => h.value === startTime);
-  const validEndHours = HOURS.filter((_, i) => i > startIdx);
+  const resetForm = () => {
+    setFrequency('once');
+    setDate(DATES[0].id);
+    setStart('09:00');
+    setEnd('12:00');
+    setEnds('indefinite');
+    setEndDate(null);
+    setEditingId(null);
+  };
+
+  const toggleDay = (i: number) =>
+    setWeeklyDays((prev) => (prev.includes(i) ? prev.filter((d) => d !== i) : [...prev, i].sort()));
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (toMinutes(start) >= toMinutes(end)) {
+        throw new Error(`Start (${timeLabel(start)}) has to be before end (${timeLabel(end)}).`);
+      }
+      // Editing one date = replace it, same as the admin screen.
+      if (editingId) await providersApi.deleteSelfBlock(editingId);
+      if (frequency === 'once') {
+        return api.post('/providers/self/blocks', { startAt: `${date}T${start}:00`, endAt: `${date}T${end}:00` });
+      }
+      const indefinite = ends === 'indefinite';
+      return api.post('/providers/self/recurring-block', {
+        frequency,
+        daysOfWeek: frequency === 'weekly' ? weeklyDays : undefined,
+        dayOfMonth: frequency === 'monthly' ? Number(dayOfMonth) || 1 : undefined,
+        startTime: start,
+        endTime: end,
+        endDate: indefinite ? undefined : endDate ?? undefined,
+        // Rides the service's own cap, as the admin screen does.
+        weeks: indefinite ? 999 : undefined,
+      });
+    },
+    onSuccess: () => {
+      const wasEditing = !!editingId;
+      resetForm();
+      refresh();
+      Alert.alert(wasEditing ? 'Updated' : 'Time blocked', wasEditing ? 'Block updated.' : 'Your block is saved.');
+    },
+    onError: (err: any) =>
+      Alert.alert("Couldn't save block", err?.response?.data?.message || err?.message || 'Please try again.'),
+  });
+
+  const remove = useMutation({
+    mutationFn: (ids: string[]) => Promise.all(ids.map((id) => providersApi.deleteSelfBlock(id))),
+    onSuccess: refresh,
+    onError: (err: any) => Alert.alert("Couldn't remove block", err?.response?.data?.message || 'Please try again.'),
+  });
+
+  const startEdit = (b: any) => {
+    const s = new Date(b.startAt);
+    setEditingId(b.id);
+    setFrequency('once');
+    setDate(s.toLocaleDateString('en-CA', { timeZone: TZ }));
+    setStart(s.toLocaleTimeString('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }));
+    setEnd(new Date(b.endAt).toLocaleTimeString('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }));
+  };
+
+  const needsDays = frequency === 'weekly' && weeklyDays.length === 0;
+  const needsEndDate = frequency !== 'once' && ends === 'date' && !endDate;
+  const summary =
+    frequency === 'once' ? `${dateLabel(DATES, date)}, ${timeLabel(start)} – ${timeLabel(end)}`
+    : `${frequency === 'daily' ? 'Every day'
+        : frequency === 'weekly' ? `Every ${weeklyDays.map((d) => DAY_LABELS[d]).join(', ') || '…'}`
+        : `Monthly on day ${Number(dayOfMonth) || 1}`}, ${timeLabel(start)} – ${timeLabel(end)}${
+        ends === 'date' && endDate ? `, through ${dateLabel(END_DATES, endDate)}` : ', indefinitely'}`;
+
+  const chip = (active: boolean) =>
+    `px-3 py-1.5 rounded-full border ${active ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`;
+  const chipText = (active: boolean) => `text-xs font-medium ${active ? 'text-white' : 'text-gray-600'}`;
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
@@ -120,209 +142,113 @@ export default function BlockTimeScreen() {
       </View>
 
       <ScrollView className="flex-1" contentContainerClassName="px-5 pb-10">
-
-        {/* Date */}
-        <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Date</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1 mb-5">
-          {days.slice(0, 14).map((d) => {
-            const active = d.iso === selectedDate;
-            return (
-              <TouchableOpacity
-                key={d.iso}
-                onPress={() => setSelectedDate(d.iso)}
-                className={`mx-1 px-4 py-2 rounded-full border ${
-                  active ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'
-                }`}
-              >
-                <Text className={`text-sm font-medium ${active ? 'text-white' : 'text-gray-700'}`}>
-                  {d.label}
-                </Text>
+        <View className="bg-white rounded-2xl border border-gray-100 p-4 mb-5">
+          <View className="flex-row items-center justify-between mb-1">
+            <Text className="text-base font-semibold text-gray-900">{editingId ? 'Edit Block' : 'Block Time'}</Text>
+            {editingId && (
+              <TouchableOpacity onPress={resetForm}>
+                <Text className="text-gray-400 text-xs font-medium">Cancel edit</Text>
               </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+            )}
+          </View>
+          <Text className="text-gray-400 text-xs mb-4">Time you're unavailable — once, or on a repeating cadence.</Text>
 
-        {/* Start time */}
-        <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Start time</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1 mb-5">
-          {HOURS.map((h) => {
-            const active = h.value === startTime;
-            return (
-              <TouchableOpacity
-                key={h.value}
-                onPress={() => {
-                  setStartTime(h.value);
-                  // Push end time forward if needed
-                  const si = HOURS.findIndex((x) => x.value === h.value);
-                  const ei = HOURS.findIndex((x) => x.value === endTime);
-                  if (ei <= si) setEndTime(HOURS[Math.min(si + 2, HOURS.length - 1)].value);
-                }}
-                className={`mx-1 px-4 py-2 rounded-full border ${
-                  active ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'
-                }`}
-              >
-                <Text className={`text-sm font-medium ${active ? 'text-white' : 'text-gray-700'}`}>
-                  {h.label}
-                </Text>
+          <View className="flex-row flex-wrap gap-1.5 mb-4">
+            {(['once', 'daily', 'weekly', 'monthly'] as const).map((f) => (
+              <TouchableOpacity key={f} onPress={() => setFrequency(f)} className={chip(frequency === f)}>
+                <Text className={`${chipText(frequency === f)} capitalize`}>{f === 'once' ? 'One-time' : f}</Text>
               </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+            ))}
+          </View>
 
-        {/* End time */}
-        <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">End time</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1 mb-5">
-          {validEndHours.map((h) => {
-            const active = h.value === endTime;
-            return (
-              <TouchableOpacity
-                key={h.value}
-                onPress={() => setEndTime(h.value)}
-                className={`mx-1 px-4 py-2 rounded-full border ${
-                  active ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'
-                }`}
-              >
-                <Text className={`text-sm font-medium ${active ? 'text-white' : 'text-gray-700'}`}>
-                  {h.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+          {frequency === 'once' && (
+            <PickerField
+              label="Date"
+              placeholder="Pick a date"
+              value={{ id: date, label: dateLabel(DATES, date) }}
+              options={DATES}
+              onSelect={(o) => setDate(o.id)}
+            />
+          )}
 
-        {/* Block type */}
-        <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Type</Text>
-        <View className="flex-row gap-2 mb-5 flex-wrap">
-          {BLOCK_TYPES.map((t) => {
-            const active = t.value === blockType;
-            return (
-              <TouchableOpacity
-                key={t.value}
-                onPress={() => setBlockType(t.value)}
-                className={`px-4 py-2 rounded-full border ${
-                  active ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'
-                }`}
-              >
-                <Text className={`text-sm font-medium ${active ? 'text-white' : 'text-gray-700'}`}>
-                  {t.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+          {frequency === 'weekly' && (
+            <>
+              <Text className="text-gray-500 text-xs font-medium mb-2">Repeats on (pick one or more days)</Text>
+              <View className="flex-row flex-wrap gap-1.5 mb-4">
+                {DAY_SHORT.map((label, i) => (
+                  <TouchableOpacity key={i} onPress={() => toggleDay(i)} className={chip(weeklyDays.includes(i))}>
+                    <Text className={chipText(weeklyDays.includes(i))}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
 
-        {/* Reason */}
-        <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-          Reason <Text className="font-normal normal-case">(optional)</Text>
-        </Text>
-        <TextInput
-          value={reason}
-          onChangeText={setReason}
-          placeholder="e.g. Out of office, doctor's appointment…"
-          placeholderTextColor="#9ca3af"
-          className="bg-white border border-gray-200 rounded-2xl px-4 py-3 text-gray-900 text-sm mb-6"
-          multiline
-          numberOfLines={2}
-        />
+          {frequency === 'monthly' && (
+            <PickerField
+              label="Day of the month"
+              placeholder="Pick a day"
+              value={{ id: dayOfMonth, label: `Day ${dayOfMonth}` }}
+              options={Array.from({ length: 28 }, (_, i) => ({ id: String(i + 1), label: `Day ${i + 1}` }))}
+              onSelect={(o) => setDayOfMonth(o.id)}
+            />
+          )}
 
-        {/* Repeat */}
-        <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Repeat</Text>
+          <View className="flex-row gap-3">
+            <View className="flex-1">
+              <PickerField label="Start time" placeholder="Select" value={{ id: start, label: timeLabel(start) }}
+                options={TIME_OPTIONS} onSelect={(o) => setStart(o.id)} />
+            </View>
+            <View className="flex-1">
+              <PickerField label="End time" placeholder="Select" value={{ id: end, label: timeLabel(end) }}
+                options={TIME_OPTIONS} onSelect={(o) => setEnd(o.id)} />
+            </View>
+          </View>
+
+          {frequency !== 'once' && (
+            <>
+              <Text className="text-gray-500 text-xs font-medium mb-2">Ends</Text>
+              <View className="flex-row gap-1.5 mb-4">
+                {(['indefinite', 'date'] as const).map((opt) => (
+                  <TouchableOpacity key={opt} onPress={() => setEnds(opt)} className={chip(ends === opt)}>
+                    <Text className={chipText(ends === opt)}>{opt === 'indefinite' ? 'Indefinitely' : 'Through a date'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {ends === 'date' && (
+                <PickerField
+                  label="Through"
+                  placeholder="Pick the last date"
+                  value={endDate ? { id: endDate, label: dateLabel(END_DATES, endDate) } : null}
+                  options={END_DATES}
+                  onSelect={(o) => setEndDate(o.id)}
+                />
+              )}
+            </>
+          )}
+
           <TouchableOpacity
-            onPress={() => setRepeats((r) => !r)}
-            className={`px-3 py-1.5 rounded-full border ${repeats ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`}
+            onPress={() => save.mutate()}
+            disabled={save.isPending || needsDays || needsEndDate}
+            className={`rounded-xl py-3.5 items-center ${needsDays || needsEndDate ? 'bg-gray-300' : 'bg-gray-900'}`}
           >
-            <Text className={`text-xs font-medium ${repeats ? 'text-white' : 'text-gray-600'}`}>
-              {repeats ? 'On' : 'One-time'}
-            </Text>
+            {save.isPending ? <ActivityIndicator color="#fff" /> : (
+              <Text className="text-white font-semibold text-sm">
+                {needsDays ? 'Pick at least one day' : needsEndDate ? 'Pick an end date' : `${editingId ? 'Save' : 'Add'} — ${summary}`}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
-        {repeats && (
-          <View className="mb-5">
-            <View className="flex-row gap-2 mb-3">
-              {FREQUENCIES.map((f) => (
-                <TouchableOpacity
-                  key={f.value}
-                  onPress={() => setFrequency(f.value)}
-                  className={`px-4 py-2 rounded-full border ${frequency === f.value ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`}
-                >
-                  <Text className={`text-sm font-medium ${frequency === f.value ? 'text-white' : 'text-gray-700'}`}>{f.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {frequency === 'weekly' ? (
-              <>
-                <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                  Repeats on <Text className="font-normal normal-case">(pick one or more days)</Text>
-                </Text>
-                <View className="flex-row flex-wrap gap-1.5 mb-3">
-                  {DAY_SHORT.map((label, i) => {
-                    const active = weeklyDays.includes(i);
-                    return (
-                      <TouchableOpacity
-                        key={i}
-                        onPress={() => toggleWeeklyDay(i)}
-                        className={`px-4 py-2 rounded-full border ${active ? 'bg-primary-600 border-primary-600' : 'bg-white border-gray-200'}`}
-                      >
-                        <Text className={`text-sm font-medium ${active ? 'text-white' : 'text-gray-700'}`}>{label}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </>
-            ) : null}
-            <Text className="text-xs text-gray-400 mb-2">
-              {frequency === 'weekly'
-                ? weeklyDays.length === 0
-                  ? 'Pick at least one day above.'
-                  : `Repeats every week on ${weeklyDays.map((d) => DAY_LABELS[d]).join(', ')}.`
-                : frequency === 'monthly'
-                ? 'Repeats monthly on this date.'
-                : 'Repeats every day.'}
-            </Text>
-            <Text className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-              End date <Text className="font-normal normal-case">(optional — leave blank for a default range)</Text>
-            </Text>
-            <TextInput
-              value={endDate}
-              onChangeText={setEndDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#9ca3af"
-              className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900"
-            />
-          </View>
-        )}
-
-        {/* Summary + Submit */}
-        <View className="bg-primary-50 border border-primary-100 rounded-2xl p-4 mb-4">
-          <Text className="text-primary-800 text-sm font-semibold mb-1">Block summary</Text>
-          <Text className="text-primary-700 text-sm">
-            {repeats && frequency === 'weekly'
-              ? weeklyDays.length > 0
-                ? weeklyDays.map((d) => DAY_LABELS[d]).join(', ')
-                : 'No days selected'
-              : selectedLabel} · {startLabel} – {endLabel}
-            {repeats ? ` · repeats ${frequency}${endDate ? ` through ${endDate}` : ''}` : ''}
-          </Text>
-          <Text className="text-primary-500 text-xs mt-0.5 capitalize">{blockType}</Text>
+        <View className="bg-white rounded-2xl border border-gray-100 p-4">
+          {isLoading ? (
+            <ActivityIndicator color="#2563eb" />
+          ) : blocks.length === 0 ? (
+            <Text className="text-gray-400 text-sm">No upcoming blocks.</Text>
+          ) : (
+            <BlockList blocks={blocks} onEdit={startEdit} onRemove={(ids) => remove.mutate(ids)} />
+          )}
         </View>
-
-        <TouchableOpacity
-          onPress={() => createBlock.mutate()}
-          disabled={createBlock.isPending || (repeats && frequency === 'weekly' && weeklyDays.length === 0)}
-          className={`rounded-2xl py-4 items-center ${
-            repeats && frequency === 'weekly' && weeklyDays.length === 0 ? 'bg-gray-300' : 'bg-primary-600'
-          }`}
-        >
-          <Text className="text-white font-semibold text-base">
-            {createBlock.isPending
-              ? 'Saving…'
-              : repeats && frequency === 'weekly' && weeklyDays.length === 0
-              ? 'Pick at least one day'
-              : 'Block This Time'}
-          </Text>
-        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );

@@ -127,6 +127,9 @@ export const providersApi = {
   replaceAvailability: (id: string, windows: { dayOfWeek: number; startTime: string; endTime: string }[]) =>
     api.put(`/providers/${id}/availability`, { windows }).then((r) => r.data),
   getBlocks: (id: string) => api.get(`/providers/${id}/blocks`).then((r) => r.data),
+  // Provider's own blocks (Block Time screen) — list every upcoming block, remove one.
+  getSelfBlocks: () => api.get('/providers/self/blocks').then((r) => r.data),
+  deleteSelfBlock: (blockId: string) => api.delete(`/providers/self/blocks/${blockId}`).then((r) => r.data),
   create: (input: {
     practiceId: string;
     firstName: string;
