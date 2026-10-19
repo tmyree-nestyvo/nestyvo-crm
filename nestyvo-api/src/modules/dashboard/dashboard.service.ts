@@ -36,14 +36,19 @@ export class DashboardService {
     private fillCandidatesService: FillCandidatesService,
   ) {}
 
-  async getAgentDashboard(user: User, days = 30): Promise<any> {
-    const now = new Date();
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
-    const thirtyDaysOut = new Date(startOfToday);
-    thirtyDaysOut.setDate(thirtyDaysOut.getDate() + days);
+  async getAgentDashboard(
+    user: User,
+    days = 30,
+    window: { from?: string; to?: string; providerId?: string } = {},
+  ): Promise<any> {
+    // Charlene, Oct 16 2026 recording — the admin calendar stopped offering
+    // times after mid-November: it only ever asked for 30 days from today.
+    // The calendar now asks for the month on screen (from/to), anywhere up to
+    // 18 months out; the dashboard cards still use the rolling `days` window.
+    const { now, start: startOfToday, end: thirtyDaysOut } = slotWindow(days, window.from, window.to);
 
-    const providerIds = await this.getScopedProviderIds(user);
+    let providerIds = await this.getScopedProviderIds(user);
+    if (window.providerId) providerIds = providerIds.filter((id) => id === window.providerId);
 
     if (!providerIds.length) {
       return { totalOpenSlots: 0, openCallbacks: 0, openCancellations: 0, waitlistOpportunities: 0, providers: [] };
@@ -218,7 +223,7 @@ export class DashboardService {
     // be a fixed 30 days, so the provider's calendar went blank past that.
     // Callers can now ask for up to a year (default stays 30). The stats
     // below only ever use the 7-day weekSchedule, so they're unaffected.
-    const windowDays = Number.isFinite(scheduleDays) ? Math.min(Math.max(scheduleDays, 1), 366) : 30;
+    const windowDays = Number.isFinite(scheduleDays) ? Math.min(Math.max(scheduleDays, 1), MAX_DAYS_AHEAD) : 30;
     const thirtyDaysOut = new Date(startOfToday); thirtyDaysOut.setDate(thirtyDaysOut.getDate() + windowDays);
     const startOfWeek = new Date(startOfToday); startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
 
@@ -323,13 +328,13 @@ export class DashboardService {
   // Available Slots card drill-in (Sep 5 2026) — a real list/calendar of this
   // provider's own open slots, day-range toggle (7/14/30). Previously the
   // card had no onPress at all.
-  async getProviderAvailableSlots(user: User, days = 30): Promise<any> {
+  async getProviderAvailableSlots(user: User, days = 30, from?: string, to?: string): Promise<any> {
     const provider = await this.providerRepo.findOne({ where: { userId: user.id } });
     if (!provider) return { totalSlots: 0, slotsByDate: [] };
 
-    const now = new Date();
-    const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
-    const daysOut = new Date(startOfToday); daysOut.setDate(daysOut.getDate() + days);
+    // Same month-on-screen window as the admin calendar (Oct 16 2026) — the
+    // provider calendar used to stop 90 days out (mid-January).
+    const { now, start: startOfToday, end: daysOut } = slotWindow(days, from, to);
 
     const [availability, booked, ownBlocks, externalBlocks] = await Promise.all([
       this.availabilityRepo.find({ where: { providerId: provider.id, isActive: true } }),
@@ -710,6 +715,40 @@ export class DashboardService {
 
     return { periodLabel, providers: providerStats, summary };
   }
+}
+
+// How far ahead anyone can see and book open times (Charlene, Oct 16 2026:
+// "at least 12 to 18 months"), and the most one request can cover so a
+// month view never asks for a year of slots at once.
+export const MAX_DAYS_AHEAD = 548;
+const MAX_SPAN_DAYS = 100;
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The date range to compute open slots for. With `from` (YYYY-MM-DD), the
+ * range is from..to inclusive — what a calendar month view asks for; without
+ * it, the rolling `days` from today. Never before today, never more than
+ * MAX_DAYS_AHEAD out. Dates are server-local midnights, same as before.
+ */
+export function slotWindow(days: number, from?: string, to?: string, now = new Date()) {
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const horizon = new Date(startOfToday);
+  horizon.setDate(horizon.getDate() + MAX_DAYS_AHEAD);
+  const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+
+  let start = startOfToday;
+  let end = addDays(startOfToday, Math.min(Math.max(days || 30, 1), MAX_DAYS_AHEAD));
+  if (from && DATE_ONLY.test(from)) {
+    const f = new Date(`${from}T00:00:00`);
+    if (!Number.isNaN(f.getTime())) start = f > startOfToday ? f : startOfToday;
+    const t = to && DATE_ONLY.test(to) ? new Date(`${to}T00:00:00`) : null;
+    end = t && !Number.isNaN(t.getTime()) ? addDays(t, 1) : addDays(start, 42);
+    if (end > addDays(start, MAX_SPAN_DAYS)) end = addDays(start, MAX_SPAN_DAYS);
+  }
+  if (end > horizon) end = horizon;
+  if (end < start) end = start;
+  return { now, start, end };
 }
 
 // Build 50-min open slots for each day in the range, grouped by date

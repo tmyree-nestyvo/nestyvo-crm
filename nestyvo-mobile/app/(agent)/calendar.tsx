@@ -9,6 +9,7 @@ import { api, providersApi } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
 import { AppointmentCard } from '../../components/dashboard/AppointmentCard';
 import { NoticeBanner, rescheduledNotice, dayOf } from '../../components/NoticeBanner';
+import { monthSlotRange } from '../../lib/slotRange';
 
 // ── Data ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,21 @@ function useBookedAppointments(providerId: string, date: string) {
     queryKey: ['provider-schedule', providerId, date],
     queryFn: () => providersApi.getSchedule(providerId, date),
     enabled: !!providerId,
+  });
+}
+
+// Charlene, Oct 16 2026 recording — the calendar "stops after November
+// 13th": open times came from the dashboard's 30-days-from-today window.
+// Now the active provider's open times are fetched for the month on screen,
+// anywhere up to 18 months out (see lib/slotRange.ts).
+function useMonthSlots(providerId: string, year: number, month: number, selectedDate: string) {
+  const { from, to } = monthSlotRange(year, month, selectedDate);
+  return useQuery({
+    queryKey: ['agent-dashboard', 'month-slots', providerId, from, to],
+    queryFn: () => api.get('/dashboard/agent', { params: { providerId, from, to } }).then((r) => r.data),
+    enabled: !!providerId,
+    staleTime: 60_000,
+    placeholderData: (prev: any) => (prev?.providers?.[0]?.id === providerId ? prev : undefined),
   });
 }
 
@@ -244,16 +260,19 @@ export default function CalendarScreen() {
 
   const { data: bookedForDay = [], isLoading: bookedLoading } = useBookedAppointments(activeProviderId, selectedDate);
 
+  const { data: monthData } = useMonthSlots(activeProviderId, year, month, selectedDate);
+  const monthProvider = monthData?.providers?.find((p: any) => p.id === activeProviderId);
+
   // Build a map: date → slot array for the active provider
   const slotsMap = useMemo<Record<string, any[]>>(() => {
-    const provider = providers.find((p) => p.id === activeProviderId);
+    const provider = monthProvider;
     if (!provider?.slotsByDate) return {};
     const map: Record<string, any[]> = {};
     for (const day of provider.slotsByDate) {
       map[day.date] = day.slots;
     }
     return map;
-  }, [providers, activeProviderId]);
+  }, [monthProvider]);
 
   // Slots for the currently selected date
   const selectedSlots: any[] = slotsMap[selectedDate] ?? [];
@@ -265,7 +284,7 @@ export default function CalendarScreen() {
   // used to look identical to a day the provider just doesn't work, since
   // only slot data drove the dots. activeDates (booked appts + blocks,
   // from the dashboard response) fills that gap without touching slot math.
-  const activeDatesSet = useMemo(() => new Set<string>(selectedProvider?.activeDates ?? []), [selectedProvider]);
+  const activeDatesSet = useMemo(() => new Set<string>(monthProvider?.activeDates ?? []), [monthProvider]);
 
   // Month navigation
   const prevMonth = () => {

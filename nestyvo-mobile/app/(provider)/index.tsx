@@ -7,6 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useAuthStore } from '../../lib/store';
 import { hasRole, ADMIN_ONLY } from '../../lib/role-groups';
 import { api } from '../../lib/api';
+import { monthSlotRange, maxBookableDate } from '../../lib/slotRange';
 import { AppointmentCard } from '../../components/dashboard/AppointmentCard';
 import { StatCard } from '../../components/dashboard/StatCard';
 import { MonthCalendarGrid } from '../../components/MonthCalendarGrid';
@@ -14,7 +15,7 @@ import { NoticeBanner } from '../../components/NoticeBanner';
 import { signOut } from '../../lib/auth';
 
 const TZ = 'America/Los_Angeles';
-const SCHEDULE_DAYS = 365;
+const SCHEDULE_DAYS = 548; // 18 months (Charlene, Oct 16 2026)
 
 function useProviderDashboard() {
   return useQuery({
@@ -41,11 +42,15 @@ function useProviderDashboard() {
 // (GET /dashboard/provider/available-slots), fetched here so the open
 // times for the selected date render directly inline, same as the
 // admin's Available Slots screen.
-function useProviderAvailableSlots() {
+// Oct 16 2026 recording: this used to load 90 days from today, so open times
+// stopped in mid-January. Now it loads the month on screen, up to 18 months out.
+function useProviderAvailableSlots(year: number, month: number, selectedDate: string) {
+  const { from, to } = monthSlotRange(year, month, selectedDate);
   return useQuery({
-    queryKey: ['provider-available-slots', 90],
-    queryFn: () => api.get('/dashboard/provider/available-slots', { params: { days: 90 } }).then((r) => r.data),
+    queryKey: ['provider-available-slots', 'month', from, to],
+    queryFn: () => api.get('/dashboard/provider/available-slots', { params: { from, to } }).then((r) => r.data),
     staleTime: 60_000,
+    placeholderData: (prev: any) => prev,
   });
 }
 function fmtSlotTime(iso: string) {
@@ -84,14 +89,14 @@ export default function ProviderScheduleScreen() {
     setMonth(Number(dateParam.slice(5, 7)) - 1);
   }, [dateParam]);
   const { data, isLoading, isError, error, refetch, isRefetching } = useProviderDashboard();
-  const { data: slotsData, isLoading: slotsLoading } = useProviderAvailableSlots();
+  const { data: slotsData, isLoading: slotsLoading } = useProviderAvailableSlots(year, month, selectedDate);
   const { width } = useWindowDimensions();
   const wide = width >= 900;
   const openDates = useMemo(
     () => new Set<string>((slotsData?.slotsByDate ?? []).filter((d: any) => d.slots?.length).map((d: any) => d.date)),
     [slotsData],
   );
-  const windowEnd = isoDate(new Date(Date.now() + 90 * 86400000));
+  const windowEnd = maxBookableDate();
   const noProviderAccount = isError && (error as any)?.response?.status === 403;
 
   const daySlots: { startAt: string; endAt: string }[] =

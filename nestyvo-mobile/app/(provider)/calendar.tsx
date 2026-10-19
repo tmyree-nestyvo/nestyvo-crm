@@ -16,7 +16,7 @@ import { NoticeBanner } from '../../components/NoticeBanner';
 // 2026), so this view is forward-looking only, no history.
 
 const TZ = 'America/Los_Angeles';
-const SCHEDULE_DAYS = 365;
+const SCHEDULE_DAYS = 548; // 18 months (Charlene, Oct 16 2026)
 
 function useProviderDashboard() {
   return useQuery({

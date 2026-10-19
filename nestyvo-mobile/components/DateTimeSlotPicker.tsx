@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Modal } fr
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { monthSlotRange, MAX_DAYS_AHEAD } from '../lib/slotRange';
 
 // Charlene, Oct 9-10 2026 (second recording): "imagine a maybe an iPhone
 // calendar here... you can just see a block of the month and select what
@@ -67,7 +68,7 @@ export function DateTimeSlotPicker({
   onSelect,
   label = 'Date & time',
   placeholder = 'Pick a date & time',
-  daysWindow = 90,
+  daysWindow = MAX_DAYS_AHEAD,
   initialDate,
 }: {
   /** Currently chosen start time, as an ISO instant, or null/undefined if nothing picked yet. */
@@ -84,10 +85,13 @@ export function DateTimeSlotPicker({
   const [viewMonth, setViewMonth] = useState<{ y: number; m0: number } | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
+  // Loads the month being shown, not one long window from today (Oct 16
+  // 2026 — open times used to stop 90 days out).
+  const range = viewMonth ? monthSlotRange(viewMonth.y, viewMonth.m0, selectedDate) : null;
   const { data, isLoading } = useQuery({
-    queryKey: ['provider-available-slots-picker', daysWindow],
-    queryFn: () => api.get('/dashboard/provider/available-slots', { params: { days: daysWindow } }).then((r) => r.data),
-    enabled: open,
+    queryKey: ['provider-available-slots-picker', range?.from, range?.to],
+    queryFn: () => api.get('/dashboard/provider/available-slots', { params: range! }).then((r) => r.data),
+    enabled: open && !!range,
     staleTime: 30_000,
   });
 
