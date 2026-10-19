@@ -172,10 +172,10 @@ export class DashboardService {
       // entry) — a booking at 11pm PT must land on today, not tomorrow UTC.
       const activeDates = new Set<string>();
       for (const a of booked) {
-        activeDates.add(new Date(a.startAt).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }));
+        activeDates.add(PT_DAY.format(new Date(a.startAt)));
       }
       for (const b of blocks) {
-        activeDates.add(new Date(b.startAt).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }));
+        activeDates.add(PT_DAY.format(new Date(b.startAt)));
       }
 
       return {
@@ -751,6 +751,13 @@ export function slotWindow(days: number, from?: string, to?: string, now = new D
   return { now, start, end };
 }
 
+// Load test, Oct 19 2026: with 50 providers the agent dashboard took ~3 s,
+// mostly building a new date formatter for every appointment and every day
+// (toLocaleDateString with options creates one each call). One shared
+// formatter each gives the same strings.
+const PT_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' });
+const DAY_LABEL = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
 // Build 50-min open slots for each day in the range, grouped by date
 function computeSlotsByDate(
   providerId: string,
@@ -767,6 +774,10 @@ function computeSlotsByDate(
 ): { date: string; dateLabel: string; slots: { startAt: string; endAt: string; durationMin: number }[] }[] {
   const results: ReturnType<typeof computeSlotsByDate> = [];
   const cursor = new Date(start);
+  // Compared as numbers, so each slot doesn't build two Dates per appointment.
+  const bookedSpans = booked.map((a) => [new Date(a.startAt).getTime(), new Date(a.endAt).getTime()]);
+  const blockSpans = blocks.map((b) => [new Date(b.startAt).getTime(), new Date(b.endAt).getTime()]);
+  const nowMs = now.getTime();
 
   while (cursor < end) {
     const dow = cursor.getDay();
@@ -783,9 +794,11 @@ function computeSlotsByDate(
 
       while (slotStart.getTime() + slotMin * 60_000 <= windowEnd.getTime()) {
         const slotEnd = new Date(slotStart.getTime() + slotMin * 60_000);
-        const isBooked = booked.some((a) => slotStart < new Date(a.endAt) && slotEnd > new Date(a.startAt));
-        const isBlocked = blocks.some((b) => slotStart < b.endAt && slotEnd > b.startAt);
-        const isPast = slotEnd <= now;
+        const s0 = slotStart.getTime();
+        const s1 = slotEnd.getTime();
+        const isBooked = bookedSpans.some(([a0, a1]) => s0 < a1 && s1 > a0);
+        const isBlocked = blockSpans.some(([b0, b1]) => s0 < b1 && s1 > b0);
+        const isPast = s1 <= nowMs;
 
         if (!isBooked && !isBlocked && !isPast) {
           slots.push({ startAt: slotStart.toISOString(), endAt: slotEnd.toISOString(), durationMin: slotMin });
@@ -810,5 +823,5 @@ function makeDateLabel(date: Date, now: Date): string {
   const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
   if (date.toDateString() === today.toDateString()) return 'Today';
   if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  return DAY_LABEL.format(date);
 }
