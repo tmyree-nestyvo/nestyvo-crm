@@ -7,7 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useAuthStore } from '../../lib/store';
 import { hasRole, ADMIN_ONLY } from '../../lib/role-groups';
 import { api } from '../../lib/api';
-import { monthSlotRange, maxBookableDate } from '../../lib/slotRange';
+import { monthSlotRange, maxBookableDate, isOutside, mergeSlotDays } from '../../lib/slotRange';
 import { AppointmentCard } from '../../components/dashboard/AppointmentCard';
 import { StatCard } from '../../components/dashboard/StatCard';
 import { MonthCalendarGrid } from '../../components/MonthCalendarGrid';
@@ -45,13 +45,25 @@ function useProviderDashboard() {
 // Oct 16 2026 recording: this used to load 90 days from today, so open times
 // stopped in mid-January. Now it loads the month on screen, up to 18 months out.
 function useProviderAvailableSlots(year: number, month: number, selectedDate: string) {
-  const { from, to } = monthSlotRange(year, month, selectedDate);
-  return useQuery({
-    queryKey: ['provider-available-slots', 'month', from, to],
-    queryFn: () => api.get('/dashboard/provider/available-slots', { params: { from, to } }).then((r) => r.data),
+  const range = monthSlotRange(year, month);
+  const outside = isOutside(range, selectedDate);
+  const fetchRange = (from: string, to: string) =>
+    api.get('/dashboard/provider/available-slots', { params: { from, to } }).then((r) => r.data);
+  const monthQ = useQuery({
+    queryKey: ['provider-available-slots', 'month', range.from, range.to],
+    queryFn: () => fetchRange(range.from, range.to),
     staleTime: 60_000,
     placeholderData: (prev: any) => prev,
   });
+  // The selected day, when it isn't in the month on screen.
+  const dayQ = useQuery({
+    queryKey: ['provider-available-slots', 'day', selectedDate],
+    queryFn: () => fetchRange(selectedDate, selectedDate),
+    enabled: outside,
+    staleTime: 60_000,
+  });
+  const data = useMemo(() => mergeSlotDays(monthQ.data, outside ? dayQ.data : null), [monthQ.data, dayQ.data, outside]);
+  return { data, isLoading: monthQ.isLoading || (outside && dayQ.isLoading) };
 }
 function fmtSlotTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: TZ });

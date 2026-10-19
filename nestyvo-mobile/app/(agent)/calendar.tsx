@@ -9,7 +9,7 @@ import { api, providersApi } from '../../lib/api';
 import { HomeButton } from '../../components/HomeButton';
 import { AppointmentCard } from '../../components/dashboard/AppointmentCard';
 import { NoticeBanner, rescheduledNotice, dayOf } from '../../components/NoticeBanner';
-import { monthSlotRange } from '../../lib/slotRange';
+import { monthSlotRange, isOutside, mergeSlotDays } from '../../lib/slotRange';
 
 // ── Data ────────────────────────────────────────────────────────────────────
 
@@ -39,14 +39,26 @@ function useBookedAppointments(providerId: string, date: string) {
 // Now the active provider's open times are fetched for the month on screen,
 // anywhere up to 18 months out (see lib/slotRange.ts).
 function useMonthSlots(providerId: string, year: number, month: number, selectedDate: string) {
-  const { from, to } = monthSlotRange(year, month, selectedDate);
-  return useQuery({
-    queryKey: ['agent-dashboard', 'month-slots', providerId, from, to],
-    queryFn: () => api.get('/dashboard/agent', { params: { providerId, from, to } }).then((r) => r.data),
+  const range = monthSlotRange(year, month);
+  const outside = isOutside(range, selectedDate);
+  const fetchRange = (from: string, to: string) =>
+    api.get('/dashboard/agent', { params: { providerId, from, to } })
+      .then((r) => r.data?.providers?.find((p: any) => p.id === providerId) ?? null);
+  const monthQ = useQuery({
+    queryKey: ['agent-dashboard', 'month-slots', providerId, range.from, range.to],
+    queryFn: () => fetchRange(range.from, range.to),
     enabled: !!providerId,
     staleTime: 60_000,
-    placeholderData: (prev: any) => (prev?.providers?.[0]?.id === providerId ? prev : undefined),
+    placeholderData: (prev: any) => (prev?.id === providerId ? prev : undefined),
   });
+  // The selected day, when it isn't in the month on screen.
+  const dayQ = useQuery({
+    queryKey: ['agent-dashboard', 'day-slots', providerId, selectedDate],
+    queryFn: () => fetchRange(selectedDate, selectedDate),
+    enabled: !!providerId && outside,
+    staleTime: 60_000,
+  });
+  return useMemo(() => mergeSlotDays(monthQ.data, outside ? dayQ.data : null), [monthQ.data, dayQ.data, outside]);
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -260,8 +272,7 @@ export default function CalendarScreen() {
 
   const { data: bookedForDay = [], isLoading: bookedLoading } = useBookedAppointments(activeProviderId, selectedDate);
 
-  const { data: monthData } = useMonthSlots(activeProviderId, year, month, selectedDate);
-  const monthProvider = monthData?.providers?.find((p: any) => p.id === activeProviderId);
+  const monthProvider = useMonthSlots(activeProviderId, year, month, selectedDate);
 
   // Build a map: date → slot array for the active provider
   const slotsMap = useMemo<Record<string, any[]>>(() => {

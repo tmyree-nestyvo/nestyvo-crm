@@ -10,14 +10,29 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 /**
  * The month on screen plus a week either side (grid rows that spill into the
- * neighbouring months), stretched to include `selectedDate` if it's outside.
+ * neighbouring months). A selected day outside it is fetched on its own (see
+ * isOutside) rather than stretching this range, which the API caps at 100 days.
  */
-export function monthSlotRange(year: number, month0: number, selectedDate?: string | null) {
-  let from = iso(new Date(Date.UTC(year, month0, 1 - 7)));
-  let to = iso(new Date(Date.UTC(year, month0 + 1, 7)));
-  if (selectedDate && selectedDate < from) from = selectedDate;
-  if (selectedDate && selectedDate > to) to = selectedDate;
-  return { from, to };
+export function monthSlotRange(year: number, month0: number) {
+  return {
+    from: iso(new Date(Date.UTC(year, month0, 1 - 7))),
+    to: iso(new Date(Date.UTC(year, month0 + 1, 7))),
+  };
+}
+
+export const isOutside = (range: { from: string; to: string }, date: string) => date < range.from || date > range.to;
+
+type DaySlots = { date: string; slots: any[] };
+/** Combine the month's open days with a separately fetched selected day. */
+export function mergeSlotDays<T extends { slotsByDate?: DaySlots[]; activeDates?: string[] }>(month?: T | null, day?: T | null): T | undefined {
+  if (!month) return day ?? undefined;
+  if (!day) return month;
+  const seen = new Set((month.slotsByDate ?? []).map((d) => d.date));
+  return {
+    ...month,
+    slotsByDate: [...(month.slotsByDate ?? []), ...(day.slotsByDate ?? []).filter((d) => !seen.has(d.date))],
+    activeDates: Array.from(new Set([...(month.activeDates ?? []), ...(day.activeDates ?? [])])),
+  };
 }
 
 /** The last bookable date (YYYY-MM-DD) in Pacific time. */

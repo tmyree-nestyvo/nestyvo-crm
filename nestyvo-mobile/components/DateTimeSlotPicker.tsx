@@ -87,7 +87,7 @@ export function DateTimeSlotPicker({
 
   // Loads the month being shown, not one long window from today (Oct 16
   // 2026 — open times used to stop 90 days out).
-  const range = viewMonth ? monthSlotRange(viewMonth.y, viewMonth.m0, selectedDate) : null;
+  const range = viewMonth ? monthSlotRange(viewMonth.y, viewMonth.m0) : null;
   const { data, isLoading } = useQuery({
     queryKey: ['provider-available-slots-picker', range?.from, range?.to],
     queryFn: () => api.get('/dashboard/provider/available-slots', { params: range! }).then((r) => r.data),
